@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
 <meta name="description" content="화물 운행과 받을 돈을 한눈에 보는 개인 장부">
 <title>아빠장부</title>
+<script>try{var z=localStorage.getItem('textSize');if(z)document.documentElement.setAttribute('data-text',z)}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -60,7 +61,37 @@ header.top h1{margin:0;font-size:22px;font-weight:700}
 .stats div{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
 .stats span{font-size:14px;color:var(--muted)}
 .stats b{font-size:18px}
-.c-paid{color:var(--paid)} .c-due{color:var(--late)}
+.c-paid{color:var(--paid)} .c-due{color:var(--late)} .c-cost{color:var(--due)}
+.stats2{grid-template-columns:repeat(2,1fr)}
+/* 글씨 크기 (설정): 화면 전체를 비율로 키움 */
+html[data-text="l"] body{zoom:1.12}
+html[data-text="xl"] body{zoom:1.25}
+html[data-text] .monthnav{gap:4px}
+html[data-text] .monthnav button{padding:8px 8px;flex:none}
+html[data-text] .monthnav .picker{flex:1;min-width:0;padding-inline:6px}
+html[data-text="xl"] .monthnav .picker{font-size:15px}
+/* 지출 */
+.seg.kind{grid-template-columns:repeat(2,1fr)}
+.flabel{font-weight:600;font-size:16px}
+.flabel em{color:var(--late);font-style:normal}
+.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.catgrid button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 2px;font-size:15px;font-weight:600;color:var(--fg)}
+.catgrid button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.cf-recent{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.cf-recent:empty{display:none}
+.cf-recent b{color:var(--fg);font-weight:600}
+.costhead{display:flex;align-items:baseline;justify-content:space-between;margin:10px 2px -4px}
+.costhead h2{margin:0;font-size:18px}
+.costhead b{font-size:18px}
+.catsum{display:flex;flex-wrap:wrap;gap:6px}
+.catsum:empty{display:none}
+.catsum span{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:14px}
+.crow .chead{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;cursor:pointer}
+.crow .cat{font-weight:700;font-size:17px}
+.crow .cmemo{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.crow .camt{font-size:18px;color:var(--due);text-align:right}
+.crow .cdate{grid-column:1/-1;font-size:14px;color:var(--muted)}
+.crow.open .cmemo{white-space:normal}
 
 /* list */
 .list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -372,15 +403,24 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
       <div><span>못 받은 돈</span><b class="num c-due" id="l-due"></b></div>
     </div>
+    <div class="stats stats2">
+      <div><span id="l-costlabel">지출</span><b class="num c-cost" id="l-cost"></b></div>
+      <div><span>순수익</span><b class="num" id="l-net"></b></div>
+    </div>
     <div class="seg" id="l-seg" role="group" aria-label="장부 보기 설정"></div>
     <input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기">
     <div class="list" id="l-list"></div>
+    <div class="costhead"><h2>이 달 지출</h2><b class="num c-cost" id="l-costsum"></b></div>
+    <div class="catsum" id="l-catsum"></div>
+    <div class="list" id="l-costs"></div>
+    <button type="button" class="btn ghost" id="l-addcost">+ 지출 적기</button>
     <button type="button" class="btn ghost" id="l-csv">이 달 장부를 엑셀 파일로 보내기</button>
   </section>
 
   <!-- 입력 -->
   <section class="view" id="v-add" hidden>
     <header class="top form-top"><h1 id="f-title">운행 등록</h1><button type="button" class="btn ghost small" id="f-cancel" hidden>수정 취소</button></header>
+    <div class="seg kind" id="f-kind" role="group" aria-label="무엇을 적을까요"><button type="button" data-fkind="trip" aria-pressed="true">운행 기록</button><button type="button" data-fkind="cost" aria-pressed="false">지출 기록</button></div>
     <p class="notice draftnote" id="f-draft" hidden><span id="f-draftmsg"></span><button type="button" class="linkbtn" id="f-discard">지우고 새로 쓰기</button></p>
     <form class="form" id="f" novalidate>
       <div class="field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
@@ -408,12 +448,37 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="err" id="f-err" role="alert"></div>
       <button class="btn" type="submit" id="f-submit" style="padding:14px;font-size:18px">저장</button>
     </form>
+    <!-- 지출: 기름값·통행료 등 → 장부에서 순수익 계산 -->
+    <form class="form" id="cf" novalidate hidden>
+      <div class="field"><label for="cf-date">날짜 <em>*</em></label><input type="date" id="cf-date"></div>
+      <div class="field"><span class="flabel">항목 <em>*</em></span>
+        <div class="catgrid" id="cf-cat" role="group" aria-label="지출 항목">
+          <button type="button" data-cat="주유" aria-pressed="false">주유</button>
+          <button type="button" data-cat="요소수" aria-pressed="false">요소수</button>
+          <button type="button" data-cat="통행료" aria-pressed="false">통행료</button>
+          <button type="button" data-cat="수리·정비" aria-pressed="false">수리·정비</button>
+          <button type="button" data-cat="타이어" aria-pressed="false">타이어</button>
+          <button type="button" data-cat="보험·세금" aria-pressed="false">보험·세금</button>
+          <button type="button" data-cat="식비" aria-pressed="false">식비</button>
+          <button type="button" data-cat="기타" aria-pressed="false">기타</button>
+        </div></div>
+      <div class="field"><label for="cf-amt">금액 (원) <em>*</em></label>
+        <input type="text" id="cf-amt" inputmode="numeric" placeholder="예: 80,000">
+        <div class="quick"><button type="button" data-cadd="10000">+1만</button><button type="button" data-cadd="50000">+5만</button><button type="button" data-cadd="100000">+10만</button><button type="button" data-cadd="0">지우기</button></div></div>
+      <div class="field"><label for="cf-memo">메모</label><input type="text" id="cf-memo" placeholder="예: 평택 휴게소, 엔진오일 교환"></div>
+      <div class="err" id="cf-err" role="alert"></div>
+      <button class="btn" type="submit" id="cf-submit" style="padding:14px;font-size:18px">지출 저장</button>
+      <div class="cf-recent" id="cf-recent"></div>
+    </form>
   </section>
 
   <!-- 설정·백업 -->
   <section class="view" id="v-set" hidden>
     <header class="top"><h1>설정 · 백업</h1></header>
     <div class="card"><h2>클라우드 저장</h2><div id="s-cloud"></div></div>
+    <div class="card"><h2>글씨 크기</h2>
+      <div class="seg" id="s-text" role="group" aria-label="글씨 크기"><button type="button" data-tsize="" aria-pressed="true">보통</button><button type="button" data-tsize="l" aria-pressed="false">크게</button><button type="button" data-tsize="xl" aria-pressed="false">아주 크게</button></div>
+    </div>
     <div class="card"><h2>백업 파일</h2>
       <p class="hint">휴대폰을 바꾸거나 초기화할 때를 대비해 가끔 백업 파일을 만들어 두세요. 카톡 "나와의 채팅"이나 구글 드라이브로 보내 두면 안전해요.</p>
       <p class="lastbk" id="s-lastbk"></p>

@@ -89,16 +89,17 @@ const DB={
   })},
 };
 
-// 모든 기록(삭제 표시 포함)은 store, 화면에 쓰는 살아있는 기록은 trips
+// 모든 기록(삭제 표시 포함)은 store, 화면에 쓰는 살아있는 운행은 trips, 지출(kind:'cost')은 costs
+// 지출도 같은 저장소·클라우드(trips 컬렉션)에 함께 넣어 동기화·백업을 그대로 씀
 const store=new Map();
-let trips=[];
-function rebuild(){trips=[...store.values()].filter(t=>!t.deleted)}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo'];
+let trips=[], costs=[];
+function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>t.kind!=='cost');costs=live.filter(t=>t.kind==='cost')}
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),paid:r.paid?String(r.paid):null};
   STR.forEach(k=>t[k]=r[k]==null?'':String(r[k]));
-  if(!t.payType)t.payType='인수증';
+  if(!t.payType&&t.kind!=='cost')t.payType='인수증';
   return t;
 }
 function validRecord(r){return r&&r.id&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)}
@@ -171,10 +172,11 @@ function rowHtml(t,mode){
   if(payingId===t.id){
     act=`<div class="act"><div class="payline"><label for="pd-${t.id}" style="font-size:15px;font-weight:600">입금일</label><input type="date" id="pd-${t.id}" value="${todayIso}"><button class="btn small" data-do="paycfm" data-id="${t.id}">입금 확인</button><button class="btn ghost small" data-do="paycancel">취소</button></div></div>`;
   } else if(mode==='unpaid'){
-    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>`:''}</div>`;
+    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button><button class="btn ghost small" data-do="again" data-id="${t.id}">또 등록</button>`:''}</div>`;
   } else if(open){
     act=`<div class="act">
       <button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>
+      <button class="btn ghost small" data-do="again" data-id="${t.id}">또 등록</button>
       ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>`}
       ${deletingId===t.id?`<button class="btn danger small" data-do="delcfm" data-id="${t.id}">정말 삭제</button><button class="btn ghost small" data-do="delcancel">취소</button>`:`<button class="btn ghost small" data-do="del" data-id="${t.id}">삭제</button>`}</div>`;
   }
@@ -256,7 +258,8 @@ function renderCal(){
   $('c-grid').innerHTML=h;
   const ts=trips.filter(t=>t.date===calSel).sort(byOld);
   const sum=ts.reduce((s,t)=>s+t.amount,0);
-  $('c-daytitle').textContent=`${md(calSel)} 운행 ${ts.length}건`+(ts.length?` · ${won(sum)}`:'');
+  const dcost=costs.filter(c=>c.date===calSel).reduce((s,c)=>s+c.amount,0);
+  $('c-daytitle').textContent=`${md(calSel)} 운행 ${ts.length}건`+(ts.length?` · ${won(sum)}`:'')+(dcost?` · 지출 ${won(dcost)}`:'');
   $('c-seg').hidden=!ts.length;
   $('c-seg').innerHTML=segHtml('cal',ts,calFilter);
   const shown=ts.filter(t=>pass(t,calFilter));
@@ -275,6 +278,26 @@ function renderLedger(){
   $('l-seg').innerHTML=segHtml('led',found,ledFilter);
   const list=found.filter(t=>pass(t,ledFilter)).sort(byNew);
   $('l-list').innerHTML=list.length?list.map(t=>rowHtml(t,'ledger')).join(''):`<div class="empty">${q?'찾는 기록이 없어요.':'이 달은 '+EMPTY[ledFilter]}</div>`;
+  // 지출 · 순수익 (순수익 = 총 운임 − 수수료 − 지출)
+  const mc=monthCosts(ledY,ledM), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-csum;
+  $('l-costlabel').textContent=fees?'수수료·지출':'지출';
+  $('l-cost').textContent=short(fees+csum);
+  $('l-net').textContent=(net<0?'-':'')+short(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
+  $('l-costsum').textContent=won(csum);
+  const byCat={};mc.forEach(c=>byCat[c.cat||'기타']=(byCat[c.cat||'기타']||0)+c.amount);
+  $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
+  const cshown=mc.filter(c=>!q||[c.cat,c.memo].join(' ').toLowerCase().includes(q)).sort(byNew);
+  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">${q&&mc.length?'찾는 지출이 없어요.':'이 달은 적은 지출이 없어요.'}</div>`;
+}
+function monthCosts(y,m){const p=`${y}-${pad(m+1)}`;return costs.filter(c=>c.date.startsWith(p))}
+let costOpen=null, costDel=null;
+function costRowHtml(c){
+  const open=costOpen===c.id;
+  const act=!open?'':`<div class="act"><button type="button" class="btn ghost small" data-do="cedit" data-id="${c.id}">수정</button>`
+    +(costDel===c.id?`<button type="button" class="btn danger small" data-do="cdelcfm" data-id="${c.id}">정말 삭제</button><button type="button" class="btn ghost small" data-do="cdelcancel">취소</button>`
+      :`<button type="button" class="btn ghost small" data-do="cdel" data-id="${c.id}">삭제</button>`)+`</div>`;
+  return `<div class="row crow${open?' open':''}"><div class="chead" data-do="copen" data-id="${c.id}" role="button" tabindex="0" aria-expanded="${open}">`
+    +`<span class="cat">${esc(c.cat||'기타')}</span><span class="cmemo">${esc(c.memo)}</span><b class="num camt">${comma(c.amount)}</b><span class="cdate num">${md(c.date)}</span></div>${act}</div>`;
 }
 
 // ---------- 등록 ----------
@@ -318,6 +341,7 @@ function renderSettings(){
   $('s-stats').innerHTML=trips.length
     ?`운행 기록 <b class="num">${comma(trips.length)}건</b> (${md(dates[0])}/${dates[0].slice(2,4)} ~ ${md(dates[dates.length-1])}/${dates[dates.length-1].slice(2,4)})<br>못 받은 돈 <b class="num c-due">${comma(due.length)}건 · ${won(due.reduce((s,t)=>s+t.amount,0))}</b>`
     :'아직 운행 기록이 없어요.';
+  if(costs.length)$('s-stats').innerHTML+=`<br>지출 기록 <b class="num">${comma(costs.length)}건</b>`;
   // 자동 저장 현황: 기록을 저장·수정·삭제할 때마다 휴대폰과 클라우드에 바로 저장됨
   const n=k=>Number(ls.get(k))||0, lLocal=n('lastLocalSave'), lErr=n('localSaveErr'), lCloud=n('lastCloudSave')||Cloud.lastSync||0;
   const ok=(t,s)=>`<span class="c-paid">✓</span> <b>${t}</b> ${s}`, bad=(t,s)=>`<span class="c-due">!</span> <b>${t}</b> ${s}`;
@@ -355,15 +379,22 @@ async function doBackup(share){
   toast(r==='shared'?'백업 파일을 보냈어요':'백업 파일을 휴대폰 "다운로드" 폴더에 저장했어요');
   render();
 }
-function csvText(list){
+function csvText(list,costList){
   const head=['상차일','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','메모'];
   const q=v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const rows=list.sort(byOld).map(t=>[t.date,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.memo]);
-  return '﻿'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n');
+  const out=[head,...rows];
+  // 아래에 지출 표와 합계(순수익)를 이어 붙임
+  if(costList){
+    const cl=[...costList].sort(byOld), sum=list.reduce((s,t)=>s+t.amount,0), fees=list.reduce((s,t)=>s+(t.fee||0),0), cs=cl.reduce((s,c)=>s+c.amount,0);
+    if(cl.length)out.push([],['지출일','항목','금액','메모'],...cl.map(c=>[c.date,c.cat,c.amount,c.memo]));
+    out.push([],['합계'],['총 운임',sum],['수수료',fees],['지출',cs],['순수익',sum-fees-cs]);
+  }
+  return '﻿'+out.map(r=>r.map(q).join(',')).join('\r\n');
 }
-async function doCsv(list,name){
-  if(!list.length){toast('내보낼 기록이 없어요.');return}
-  const r=await giveFile(csvText([...list]),name,'text/csv',true);
+async function doCsv(list,name,costList){
+  if(!list.length&&!(costList&&costList.length)){toast('내보낼 기록이 없어요.');return}
+  const r=await giveFile(csvText([...list],costList),name,'text/csv',true);
   if(r!=='cancel')toast(r==='shared'?'엑셀 파일을 보냈어요':'엑셀 파일을 "다운로드" 폴더에 저장했어요');
 }
 let pendingImport=null;
@@ -703,7 +734,7 @@ function render(){
   VIEWS.forEach(v=>$('v-'+v).hidden=v!==view);
   document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===view));
   if(view==='unpaid')renderUnpaid(); else if(view==='cal')renderCal(); else if(view==='ledger')renderLedger();
-  else if(view==='add')renderRecent(); else renderSettings();
+  else if(view==='add'){renderRecent();if(formKind==='cost')renderCostRecent()} else renderSettings();
 }
 let undoFn=null,toastTimer=null;
 function toast(msg,undo){
@@ -711,13 +742,13 @@ function toast(msg,undo){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,undo?6000:4000);
 }
 $('toast-undo').onclick=()=>{const f=undoFn;undoFn=null;$('toast').hidden=true;if(f)f();render()};
-function go(v){view=v;payingId=openId=deletingId=null;render();window.scrollTo(0,0)}
+function go(v){view=v;payingId=openId=deletingId=costOpen=costDel=null;render();window.scrollTo(0,0)}
 
 // ---------- 뒤로가기 (휴대폰 뒤로 버튼) ----------
 // 기록 단계: 0 맨 아래(종료 경계) · 1 달력 · 2 다른 탭 · 3 그 위에 열린 화면(수정, 기간 선택)
 let pendingTab=null, exitTimer=null;
 const curLvl=()=>(history.state&&history.state.lvl)||0;
-function closeOverlays(){if(editingId!==null)leaveEdit();uPanel=false}
+function closeOverlays(){if(editingId!==null)leaveEdit();if(costEditId!==null)resetCost();uPanel=false}
 function navTab(v){
   if(selMode)exitSelect();
   const lvl=curLvl();
@@ -748,6 +779,7 @@ window.addEventListener('popstate',e=>{
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)leaveEdit();
+  if(costEditId!==null&&!s.cedit)resetCost();
   if(s.v&&s.v!==view){view=s.v;openId=null;window.scrollTo(0,0)}
   payingId=deletingId=null;
   render();
@@ -767,6 +799,18 @@ document.addEventListener('click',e=>{
   const tab=e.target.closest('nav.tabs button');
   if(tab){navTab(tab.dataset.v);return}
   if(e.target.closest('[data-goto]')){navTab(e.target.closest('[data-goto]').dataset.goto);return}
+  const agn=e.target.closest('[data-do="again"]');
+  if(agn){startAgain(store.get(agn.dataset.id));return}
+  const ced=e.target.closest('[data-do="cedit"]');
+  if(ced){startCostEdit(store.get(ced.dataset.id));return}
+  const kd=e.target.closest('[data-fkind]');
+  if(kd){setKind(kd.dataset.fkind);return}
+  const ct=e.target.closest('[data-cat]');
+  if(ct){setCat(ct.dataset.cat);return}
+  const ca=e.target.closest('[data-cadd]');
+  if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
+  const tx=e.target.closest('[data-tsize]');
+  if(tx){setTextSize(tx.dataset.tsize);return}
   const ed=e.target.closest('[data-do="edit"]');
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
@@ -802,6 +846,10 @@ document.addEventListener('click',e=>{
     case 'rpick': { const d=el.dataset.d; const r=uDraft;
       if(!r.start||r.end){r.start=d;r.end=null} else if(d<r.start){r.start=d} else {r.end=d}
       break; }
+    case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
+    case 'cdel': costDel=id; break;
+    case 'cdelcancel': costDel=null; break;
+    case 'cdelcfm': removeTrip(t); costDel=costOpen=null; toast('지출을 삭제했어요',()=>restoreTrip(t)); break;
     case 'filter': if(el.dataset.which==='led')ledFilter=el.dataset.f; else calFilter=el.dataset.f; openId=payingId=deletingId=null; break;
   }
   render();
@@ -813,7 +861,8 @@ $('l-next').onclick=()=>{ledM++;if(ledM>11){ledM=0;ledY++}render()};
 $('c-pick').onchange=e=>{const v=e.target.value;if(!v)return;const d=parseD(v);calY=d.getFullYear();calM=d.getMonth();calSel=v;calFilter='all';openId=payingId=null;render()};
 $('l-pick').onchange=e=>{const v=e.target.value;if(!v)return;const [y,m]=v.split('-').map(Number);ledY=y;ledM=m-1;openId=payingId=null;render()};
 $('l-search').oninput=renderLedger;
-$('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`아빠장부_${ledY}-${pad(ledM+1)}.csv`);
+$('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`아빠장부_${ledY}-${pad(ledM+1)}.csv`,monthCosts(ledY,ledM));
+$('l-addcost').onclick=()=>{navTab('add');setKind('cost');$('cf-amt').focus()};
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
 $('u-rangebtn').onclick=()=>{uPanel=!uPanel;if(uPanel){uDraft=uRange?{...uRange}:{start:null,end:null};const d=uRange?parseD(uRange.start):TODAY;rpY=d.getFullYear();rpM=d.getMonth();pushOverlay({panel:'range'})}else popOverlay('panel');renderUnpaid()};
 $('rp-prev').onclick=()=>{rpM--;if(rpM<0){rpM=11;rpY--}renderRangePanel()};
@@ -831,9 +880,9 @@ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
   uPanel=false;popOverlay('panel');openId=payingId=null;renderUnpaid()});
 $('s-share').onclick=()=>doBackup(true);
 $('s-download').onclick=()=>doBackup(false);
-$('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.csv`);
+$('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.csv`,costs);
 $('s-import').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readImport(f)};
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head,.chead')){e.preventDefault();e.target.click()}});
 
 // ---------- 입력 양식 ----------
 function fmtPhone(v){const d=v.replace(/\D/g,'').slice(0,11);
@@ -850,11 +899,78 @@ const readForm=()=>({date:$('f-date').value,from:$('f-from').value.trim(),to:$('
 function formMissing(f){return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
 ['f-amt','f-fee'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
 function setPt(v){formPt=v;document.querySelectorAll('#f-pt [data-pt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pt===v))}
-function setMode(editing){
-  $('f-title').textContent=editing?'운행 수정':'운행 등록';
-  $('f-submit').textContent=editing?'수정 저장':'저장';
-  $('f-cancel').hidden=!editing;
+// 등록 화면 위쪽: [운행 기록 | 지출 기록] 고르기, 제목·취소 버튼은 지금 하는 일에 맞춤
+let formKind='trip', costEditId=null, costCat='';
+function setMode(){
+  const cost=formKind==='cost', ed=cost?costEditId!==null:editingId!==null;
+  $('f-title').textContent=(cost?'지출 ':'운행 ')+(ed?'수정':'등록');
+  $('f-submit').textContent=editingId!==null?'수정 저장':'저장';
+  $('cf-submit').textContent=costEditId!==null?'수정 저장':'지출 저장';
+  $('f-cancel').hidden=!ed;
+  $('f-kind').hidden=editingId!==null||costEditId!==null;
+  $('f').hidden=cost; $('cf').hidden=!cost;
+  if(cost)$('f-draft').hidden=true;
+  document.querySelectorAll('#f-kind [data-fkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fkind===formKind));
 }
+function setKind(k){formKind=k;setMode();if(k==='cost')renderCostRecent();else loadDraftNew()}
+
+// ---------- 지출 기록 ----------
+function setCat(c){costCat=c;document.querySelectorAll('#cf-cat [data-cat]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===c))}
+function resetCost(){costEditId=null;$('cf').reset();$('cf-date').value=todayIso;$('cf-err').textContent='';setCat('');setMode()}
+// 방금 적은 지출 확인용: 최근 5건
+function renderCostRecent(){
+  const l=[...costs].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,5);
+  $('cf-recent').innerHTML=costEditId!==null||!l.length?'':'<span>최근 적은 지출</span>'+l.map(c=>`<span>${md(c.date)} <b>${esc(c.cat)}</b> ${comma(c.amount)}원${c.memo?' · '+esc(c.memo):''}</span>`).join('');
+}
+function startCostEdit(c){
+  if(!c)return;
+  backView=view==='add'?'ledger':view;
+  resetCost(); costEditId=c.id; formKind='cost';
+  $('cf-date').value=c.date; setCat(c.cat||'기타'); $('cf-amt').value=comma(c.amount); $('cf-memo').value=c.memo||'';
+  setMode(); renderCostRecent();
+  view='add'; costOpen=costDel=null; pushOverlay({cedit:true,v:'add'}); render(); window.scrollTo(0,0);
+}
+$('cf-amt').addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''});
+$('cf').addEventListener('submit',e=>{
+  e.preventDefault();
+  const date=$('cf-date').value, amount=Number($('cf-amt').value.replace(/\D/g,'')), memo=$('cf-memo').value.trim();
+  const miss=[!date&&'날짜',!costCat&&'항목',!amount&&'금액'].filter(Boolean);
+  if(miss.length){$('cf-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
+  const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth();
+  if(costEditId!==null){
+    const c=store.get(costEditId);
+    if(!c){resetCost();popOverlay('cedit');go(backView);return}
+    const before={...c}; Object.assign(c,{date,cat:costCat,amount,memo}); saveTrip(c);
+    const id=c.id; resetCost(); view=backView; costOpen=id; popOverlay('cedit'); render(); window.scrollTo(0,0);
+    toast('지출을 고쳤어요',()=>{Object.assign(c,before);saveTrip(c)});
+    return;
+  }
+  const c=normalize({id:newId(),createdAt:Date.now(),updatedAt:0,kind:'cost',date,cat:costCat,amount,memo});
+  saveTrip(c);
+  // 주유·통행료처럼 이어서 적는 경우가 많아 화면은 그대로 두고 날짜만 유지
+  resetCost(); $('cf-date').value=date; renderCostRecent();
+  toast(`${c.cat} ${comma(amount)}원 저장했어요`,()=>{removeTrip(c);renderCostRecent()});
+});
+
+// ---------- 이번처럼 또 등록 ----------
+// 지난 운행으로 새 운행 적기: 날짜는 오늘, 입금은 "안 받음"으로
+function startAgain(t){
+  if(!t)return;
+  const d=readDraft('draftNew');
+  if(d&&d.v&&!confirm('적던 새 운행이 있어요. 지우고 이 기록으로 새로 쓸까요?'))return;
+  navTab('add'); formKind='trip'; resetForm(); fillTrip(t);
+  $('f-date').value=todayIso; $('f-paidnow').checked=false; $('f-more').open=!!t.fee;
+  showDraftNote(`${t.from}→${t.to} 기록을 불러왔어요. 날짜·운임을 확인하고 저장하세요.`,true);
+  saveDraft(); window.scrollTo(0,0);
+}
+
+// ---------- 글씨 크기 ----------
+function setTextSize(z){
+  ls.set('textSize',z);
+  if(z)document.documentElement.setAttribute('data-text',z);else document.documentElement.removeAttribute('data-text');
+  document.querySelectorAll('#s-text [data-tsize]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tsize===z));
+}
+setTextSize(ls.get('textSize')||'');
 function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false);showDraftNote('')}
 
 // ---------- 적는 중 임시 저장 ----------
@@ -864,13 +980,13 @@ const F_IDS=['f-date','f-client','f-clientname','f-clientphone','f-from','f-from
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
 function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
 function saveDraft(){
-  if(view!=='add')return;
+  if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
   const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
 function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more}
-function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg}
+function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
 const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid]);
@@ -914,7 +1030,14 @@ $('f-discard').onclick=()=>{resetForm();ls.set('draftNew','');$('f-date').focus(
 function startEdit(t){
   if(!t)return;
   backView=view==='add'?'ledger':view;
-  resetForm(); editingId=t.id; setMode(true);
+  formKind='trip'; resetForm(); editingId=t.id; setMode();
+  fillTrip(t);
+  $('f-paidnow').checked=!!t.paid;
+  $('f-more').open=!!(t.fee||t.paid);
+  editOrig=snapKey(formSnap()); hideAsk();
+  view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
+}
+function fillTrip(t){
   $('f-date').value=t.date; $('f-client').value=t.client||'';
   $('f-from').value=t.from; $('f-fromaddr').value=t.fromAddr||'';
   $('f-to').value=t.to; $('f-toaddr').value=t.toAddr||'';
@@ -922,12 +1045,10 @@ function startEdit(t){
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
-  $('f-paidnow').checked=!!t.paid;
-  $('f-more').open=!!(t.fee||t.paid);
-  editOrig=snapKey(formSnap()); hideAsk();
-  view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
-$('f-cancel').onclick=()=>{const id=editingId;resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
+$('f-cancel').onclick=()=>{
+  if(costEditId!==null){const id=costEditId;resetCost();view=backView;costOpen=id;popOverlay('cedit');render();window.scrollTo(0,0);return}
+  const id=editingId;resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
 $('f').addEventListener('submit',e=>{
   e.preventDefault();
   const f=readForm(), miss=formMissing(f), date=f.date;
@@ -959,7 +1080,7 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('online',renderSettings);window.addEventListener('offline',renderSettings);
 (async function boot(){
   Updater.init();
-  resetForm();
+  resetForm(); resetCost();
   try{
     await DB.open();
     (await DB.all()).forEach(r=>{if(validRecord(r))store.set(String(r.id),normalize(r))});
