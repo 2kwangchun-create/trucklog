@@ -177,12 +177,12 @@ function rowHtml(t,mode){
   if(payingId===t.id){
     act=`<div class="act"><div class="payline"><label for="pd-${t.id}" style="font-size:15px;font-weight:600">입금일</label><input type="date" id="pd-${t.id}" value="${todayIso}"><button class="btn small" data-do="paycfm" data-id="${t.id}">입금 확인</button><button class="btn ghost small" data-do="paycancel">취소</button></div></div>`;
   } else if(mode==='unpaid'){
-    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>`:''}</div>`;
+    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button><button class="btn ghost small" data-do="sms" data-id="${t.id}">정산 문자</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>`:''}</div>`;
   } else if(open){
     act=`<div class="act">
       <button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>
       
-      ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>`}
+      ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button><button class="btn ghost small" data-do="sms" data-id="${t.id}">정산 문자</button>`}
       ${deletingId===t.id?`<button class="btn danger small" data-do="delcfm" data-id="${t.id}">정말 삭제</button><button class="btn ghost small" data-do="delcancel">취소</button>`:`<button class="btn ghost small" data-do="del" data-id="${t.id}">삭제</button>`}</div>`;
   }
   return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${act}</div>`;
@@ -690,6 +690,56 @@ async function doCopy(){
   $('cp-hint').classList.toggle('errline',!ok);$('cp-hint').classList.toggle('okline2',ok);
   if(ok)toast('복사했어요');
 }
+// ---------- 정산 문자 ----------
+// 운행 한 건마다 화주에게: "운임 금액 {금액}원 입금확인바랍니다." · 계산서 발행이면 운임에 10%(부가세)를 더해서
+// 화주마다 마지막에 고른 발행/미발행을 기억해 다음에도 그대로 고름
+let smTrip=null, smTax=false, smOrig='';
+const vat=a=>Math.round(a*1.1);
+function smsText(t,tax){
+  const p=getProfile(), amt=tax?vat(t.amount):t.amount, acct=acctText(p);
+  const L=[p.carNo?`안녕하세요, ${p.carNo} 차량입니다.`:'안녕하세요.',
+    `${md(t.date)} ${t.from}→${t.to} 운임 금액 ${comma(amt)}원${tax?'(부가세 포함)':''} 입금확인바랍니다.`];
+  if(acct)L.push(acct);
+  return L.join('\n');
+}
+function setSmTax(tax){
+  smTax=tax;
+  document.querySelectorAll('#sm-tax [data-tax]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tax===(tax?'1':'0')));
+  const a=smTrip.amount;
+  $('sm-amt').innerHTML=tax?`운임 ${comma(a)} + 부가세 ${comma(vat(a)-a)} = <b>${comma(vat(a))}원</b>`:`운임 <b>${comma(a)}원</b>`;
+  smOrig=smsText(smTrip,tax); $('sm-text').value=smOrig; $('sm-undo').hidden=true;
+}
+function openSms(t){
+  if(!t)return;
+  smTrip=t; const p=getProfile();
+  $('sm-title').textContent=`정산 문자 · ${t.client||'화주 미입력'}`;
+  $('sm-to').textContent=t.clientPhone?`받는 사람: ${t.clientName?t.clientName+' ':''}${t.clientPhone}`
+    :'화주 연락처가 없어요. [문자 보내기]를 누른 뒤 번호를 넣거나, [복사]해서 카톡으로 보내세요.';
+  setSmTax(ls.get('tax:'+(t.client||''))==='1');
+  $('sm-hint').textContent=p.carNo&&p.account?'글을 눌러 직접 고칠 수 있어요.':'설정 → 내 정보에 차량 번호·계좌를 적어 두면 자동으로 들어가요.';
+  $('sm-hint').classList.remove('errline','okline2');
+  $('smsheet').hidden=false; pushOverlay({sms:true});
+}
+$('sm-tax').addEventListener('click',e=>{
+  const b=e.target.closest('[data-tax]'); if(!b)return;
+  const tax=b.dataset.tax==='1'; if(tax===smTax)return;
+  if($('sm-text').value!==smOrig&&!confirm('고친 내용이 처음 문구로 바뀌어요. 바꿀까요?'))return;
+  setSmTax(tax); ls.set('tax:'+(smTrip.client||''),tax?'1':'0');
+});
+$('sm-text').addEventListener('input',()=>{$('sm-undo').hidden=$('sm-text').value===smOrig});
+$('sm-undo').onclick=()=>{$('sm-text').value=smOrig;$('sm-undo').hidden=true;toast('처음 내용으로 되돌렸어요')};
+// 휴대폰 문자 앱을 화주 번호와 내용이 채워진 채로 열기
+$('sm-send').onclick=()=>{location.href=`sms:${(smTrip.clientPhone||'').replace(/\D/g,'')}?body=${encodeURIComponent($('sm-text').value)}`};
+$('sm-copy').onclick=async()=>{
+  const ta=$('sm-text'); let ok=false;
+  try{await navigator.clipboard.writeText(ta.value);ok=true}catch(_){}
+  if(!ok){try{ta.focus();ta.select();ok=document.execCommand('copy');ta.blur();ta.setSelectionRange(0,0)}catch(_){}}
+  $('sm-hint').textContent=ok?'복사했어요. 카톡에 붙여넣기 하세요.':'자동 복사가 안 됐어요. 글을 길게 눌러 "모두 선택" → "복사" 해 주세요.';
+  $('sm-hint').classList.toggle('errline',!ok);$('sm-hint').classList.toggle('okline2',ok);
+  if(ok)toast('복사했어요');
+};
+$('sm-close').onclick=()=>{$('smsheet').hidden=true;popOverlay('sms')};
+
 $('cp-opts').addEventListener('click',e=>{
   const b=e.target.closest('[data-opt]');if(!b)return;
   if(b.dataset.opt==='none')cpOpts={date:false,client:false,city:false};
@@ -809,6 +859,7 @@ window.addEventListener('popstate',e=>{
   }
   if(uPanel&&!s.panel)uPanel=false;
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
+  if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)leaveEdit();
   if(costEditId!==null&&!s.cedit)resetCost();
@@ -831,6 +882,8 @@ document.addEventListener('click',e=>{
   const tab=e.target.closest('nav.tabs button');
   if(tab){navTab(tab.dataset.v);return}
   if(e.target.closest('[data-goto]')){navTab(e.target.closest('[data-goto]').dataset.goto);return}
+  const smb=e.target.closest('[data-do="sms"]');
+  if(smb){openSms(store.get(smb.dataset.id));return}
   const ced=e.target.closest('[data-do="cedit"]');
   if(ced){startCostEdit(store.get(ced.dataset.id));return}
   const kd=e.target.closest('[data-fkind]');

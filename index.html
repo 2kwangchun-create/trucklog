@@ -273,7 +273,10 @@ body.selecting nav.tabs{display:none}
 .cpopts button[aria-pressed="true"]::before{content:"✓ "}
 .cpline{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 .cpline .hint{flex:1;min-width:0}
-#cp-undo{flex:none}
+#cp-undo,#sm-undo{flex:none}
+.sm-amt{margin:0;font-size:16px;font-weight:600}
+.sm-amt b{color:var(--late);font-size:18px}
+#sm-text{min-height:140px}
 .okline2{color:var(--paid);font-weight:600}
 .sheet-in textarea{flex:1;min-height:180px;font-size:15px;line-height:1.5;-webkit-user-select:text;user-select:text;background:var(--bg)}
 
@@ -529,6 +532,19 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <button type="button" class="btn" data-kind="from">상차 복사</button>
     <button type="button" class="btn" data-kind="to">하차 복사</button>
     <button type="button" class="btn ghost" id="sel-cancel">취소</button>
+  </div>
+</div>
+<!-- 정산 문자: 운행 한 건마다 화주에게 운임 입금 확인 문자 -->
+<div class="sheet" id="smsheet" role="dialog" aria-modal="true" aria-labelledby="sm-title" hidden>
+  <div class="sheet-in">
+    <h2 id="sm-title">정산 문자</h2>
+    <p class="hint" id="sm-to"></p>
+    <div class="seg kind" id="sm-tax" role="group" aria-label="세금계산서"><button type="button" data-tax="0" aria-pressed="true">계산서 미발행</button><button type="button" data-tax="1" aria-pressed="false">계산서 발행 (+10%)</button></div>
+    <p class="sm-amt num" id="sm-amt"></p>
+    <textarea id="sm-text" rows="6" aria-label="보낼 내용 (고칠 수 있음)"></textarea>
+    <div class="cpline"><p class="hint" id="sm-hint"></p><button type="button" class="btn ghost small" id="sm-undo" hidden>↺ 되돌리기</button></div>
+    <div class="btnrow"><button type="button" class="btn" id="sm-send">문자 보내기</button><button type="button" class="btn ghost" id="sm-copy">복사 (카톡용)</button></div>
+    <button type="button" class="btn ghost" id="sm-close">닫기</button>
   </div>
 </div>
 <div class="sheet" id="cpsheet" role="dialog" aria-modal="true" aria-labelledby="cp-title" hidden>
