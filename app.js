@@ -23,15 +23,53 @@ const ls={get(k){try{return localStorage.getItem(k)}catch(_){return null}},set(k
 // ---------- 시작 화면 ----------
 // 앱을 열 때 3초쯤 보여주고 사라짐 (누르면 바로 닫힘). 새로고침 때는 index.html에서 미리 지움
 const SPLASH_MS=3000;
-(function splash(){
-  const el=$('splash'); if(!el)return;
-  try{sessionStorage.setItem('splashed','1')}catch(_){}
-  $('splash-date').textContent=TODAY.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
-  let done=false;
-  const close=()=>{if(done)return;done=true;el.classList.add('out');setTimeout(()=>el.remove(),500)};
-  el.addEventListener('click',close);
-  setTimeout(close,Math.max(0,SPLASH_MS-performance.now()));
-})();
+const Splash={
+  open:false,held:false,el:null,timer:null,
+  init(){
+    const el=$('splash'); if(!el)return;
+    this.el=el; this.open=true;
+    try{sessionStorage.setItem('splashed','1')}catch(_){}
+    $('splash-date').textContent=TODAY.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+    el.addEventListener('click',()=>{if(!this.held)this.close()});
+    this.timer=setTimeout(()=>this.close(),Math.max(0,SPLASH_MS-performance.now()));
+  },
+  close(){if(!this.open)return;this.open=false;clearTimeout(this.timer);this.el.classList.add('out');setTimeout(()=>this.el.remove(),500)},
+  // 새 버전을 받는 동안 시작 화면을 조금 더 붙잡아 둠 (최대 8초, 넘으면 그냥 닫고 위에 안내)
+  hold(msg){
+    if(!this.open)return;
+    this.held=true; clearTimeout(this.timer);
+    $('splash-upd').textContent=msg; $('splash-upd').hidden=false;
+    this.timer=setTimeout(()=>{this.held=false;this.close()},8000);
+  },
+};
+Splash.init();
+
+// ---------- 새 버전 받기 ----------
+// 새 버전을 올리면 서비스 워커가 받아 둠 → 앱을 막 연 참이면(시작 화면 중·아직 아무것도 안 누름) 바로 새로 열고,
+// 쓰는 중이면 위에 [지금 업데이트] 안내 (적던 내용은 임시 저장돼 있어 안전)
+const Updater={
+  reg:null,lastCheck:0,touched:false,shown:false,reloading:false,
+  init(){
+    if(!('serviceWorker' in navigator))return;
+    const had=!!navigator.serviceWorker.controller; // 처음 설치될 때는 새 버전이 아님
+    ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{this.touched=true},{capture:true,once:true}));
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)this.ready()});
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      this.reg=reg;
+      reg.addEventListener('updatefound',()=>{if(had)Splash.hold('새 버전으로 바꾸는 중…')});
+      this.check();
+    }).catch(()=>{});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')this.check()});
+  },
+  // 앱을 열 때와, 다시 화면에 띄울 때 확인 (10분에 한 번까지)
+  check(){if(!this.reg||!navigator.onLine||Date.now()-this.lastCheck<600000)return;this.lastCheck=Date.now();this.reg.update().catch(()=>{})},
+  ready(){
+    if(this.reloading)return;
+    if(Splash.open||(!this.touched&&performance.now()<10000)){this.reloading=true;location.reload();return}
+    if(!this.shown){this.shown=true;$('updbar').hidden=false}
+  },
+};
+$('upd-go').onclick=()=>{Updater.reloading=true;location.reload()};
 
 // ---------- 휴대폰 저장소 (IndexedDB) ----------
 const DB={
@@ -920,6 +958,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('online',renderSettings);window.addEventListener('offline',renderSettings);
 (async function boot(){
+  Updater.init();
   resetForm();
   try{
     await DB.open();
@@ -939,5 +978,4 @@ window.addEventListener('online',renderSettings);window.addEventListener('offlin
   }
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
   Cloud.init();
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

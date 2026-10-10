@@ -1,6 +1,6 @@
 /* 아빠장부 오프라인 동작용 서비스 워커
    - 앱 파일은 저장해 두고 바로 띄운 뒤, 인터넷이 되면 뒤에서 새 파일로 바꿔 둡니다.
-     (앱을 고쳐서 올리면, 다음에 한 번 더 열 때 새 버전이 보여요)
+     (앱을 고쳐서 올리면, 앱을 열 때 새 버전을 받아 바로 바꿔요 — app.js의 Updater)
    - 기록 데이터는 여기서 다루지 않습니다 (휴대폰 저장소 + 클라우드). */
 const VERSION = '1.4.1';
 const SHELL = 'trucklog-shell-' + VERSION;
@@ -10,7 +10,8 @@ const FILES = ['./', './index.html', './app.js', './firebase-config.js', './mani
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache:'reload' — 휴대폰·GitHub 쪽 임시 저장본이 아니라 방금 올린 파일을 바로 받음
+  e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

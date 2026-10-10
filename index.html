@@ -254,6 +254,11 @@ body.selecting nav.tabs{display:none}
 .splash h1{margin:0;font-size:32px;font-weight:700}
 .splash-date{margin:0;color:var(--muted);font-size:16px}
 .splash-msg{margin:14px 0 0;font-size:22px;font-weight:700;color:var(--accent)}
+.splash-upd{margin:10px 0 0;font-size:15px;color:var(--muted)}
+/* 새 버전 안내: 화면 위쪽에 고정 */
+.updbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));width:min(528px,calc(100% - 32px));z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--accent-soft);border:2px solid var(--accent);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.15);font-size:16px;font-weight:600}
+.updbar .btn{flex:none;padding:10px 14px}
+body.gated .updbar{visibility:hidden}
 @media (prefers-reduced-motion:no-preference){
   .splash-truck img{animation:drive-in .9s cubic-bezier(.2,.8,.3,1) both, bump 1.2s ease-in-out .9s infinite}
   .splash-road{animation:road .6s linear infinite}
@@ -310,6 +315,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <h1>아빠장부</h1>
     <p class="splash-date" id="splash-date"></p>
     <p class="splash-msg">오늘도 안전운전 하세요!</p>
+    <p class="splash-upd" id="splash-upd" hidden></p>
   </div>
 </div>
 <script>try{if(sessionStorage.getItem('splashed'))document.getElementById('splash').remove()}catch(e){}</script>
@@ -466,6 +472,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <button type="button" class="linkbtn" id="g-skip" hidden>인터넷이 없을 때: 로그인 없이 이 휴대폰에만 저장</button>
   </div>
 </div>
+<div class="updbar" id="updbar" role="status" hidden><span>새 버전이 있어요</span><button type="button" class="btn small" id="upd-go">지금 업데이트</button></div>
 <div class="askbar" id="askbar" role="alertdialog" aria-labelledby="ask-msg" hidden><p id="ask-msg">고치던 내용이 있어요.<br>수정 화면으로 돌아갈까요?</p><div class="btnrow"><button type="button" class="btn small" id="ask-back">돌아가기</button><button type="button" class="btn ghost small" id="ask-drop">버리기</button></div></div>
 <div class="toast" id="toast" hidden><span id="toast-msg"></span><button type="button" id="toast-undo">되돌리기</button></div>
 
