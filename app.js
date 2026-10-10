@@ -128,7 +128,7 @@ const restoreTrip=t=>{t.deleted=false;return saveTrip(t)};
 let view='cal', payingId=null, openId=null, deletingId=null;
 let calY=TODAY.getFullYear(), calM=TODAY.getMonth(), calSel=todayIso;
 let ledY=calY, ledM=calM;
-let ledFilter='all', calFilter='all';
+let ledFilter='all', calFilter='all', ledKind='trip'; // ledKind: 장부에서 운행/지출 중 무엇을 볼지
 let editingId=null, backView='ledger';
 const MONTH_OK=(()=>{const i=document.createElement('input');i.type='month';return i.type==='month'})();
 if(!MONTH_OK) $('l-pick').type='date';
@@ -269,6 +269,8 @@ function renderCal(){
 
 // ---------- 장부 ----------
 function renderLedger(){
+  $('l-tripgrp').hidden=ledKind!=='trip'; $('l-costgrp').hidden=ledKind!=='cost';
+  document.querySelectorAll('#l-kind [data-lkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lkind===ledKind));
   $('l-pick').value=MONTH_OK?`${ledY}-${pad(ledM+1)}`:`${ledY}-${pad(ledM+1)}-01`;
   const all=monthTrips(ledY,ledM);
   const sum=all.reduce((s,t)=>s+t.amount,0), paid=all.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);
@@ -286,8 +288,8 @@ function renderLedger(){
   $('l-costsum').textContent=won(csum);
   const byCat={};mc.forEach(c=>byCat[c.cat||'기타']=(byCat[c.cat||'기타']||0)+c.amount);
   $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
-  const cshown=mc.filter(c=>!q||[c.cat,c.memo].join(' ').toLowerCase().includes(q)).sort(byNew);
-  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">${q&&mc.length?'찾는 지출이 없어요.':'이 달은 적은 지출이 없어요.'}</div>`;
+  const cshown=[...mc].sort(byNew);
+  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">이 달은 적은 지출이 없어요.</div>`;
 }
 function monthCosts(y,m){const p=`${y}-${pad(m+1)}`;return costs.filter(c=>c.date.startsWith(p))}
 let costOpen=null, costDel=null;
@@ -718,7 +720,7 @@ document.addEventListener('contextmenu',e=>{if(e.target.closest('.list .row[data
 
 // 새로고침해도 보던 화면(탭·달·스크롤)으로 돌아오게 — 앱을 완전히 닫았다 열면 달력부터
 const ss={get(k){try{return sessionStorage.getItem(k)}catch(_){return null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(_){}}};
-function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,y:window.scrollY}))}
+function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,lk:ledKind,y:window.scrollY}))}
 function loadSpot(){
   let s=null;try{s=JSON.parse(ss.get('spot'))}catch(_){}
   if(!s||!VIEWS.includes(s.v))return 0;
@@ -726,6 +728,7 @@ function loadSpot(){
   if(Number.isInteger(s.calY)&&Number.isInteger(s.calM)){calY=s.calY;calM=s.calM}
   if(typeof s.calSel==='string')calSel=s.calSel;
   if(Number.isInteger(s.ledY)&&Number.isInteger(s.ledM)){ledY=s.ledY;ledM=s.ledM}
+  if(s.lk==='cost')ledKind='cost';
   return s.y||0;
 }
 window.addEventListener('pagehide',saveSpot);
@@ -807,6 +810,8 @@ document.addEventListener('click',e=>{
   if(ct){setCat(ct.dataset.cat);return}
   const ca=e.target.closest('[data-cadd]');
   if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
+  const lk=e.target.closest('[data-lkind]');
+  if(lk){ledKind=lk.dataset.lkind;openId=payingId=deletingId=costOpen=costDel=null;renderLedger();saveSpot();return}
   const tx=e.target.closest('[data-tsize]');
   if(tx){setTextSize(tx.dataset.tsize);return}
   const ed=e.target.closest('[data-do="edit"]');
@@ -934,7 +939,7 @@ $('cf').addEventListener('submit',e=>{
   const date=$('cf-date').value, amount=Number($('cf-amt').value.replace(/\D/g,'')), memo=$('cf-memo').value.trim();
   const miss=[!date&&'날짜',!costCat&&'항목',!amount&&'금액'].filter(Boolean);
   if(miss.length){$('cf-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
-  const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth();
+  const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth(); ledKind='cost';
   if(costEditId!==null){
     const c=store.get(costEditId);
     if(!c){resetCost();popOverlay('cedit');go(backView);return}

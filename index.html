@@ -63,6 +63,7 @@ header.top h1{margin:0;font-size:22px;font-weight:700}
 .stats b{font-size:18px}
 .c-paid{color:var(--paid)} .c-due{color:var(--late)} .c-cost{color:var(--due)}
 .stats2{grid-template-columns:repeat(2,1fr)}
+.grp{display:contents}
 /* 글씨 크기 (설정): 화면 전체를 비율로 키움 */
 html[data-text="l"] body{zoom:1.12}
 html[data-text="xl"] body{zoom:1.25}
@@ -398,6 +399,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <section class="view" id="v-ledger" hidden>
     <header class="top"><h1>월별 장부</h1></header>
     <div class="monthnav"><button id="l-prev" type="button">◀ 이전</button><input type="month" id="l-pick" class="picker num" aria-label="달 선택"><button id="l-next" type="button">다음 ▶</button></div>
+    <div class="seg kind" id="l-kind" role="group" aria-label="장부에서 볼 것"><button type="button" data-lkind="trip" aria-pressed="true">운행</button><button type="button" data-lkind="cost" aria-pressed="false">지출</button></div>
+    <div class="grp" id="l-tripgrp">
     <div class="stats">
       <div><span>총 운임</span><b class="num" id="l-sum"></b></div>
       <div><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
@@ -406,6 +409,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="seg" id="l-seg" role="group" aria-label="장부 보기 설정"></div>
     <input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기">
     <div class="list" id="l-list"></div>
+    </div>
+    <div class="grp" id="l-costgrp" hidden>
     <div class="costhead"><h2>이 달 지출</h2><b class="num c-cost" id="l-costsum"></b></div>
     <div class="stats stats2">
       <div><span id="l-costlabel">지출</span><b class="num c-cost" id="l-cost"></b></div>
@@ -414,6 +419,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="catsum" id="l-catsum"></div>
     <div class="list" id="l-costs"></div>
     <button type="button" class="btn ghost" id="l-addcost">+ 지출 적기</button>
+    </div>
     <button type="button" class="btn ghost" id="l-csv">이 달 장부를 엑셀 파일로 보내기</button>
   </section>
 
