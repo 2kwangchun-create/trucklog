@@ -264,10 +264,11 @@ function renderSettings(){
     h=`<p class="hint">구글 계정으로 로그인하면 기록이 클라우드에도 함께 저장돼요. 휴대폰을 바꾸거나 잃어버려도 기록이 남고, 같은 계정으로 다른 휴대폰에서도 볼 수 있어요.</p>
        <button type="button" class="btn" id="s-login">구글로 로그인해서 클라우드에도 저장</button>`;
   } else {
-    const st=!navigator.onLine?'인터넷 연결을 기다리는 중 (연결되면 자동으로 올라가요)':Cloud.pending?'클라우드에 올리는 중…':Cloud.lastSync?`클라우드와 맞춤 · ${fmtDT(Cloud.lastSync)}`:'클라우드와 맞추는 중…';
+    const st=!navigator.onLine?'인터넷 연결을 기다리는 중 (연결되면 자동으로 올라가요)':Cloud.fullBusy?'클라우드 전체 기록과 맞추는 중…':Cloud.pending?'클라우드에 올리는 중…':Cloud.lastSync?`클라우드와 맞춤 · ${fmtDT(Cloud.lastSync)}`:'클라우드와 맞추는 중…';
     h=`<p class="okline"><span class="dot-ok"></span><b>${esc(Cloud.user.email||Cloud.user.displayName||'구글 계정')}</b></p>
        <p class="hint">${esc(st)}</p>
-       <button type="button" class="btn ghost" id="s-logout">로그아웃</button>
+       <div class="btnrow"><button type="button" class="btn ghost" id="s-resync"${Cloud.fullBusy?' disabled':''}>전체 다시 맞추기</button><button type="button" class="btn ghost" id="s-logout">로그아웃</button></div>
+       <p class="hint small">평소에는 바뀐 기록만 주고받아요. 다른 휴대폰에서 고친 게 안 보이면 [전체 다시 맞추기]를 눌러 주세요.</p>
        <p class="hint small">로그아웃해도 이 휴대폰의 기록은 지워지지 않아요.</p>`;
   }
   if(Cloud.lastErr)h+=`<p class="errline">${esc(Cloud.lastErr)}</p>`;
@@ -358,6 +359,7 @@ async function applyImport(){
 
 // ---------- 구글 클라우드 동기화 (Firebase) ----------
 const FB_VER='10.12.2';
+const FULL_EVERY=7*86400000; // 전체 맞춤 주기 (예전 버전 휴대폰이 올린 기록도 놓치지 않게)
 const Cloud={
   configured:false,ready:false,loadErr:false,user:null,col:null,unsub:null,lastSync:null,pending:false,lastErr:'',inflight:0,
   async init(){
@@ -382,41 +384,81 @@ const Cloud={
     if(u){
       // 다른 계정으로 바뀌면 이 휴대폰에 남은 이전 계정 기록은 비움 (이전 기록은 그 계정 클라우드에 있음)
       const owner=ls.get('ownerUid');
-      if(owner&&owner!==u.uid){store.clear();try{await DB.clear()}catch(_){}rebuild();render()}
+      if(owner&&owner!==u.uid){store.clear();try{await DB.clear()}catch(_){}rebuild();render();ls.set('sync:'+u.uid,'')}
       ls.set('ownerUid',u.uid);
       Gate.hide();
     } else if(!Gate.skipped){Gate.show('out')}
     this.user=u;this.lastSync=null;this.lastErr='';
     this.col=u?this.fs.collection('users').doc(u.uid).collection('trips'):null;
-    if(u){
-      let first=true;
-      this.unsub=this.col.onSnapshot({includeMetadataChanges:true},snap=>{
-        const changed=[];
-        snap.docChanges().forEach(ch=>{if(ch.type==='removed')return;const t=mergeIncoming(ch.doc.data());if(t)changed.push(t)});
-        if(changed.length){DB.putMany(changed).then(()=>ls.set('lastLocalSave',String(Date.now())),()=>{});rebuild();render()}
-        if(first&&!snap.metadata.fromCache){
-          first=false;
-          const remote=new Map(snap.docs.map(d=>[d.id,Number(d.data().updatedAt)||0]));
-          const up=[...store.values()].filter(t=>!remote.has(t.id)||(t.updatedAt||0)>remote.get(t.id));
-          this.pushMany(up);
-          if(up.length||changed.length)toast(`클라우드와 맞췄어요 (올림 ${up.length}건 · 받음 ${changed.length}건)`);
-        }
-        this.pending=snap.metadata.hasPendingWrites;
-        if(!snap.metadata.fromCache)this.lastSync=Date.now();
-        renderSettings();renderBackupBanner();
-      },e=>this.fail(e));
-    }
+    const run=this.run=(this.run||0)+1; // 로그인이 바뀌면 이전 작업은 버림
+    this.reconciled=false;
     renderSettings();if(view==='cal')renderBackupBanner();
+    if(!u)return;
+    // 바뀐 기록만 받기: 기록마다 클라우드 시각(srvAt)을 붙여 두고, 앱을 열면 지난번 이후 것만 읽음
+    // 전체 맞춤은 이 휴대폰에서 처음 로그인할 때 · 7일에 한 번 · [설정]에서 누를 때만
+    let s=this.syncInfo(), fullDone=false, got=0, upN=0;
+    if(!s.full||Date.now()-s.full>FULL_EVERY||this.forceFull||!store.size){
+      this.forceFull=false; this.fullBusy=true; renderSettings();
+      try{
+        const t0=Date.now(), snap=await this.col.get({source:'server'});
+        if(run!==this.run)return;
+        const r=this.takeIncoming(snap.docs); got=r.changed.length;
+        const remote=new Map(snap.docs.map(d=>[d.id,Number(d.data().updatedAt)||0]));
+        const up=[...store.values()].filter(t=>!remote.has(t.id)||(t.updatedAt||0)>remote.get(t.id));
+        this.pushMany(up); upN=up.length;
+        this.setSync({cursor:Math.max(s.cursor||0,r.max),full:Date.now(),upTo:t0}); this.reconciled=true;
+        s=this.syncInfo(); fullDone=true; this.lastSync=Date.now();
+      }catch(e){if(run!==this.run)return;if(this.manualFull){this.manualFull=false;toast('인터넷에 연결한 뒤 다시 눌러 주세요.')}} // 인터넷이 없으면 다음에 열 때 다시
+      this.fullBusy=false;
+    }
+    let first=true;
+    const q=this.col.where('srvAt','>',firebase.firestore.Timestamp.fromMillis(s.cursor||0));
+    this.unsub=q.onSnapshot({includeMetadataChanges:true},snap=>{
+      const r=this.takeIncoming(snap.docChanges().filter(ch=>ch.type!=='removed').map(ch=>ch.doc));
+      if(r.max>(this.syncInfo().cursor||0))this.setSync({cursor:r.max});
+      if(first&&!snap.metadata.fromCache){
+        first=false; got+=r.changed.length;
+        if(!fullDone){
+          // 로그인 안 한 채 적은 기록 등, 지난번 맞춘 뒤 이 휴대폰에서 바뀐 것 올리기
+          const t0=Date.now(), up=[...store.values()].filter(t=>(t.updatedAt||0)>(s.upTo||0));
+          this.pushMany(up); upN=up.length; this.setSync({upTo:t0}); this.reconciled=true;
+        }
+        if(upN||got)toast(`클라우드와 맞췄어요 (올림 ${upN}건 · 받음 ${got}건)`);
+        else if(this.manualFull)toast('클라우드와 이미 똑같아요.');
+        this.manualFull=false;
+      }
+      this.pending=snap.metadata.hasPendingWrites;
+      if(!snap.metadata.fromCache)this.lastSync=Date.now();
+      renderSettings();renderBackupBanner();
+    },e=>this.fail(e));
   },
+  // 계정별 맞춤 기록: cursor=받은 마지막 변경의 클라우드 시각 · full=마지막 전체 맞춤 · upTo=이 휴대폰 기록을 올려 맞춘 시각
+  syncInfo(){let o=null;try{o=JSON.parse(ls.get('sync:'+this.user.uid))}catch(_){}return o||{}},
+  setSync(o){ls.set('sync:'+this.user.uid,JSON.stringify(Object.assign(this.syncInfo(),o)))},
+  takeIncoming(docs){
+    const changed=[]; let max=0;
+    docs.forEach(d=>{
+      const x=d.data(), ts=x.srvAt&&x.srvAt.toMillis?x.srvAt.toMillis():0;
+      if(ts>max&&!d.metadata.hasPendingWrites)max=ts;
+      const t=mergeIncoming(x); if(t)changed.push(t);
+    });
+    if(changed.length){DB.putMany(changed).then(()=>ls.set('lastLocalSave',String(Date.now())),()=>{});rebuild();render()}
+    return {changed,max};
+  },
+  fullResync(){if(!this.user||this.fullBusy)return;this.forceFull=true;this.manualFull=true;this.onUser(this.user)},
   pushMany(list){
     if(!this.col||!list.length)return;
     for(let i=0;i<list.length;i+=400){
       const b=this.fs.batch();
       const part=list.slice(i,i+400);
-      part.forEach(t=>b.set(this.col.doc(t.id),JSON.parse(JSON.stringify(t))));
+      const now=firebase.firestore.FieldValue.serverTimestamp();
+      part.forEach(t=>b.set(this.col.doc(t.id),Object.assign(JSON.parse(JSON.stringify(t)),{srvAt:now})));
       // 인터넷이 없으면 commit은 연결될 때까지 기다림 → inflight가 "아직 안 올라간 건수"
       this.inflight+=part.length;
-      b.commit().then(()=>{ls.set('lastCloudSave',String(Date.now()))},e=>this.fail(e))
+      const uid=this.user&&this.user.uid, top=Math.max(...part.map(t=>t.updatedAt||0));
+      b.commit().then(()=>{ls.set('lastCloudSave',String(Date.now()));
+        // 맞춘 뒤에 올린 것은 다음에 다시 올리지 않게 표시
+        if(this.reconciled&&this.user&&this.user.uid===uid&&top>(this.syncInfo().upTo||0))this.setSync({upTo:top})},e=>this.fail(e))
         .finally(()=>{this.inflight-=part.length;renderSettings()});
     }
   },
@@ -703,6 +745,7 @@ document.addEventListener('click',e=>{
   const sid=e.target.closest('button')&&e.target.closest('button').id;
   if(sid==='s-login'){Cloud.signIn();return}
   if(sid==='s-logout'){Cloud.signOut();return}
+  if(sid==='s-resync'){Cloud.fullResync();return}
   if(sid==='s-import-go'){applyImport();return}
   if(sid==='s-import-no'){pendingImport=null;$('s-importbox').hidden=true;$('s-import').value='';return}
   const el=e.target.closest('[data-do]'); if(!el)return;
