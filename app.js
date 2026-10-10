@@ -135,8 +135,7 @@ let calY=TODAY.getFullYear(), calM=TODAY.getMonth(), calSel=todayIso;
 let ledY=calY, ledM=calM;
 let ledFilter='all', calFilter='all', ledKind='trip'; // ledKind: 장부에서 운행/지출 중 무엇을 볼지
 let editingId=null, backView='ledger';
-const MONTH_OK=(()=>{const i=document.createElement('input');i.type='month';return i.type==='month'})();
-if(!MONTH_OK) $('l-pick').type='date';
+let ledRange=null; // 장부: 하루·기간을 고르면 {start,end}, 아니면 ledY/ledM 한 달
 const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:true;
 const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.'};
 function segHtml(which,list,cur){
@@ -155,35 +154,55 @@ function ageChip(t){
 }
 const routeHtml=t=>`${esc(t.from)} → ${esc(t.to)}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
-function phHtml(p,name){const who=name?`<span class="who">${esc(name)}</span>`:'';
-  return p?`<span class="ph num">☎ ${who}<a href="${telHref(p)}">${esc(p)}</a> <button type="button" class="cpy" data-copy="${esc(p)}">복사</button></span>`
-    :name?`<span class="ph">☎ ${who}<span class="na">연락처 없음</span></span>`:'<span class="ph na">☎ 연락처 없음</span>'}
-function addrHtml(city,addr,phone,name){return `<b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}${phHtml(phone,name)}`}
+// 선 아이콘 (그림 문자 대신)
+const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const P={arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'};
+const WD='일월화수목금토', wdOf=s=>WD[parseD(s).getDay()];
+const mdK=s=>`${Number(s.slice(5,7))}월 ${Number(s.slice(8,10))}일`;
+const dayK=s=>`${mdK(s)} (${wdOf(s)})`;
+// 상세: 담당자·번호 + [전화][번호 복사]
+function ctHtml(p,name){
+  const who=name?`<span class="who">${esc(name)}</span>`:'';
+  if(!p)return `<div class="ct">${who}<span class="na">연락처 없음</span></div>`;
+  return `<div class="ct">${who}<span class="num">${esc(p)}</span></div>`
+    +`<div class="ct"><a class="callbtn" href="${telHref(p)}">${ic(P.phone)}전화</a><button type="button" class="cpy" data-copy="${esc(p)}">번호 복사</button></div>`;
+}
+function addrBlk(label,mk,city,addr,phone,name){
+  return `<div class="blk"><span class="bl"><i class="mk ${mk}"></i>${label}</span><div class="addr"><b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}</div>${ctHtml(phone,name)}</div>`;
+}
+// mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode){
   const open=openId===t.id;
-  const head=`<div class="head" data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}">
-    <div class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}${t.clientPhone?`<a class="cph num" href="${telHref(t.clientPhone)}">☎ ${t.clientName?esc(t.clientName)+' ':''}${esc(t.clientPhone)}</a>`:t.clientName?`<span class="cph">${esc(t.clientName)}</span>`:''}</div>
-    <div class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</div>
-    <div class="route"><span class="rt">${routeHtml(t)}</span>${t.memo?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
-    <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="more">${open?'접기 ▲':'상세 ▼'}</span></div></div>`;
+  const client=`<span class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}</span>`;
+  const amt=`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
+  const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
+  const head=mode==='month'
+    ?`<div class="head mini" ${attrs}><span class="dt"><b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span>${client}${amt}
+      <span class="rt2">${routeHtml(t)}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
+    :`<div class="head" ${attrs}><span class="cwrap">${client}${t.clientPhone&&!open?`<a class="call" href="${telHref(t.clientPhone)}">${ic(P.phone)}전화</a>`:''}</span>${amt}
+      <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
+      <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
   if(open){
-    detail=`<dl class="detail"><dt>화주</dt><dd>${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}${phHtml(t.clientPhone,t.clientName)}</dd>`
-      +`<dt>상차</dt><dd>${addrHtml(t.from,t.fromAddr,t.fromPhone,t.fromName)}</dd><dt>하차</dt><dd>${addrHtml(t.to,t.toAddr,t.toPhone,t.toName)}</dd>`
-      +(t.fee?`<dt>수수료</dt><dd class="num">${won(t.fee)}</dd>`:'')
-      +(t.memo?`<dt>메모</dt><dd>${esc(t.memo)}</dd>`:'')+`</dl>`;
+    detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
+      +addrBlk('상차','from',t.from,t.fromAddr,t.fromPhone,t.fromName)+addrBlk('하차','to',t.to,t.toAddr,t.toPhone,t.toName)
+      +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
+      +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
+      +(t.memo?`<div class="blk"><span class="bl">메모</span><div>${esc(t.memo)}</div></div>`:'')+`</div>`;
   }
+  const B=(cls,act,label,icon)=>`<button type="button" class="btn ${cls}" data-do="${act}" data-id="${t.id}">${icon?ic(icon):''}${label}</button>`;
   let act='';
   if(payingId===t.id){
-    act=`<div class="act"><div class="payline"><label for="pd-${t.id}" style="font-size:15px;font-weight:600">입금일</label><input type="date" id="pd-${t.id}" value="${todayIso}"><button class="btn small" data-do="paycfm" data-id="${t.id}">입금 확인</button><button class="btn ghost small" data-do="paycancel">취소</button></div></div>`;
-  } else if(mode==='unpaid'){
-    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button><button class="btn ghost small" data-do="sms" data-id="${t.id}">정산 문자</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>`:''}</div>`;
-  } else if(open){
-    act=`<div class="act">
-      <button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>
-      
-      ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button><button class="btn ghost small" data-do="sms" data-id="${t.id}">정산 문자</button>`}
-      ${deletingId===t.id?`<button class="btn danger small" data-do="delcfm" data-id="${t.id}">정말 삭제</button><button class="btn ghost small" data-do="delcancel">취소</button>`:`<button class="btn ghost small" data-do="del" data-id="${t.id}">삭제</button>`}</div>`;
+    act=`<div class="act"><div class="paybox"><label for="pd-${t.id}">언제 받으셨어요?</label><input type="date" id="pd-${t.id}" value="${todayIso}">`
+      +`<div class="r1">${B('','paycfm','입금 확인',P.check)}<button type="button" class="btn ghost" data-do="paycancel">취소</button></div></div></div>`;
+  } else {
+    const main=t.paid?`<div class="r1 one">${B('ghost','unpay','미수로 되돌리기')}</div>`
+      :`<div class="r1">${B('','pay','입금 완료',P.check)}${B('ghost','sms','정산 문자')}</div>`;
+    const sub=deletingId===t.id?`<div class="r2">${B('danger','delcfm','정말 삭제')}<button type="button" class="btn ghost" data-do="delcancel">취소</button></div>`
+      :`<div class="r2">${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
+    if(mode==='unpaid')act=`<div class="act">${main}${open?sub:''}</div>`;
+    else if(open)act=`<div class="act">${main}${sub}</div>`;
   }
   return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${act}</div>`;
 }
@@ -246,7 +265,10 @@ function renderBackupBanner(){
 function renderCal(){
   renderBackupBanner();
   $('c-first').hidden=trips.length>0;
-  $('c-pick').value=calSel;
+  $('c-titletxt').textContent=`${calY}년 ${calM+1}월`;
+  const mt=monthTrips(calY,calM);
+  $('c-mpaid').textContent=won(mt.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0));
+  $('c-mdue').textContent=won(mt.filter(t=>!t.paid).reduce((s,t)=>s+t.amount,0));
   const first=new Date(calY,calM,1).getDay(), days=new Date(calY,calM+1,0).getDate();
   let h='';
   for(let i=0;i<first;i++) h+='<div class="day blank"></div>';
@@ -263,7 +285,8 @@ function renderCal(){
   const ts=trips.filter(t=>t.date===calSel).sort(byOld);
   const sum=ts.reduce((s,t)=>s+t.amount,0);
   const dcost=costs.filter(c=>c.date===calSel).reduce((s,c)=>s+c.amount,0);
-  $('c-daytitle').textContent=`${md(calSel)} 운행 ${ts.length}건`+(ts.length?` · ${won(sum)}`:'')+(dcost?` · 지출 ${won(dcost)}`:'');
+  $('c-daytitle').textContent=dayK(calSel);
+  $('c-daysum').textContent=`운행 ${ts.length}건`+(ts.length?` · ${short(sum)}원`:'')+(dcost?` · 지출 ${short(dcost)}원`:'');
   $('c-seg').hidden=!ts.length;
   $('c-seg').innerHTML=segHtml('cal',ts,calFilter);
   const shown=ts.filter(t=>pass(t,calFilter));
@@ -272,30 +295,133 @@ function renderCal(){
 }
 
 // ---------- 장부 ----------
+const inRange=(x,r)=>x.date>=r.start&&x.date<=r.end;
+const ledTrips=()=>ledRange?trips.filter(t=>inRange(t,ledRange)):monthTrips(ledY,ledM);
+const ledCosts=()=>ledRange?costs.filter(c=>inRange(c,ledRange)):monthCosts(ledY,ledM);
+const ledLabel=()=>!ledRange?`${ledY}년 ${ledM+1}월`:ledRange.start===ledRange.end?dayK(ledRange.start):`${mdK(ledRange.start)} ~ ${mdK(ledRange.end)}`;
+let ledSearch=false;
 function renderLedger(){
   $('l-tripgrp').hidden=ledKind!=='trip'; $('l-costgrp').hidden=ledKind!=='cost';
   document.querySelectorAll('#l-kind [data-lkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lkind===ledKind));
-  $('l-pick').value=MONTH_OK?`${ledY}-${pad(ledM+1)}`:`${ledY}-${pad(ledM+1)}-01`;
-  const all=monthTrips(ledY,ledM);
+  const span=!ledRange?'이 달':ledRange.start===ledRange.end?'이 날':'이 기간';
+  $('l-titletxt').textContent=ledLabel();
+  $('l-kicker').textContent=ledRange&&ledRange.start.slice(0,4)!==String(TODAY.getFullYear())?`장부 · ${ledRange.start.slice(0,4)}년`:'장부';
+  const all=ledTrips();
   const sum=all.reduce((s,t)=>s+t.amount,0), paid=all.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);
-  $('l-sum').textContent=short(sum); $('l-paid').textContent=short(paid); $('l-due').textContent=short(sum-paid);
+  $('l-sum').textContent=short(sum); $('l-due').textContent=short(sum-paid);
+  const showSearch=ledSearch||!!$('l-search').value;
+  $('l-searchbox').hidden=!showSearch; $('l-searchbtn').setAttribute('aria-pressed',showSearch);
   const q=$('l-search').value.trim().toLowerCase();
   const found=all.filter(t=>!q||hay(t).includes(q));
   $('l-seg').innerHTML=segHtml('led',found,ledFilter);
   const list=found.filter(t=>pass(t,ledFilter)).sort(byNew);
-  $('l-list').innerHTML=list.length?list.map(t=>rowHtml(t,'ledger')).join(''):`<div class="empty">${q?'찾는 기록이 없어요.':'이 달은 '+EMPTY[ledFilter]}</div>`;
+  $('l-list').innerHTML=list.length?list.map(t=>rowHtml(t,'month')).join(''):`<div class="empty">${q?'찾는 기록이 없어요.':span+'은 '+EMPTY[ledFilter]}</div>`;
   // 지출 · 순수익 (순수익 = 총 운임 − 수수료 − 지출)
-  const mc=monthCosts(ledY,ledM), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-csum;
+  const mc=ledCosts(), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-csum;
+  $('l-ntrip').textContent=all.length+'건'; $('l-ncost').textContent=mc.length+'건';
+  $('l-netlabel').textContent=span+' 순수익';
   $('l-costlabel').textContent=fees?'수수료·지출':'지출';
   $('l-cost').textContent=short(fees+csum);
-  $('l-net').textContent=(net<0?'-':'')+short(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
+  $('l-net').textContent=(net<0?'-':'')+won(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
+  $('l-costh').textContent=span+' 지출';
   $('l-costsum').textContent=won(csum);
+  $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
   const byCat={};mc.forEach(c=>byCat[c.cat||'기타']=(byCat[c.cat||'기타']||0)+c.amount);
   $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
   const cshown=[...mc].sort(byNew);
-  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">이 달은 적은 지출이 없어요.</div>`;
+  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">${span}은 적은 지출이 없어요.</div>`;
 }
 function monthCosts(y,m){const p=`${y}-${pad(m+1)}`;return costs.filter(c=>c.date.startsWith(p))}
+
+// ---------- 날짜 골라서 보기 (달력 · 장부 위쪽 제목을 누르면) ----------
+const curYM=()=>TODAY.getFullYear()*12+TODAY.getMonth();
+// 달력: 오늘·어제 같은 바로 가기, 달 고르기, 날짜 직접 고르기
+let jpY=calY;
+function renderJump(){
+  $('jp-year').textContent=`${jpY}년`;
+  const n=Array(12).fill(0); trips.forEach(t=>{if(t.date.startsWith(jpY+'-'))n[Number(t.date.slice(5,7))-1]++});
+  $('jp-months').innerHTML=n.map((c,i)=>{const on=jpY===calY&&i===calM, off=jpY*12+i>curYM()&&!c;
+    return `<button type="button" class="mo${on?' on':''}" data-jm="${i}" aria-pressed="${on}"${off?' disabled':''}><b>${i+1}월</b><small>${c?c+'건':'-'}</small></button>`}).join('');
+}
+function openJump(){jpY=calY;$('jp-date').value=calSel;renderJump();$('calsheet').hidden=false;pushOverlay({jump:true})}
+function closeJump(){$('calsheet').hidden=true;popOverlay('jump')}
+function calGo(ds){const d=parseD(ds);calY=d.getFullYear();calM=d.getMonth();calSel=ds;calFilter='all';openId=payingId=null}
+$('calsheet').addEventListener('click',e=>{
+  if(e.target===$('calsheet')||e.target.closest('#jp-close')){closeJump();return}
+  if(e.target.closest('#jp-yprev')){jpY--;renderJump();return}
+  if(e.target.closest('#jp-ynext')){jpY++;renderJump();return}
+  const q=e.target.closest('[data-jq]');
+  if(q){const d=new Date(TODAY),k=q.dataset.jq;if(k==='m')d.setMonth(d.getMonth()-1);else d.setDate(d.getDate()-Number(k));calGo(iso(d));closeJump();render();return}
+  const m=e.target.closest('[data-jm]');
+  if(m){const i=Number(m.dataset.jm);calGo(jpY===TODAY.getFullYear()&&i===TODAY.getMonth()?todayIso:`${jpY}-${pad(i+1)}-01`);closeJump();render();return}
+  if(e.target.closest('#jp-go')){const v=$('jp-date').value;if(!v)return;calGo(v);closeJump();render()}
+});
+// 장부: 한 달 · 하루 · 기간 직접
+let lpMode='month', lpY=ledY, lpCY=ledY, lpCM=ledM, lpDraft={start:null,end:null};
+function openLedPick(){
+  lpMode=!ledRange?'month':ledRange.start===ledRange.end?'day':'range';
+  lpY=ledY; const d=ledRange?parseD(ledRange.start):new Date(ledY,ledM,1); lpCY=d.getFullYear(); lpCM=d.getMonth();
+  lpDraft=ledRange?{...ledRange}:{start:null,end:null};
+  renderLedPick(); $('ledsheet').hidden=false; pushOverlay({lpick:true});
+}
+function closeLedPick(){$('ledsheet').hidden=true;popOverlay('lpick')}
+function setLedRange(r){ledRange=r;openId=payingId=deletingId=costOpen=costDel=null;closeLedPick();render();window.scrollTo(0,0)}
+function renderLedPick(){
+  document.querySelectorAll('#lp-mode [data-lpm]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lpm===lpMode));
+  const month=lpMode==='month';
+  $('lp-mbox').hidden=!month; $('lp-cbox').hidden=month;
+  if(month){
+    $('lp-year').textContent=`${lpY}년`;
+    const s=Array(12).fill(0), n=Array(12).fill(0);
+    trips.forEach(t=>{if(t.date.startsWith(lpY+'-')){const i=Number(t.date.slice(5,7))-1;s[i]+=t.amount;n[i]++}});
+    $('lp-months').innerHTML=s.map((v,i)=>{const on=!ledRange&&lpY===ledY&&i===ledM, off=lpY*12+i>curYM()&&!n[i];
+      return `<button type="button" class="mo${on?' on':''}" data-lpmon="${i}" aria-pressed="${on}"${off?' disabled':''}><b>${i+1}월</b><small>${n[i]?short(v):'-'}</small></button>`}).join('');
+    return;
+  }
+  const {start,end}=lpDraft, day=lpMode==='day';
+  $('lp-range').hidden=day;
+  $('lp-s').textContent=start?mdK(start):'날짜를 눌러요'; $('lp-e').textContent=end&&!day?mdK(end):'-';
+  $('lp-s').classList.toggle('on',!start); $('lp-e').classList.toggle('on',!!start&&!end);
+  $('lp-ctitle').textContent=`${lpCY}년 ${lpCM+1}월`;
+  const first=new Date(lpCY,lpCM,1).getDay(), days=new Date(lpCY,lpCM+1,0).getDate();
+  let h='';
+  for(let i=0;i<first;i++)h+='<div class="rday blank"></div>';
+  for(let d=1;d<=days;d++){
+    const ds=`${lpCY}-${pad(lpCM+1)}-${pad(d)}`, wd=(first+d-1)%7;
+    const c=['rday',wd===0?'sun':wd===6?'sat':'',ds===todayIso?'today':''];
+    if(start&&ds===start){c.push('start');if(end&&end!==start)c.push('hasend')}
+    if(end&&ds===end)c.push('end');
+    if(start&&end&&ds>start&&ds<end)c.push('in');
+    h+=`<button type="button" class="${c.join(' ')}" data-lpd="${ds}">${d}</button>`;
+  }
+  $('lp-grid').innerHTML=h;
+  const ok=day?!!start:!!(start&&end);
+  $('lp-apply').disabled=!ok;
+  $('lp-apply').textContent=day?(start?`${dayK(start)} 보기`:'날짜를 눌러 주세요')
+    :!start?'시작일을 눌러 주세요':!end?'끝날을 눌러 주세요':`${mdK(start)} ~ ${mdK(end)} (${Math.round((parseD(end)-parseD(start))/86400000)+1}일) 보기`;
+}
+$('ledsheet').addEventListener('click',e=>{
+  if(e.target===$('ledsheet')||e.target.closest('#lp-close')){closeLedPick();return}
+  const m=e.target.closest('[data-lpm]');
+  if(m){lpMode=m.dataset.lpm;if(lpMode==='day'&&lpDraft.start)lpDraft.end=lpDraft.start;renderLedPick();return}
+  const q=e.target.closest('[data-lpq]');
+  if(q){const y=TODAY.getFullYear(),mo=TODAY.getMonth(),k=q.dataset.lpq;
+    if(k==='lastm'){const d=new Date(y,mo-1,1);ledY=d.getFullYear();ledM=d.getMonth();setLedRange(null);return}
+    const s=k==='week'?new Date(y,mo,TODAY.getDate()-(TODAY.getDay()+6)%7):k==='3m'?new Date(y,mo-2,1):new Date(y,0,1);
+    setLedRange({start:iso(s),end:todayIso});return}
+  const mon=e.target.closest('[data-lpmon]');
+  if(mon){ledY=lpY;ledM=Number(mon.dataset.lpmon);setLedRange(null);return}
+  const d=e.target.closest('[data-lpd]');
+  if(d){const v=d.dataset.lpd,r=lpDraft;
+    if(lpMode==='day'){r.start=r.end=v}
+    else if(!r.start||r.end){r.start=v;r.end=null} else if(v<r.start){r.start=v} else {r.end=v}
+    renderLedPick();return}
+  if(e.target.closest('#lp-yprev')){lpY--;renderLedPick();return}
+  if(e.target.closest('#lp-ynext')){lpY++;renderLedPick();return}
+  if(e.target.closest('#lp-cprev')){lpCM--;if(lpCM<0){lpCM=11;lpCY--}renderLedPick();return}
+  if(e.target.closest('#lp-cnext')){lpCM++;if(lpCM>11){lpCM=0;lpCY++}renderLedPick();return}
+  if(e.target.closest('#lp-apply')){const r=lpDraft;if(!r.start)return;setLedRange({start:r.start,end:lpMode==='day'?r.start:(r.end||r.start)})}
+});
 let costOpen=null, costDel=null;
 function costRowHtml(c){
   const open=costOpen===c.id;
@@ -321,11 +447,20 @@ const fmtDT=ms=>{const d=new Date(ms);return `${d.getMonth()+1}/${d.getDate()} $
 // 내 정보: 고치는 중이 아니면 저장된 값으로 채움 (다른 휴대폰에서 바꾼 것도 반영)
 let profDirty=false;
 const acctText=p=>[p.bank,p.account,p.holder].filter(Boolean).join(' ');
+// 적어 둔 게 있으면 한 줄 요약 + [고치기], 없거나 고치는 중이면 입력 칸
+let profEdit=false;
 function renderProfile(){
-  const p=getProfile();
+  const p=getProfile(), has=!!(p.name||p.carNo||p.account||p.holder||p.phone);
   if(!profDirty)PROF.forEach(k=>$('p-'+k).value=p[k]||'');
+  const edit=profEdit||!has;
+  $('p-sum').hidden=edit; $('p-card').hidden=!edit; $('p-cancel').hidden=!has;
+  $('p-av').textContent=(p.name||p.holder||'나').trim().slice(0,1);
+  $('p-n').textContent=p.name||p.holder||'이름 없음'; $('p-car').textContent=p.carNo||'';
+  $('p-acct').textContent=acctText(p)||'입금 계좌를 적어 두세요';
   $('p-copy').hidden=!p.account;
 }
+$('p-edit').onclick=()=>{profEdit=true;$('p-msg').textContent='';renderProfile();$('p-carNo').focus()};
+$('p-cancel').onclick=()=>{profEdit=false;profDirty=false;renderProfile()};
 ['input','change'].forEach(ev=>$('p-form').addEventListener(ev,()=>{profDirty=true;$('p-msg').textContent=''}));
 $('p-account').addEventListener('input',e=>{e.target.value=e.target.value.replace(/[^\d-]/g,'')});
 $('p-form').addEventListener('submit',e=>{
@@ -335,8 +470,8 @@ $('p-form').addEventListener('submit',e=>{
   const cur=store.get('profile');
   const rec=cur||normalize({id:'profile',createdAt:Date.now(),date:'2000-01-01',kind:'profile'});
   rec.deleted=true; rec.prof=prof; // deleted:true 이유는 PROF 위 설명 참고
-  saveTrip(rec); profDirty=false; renderProfile();
-  $('p-msg').textContent='저장했어요.';
+  saveTrip(rec); profDirty=false; profEdit=false; renderProfile();
+  toast('내 정보를 저장했어요.');
 });
 $('p-copy').onclick=()=>{const v=acctText(getProfile());
   try{navigator.clipboard.writeText(v).then(()=>toast(`${v} 복사했어요`),()=>toast('복사가 안 됐어요. 계좌번호를 길게 눌러 복사해 주세요'))}
@@ -799,7 +934,7 @@ document.addEventListener('contextmenu',e=>{if(e.target.closest('.list .row[data
 
 // 새로고침해도 보던 화면(탭·달·스크롤)으로 돌아오게 — 앱을 완전히 닫았다 열면 달력부터
 const ss={get(k){try{return sessionStorage.getItem(k)}catch(_){return null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(_){}}};
-function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,lk:ledKind,y:window.scrollY}))}
+function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,lr:ledRange,lk:ledKind,y:window.scrollY}))}
 function loadSpot(){
   let s=null;try{s=JSON.parse(ss.get('spot'))}catch(_){}
   if(!s||!VIEWS.includes(s.v))return 0;
@@ -808,6 +943,7 @@ function loadSpot(){
   if(typeof s.calSel==='string')calSel=s.calSel;
   if(Number.isInteger(s.ledY)&&Number.isInteger(s.ledM)){ledY=s.ledY;ledM=s.ledM}
   if(s.lk==='cost')ledKind='cost';
+  if(s.lr&&typeof s.lr.start==='string'&&typeof s.lr.end==='string')ledRange={start:s.lr.start,end:s.lr.end};
   return s.y||0;
 }
 window.addEventListener('pagehide',saveSpot);
@@ -860,6 +996,8 @@ window.addEventListener('popstate',e=>{
   if(uPanel&&!s.panel)uPanel=false;
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
+  if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
+  if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)leaveEdit();
   if(costEditId!==null&&!s.cedit)resetCost();
@@ -900,7 +1038,7 @@ document.addEventListener('click',e=>{
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
   if(fill){$(fill.dataset.fill).value=fill.dataset.v;
-    if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value&&!$('f-clientname').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&(t.clientPhone||t.clientName));if(p){$('f-clientphone').value=p.clientPhone||'';$('f-clientname').value=p.clientName||''}}
+    if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value&&!$('f-clientname').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&(t.clientPhone||t.clientName));if(p){$('f-clientphone').value=p.clientPhone||'';$('f-clientname').value=p.clientName||'';syncMore()}}
     return}
   const ag=e.target.closest('[data-age]');
   if(ag){const v=ag.dataset.age||null;uAge=(v&&uAge===v)?null:v;openId=payingId=null;renderUnpaid();return}
@@ -941,12 +1079,17 @@ document.addEventListener('click',e=>{
 });
 $('c-prev').onclick=()=>{calM--;if(calM<0){calM=11;calY--}calSel=`${calY}-${pad(calM+1)}-01`;calFilter='all';render()};
 $('c-next').onclick=()=>{calM++;if(calM>11){calM=0;calY++}calSel=`${calY}-${pad(calM+1)}-01`;calFilter='all';render()};
-$('l-prev').onclick=()=>{ledM--;if(ledM<0){ledM=11;ledY--}render()};
-$('l-next').onclick=()=>{ledM++;if(ledM>11){ledM=0;ledY++}render()};
-$('c-pick').onchange=e=>{const v=e.target.value;if(!v)return;const d=parseD(v);calY=d.getFullYear();calM=d.getMonth();calSel=v;calFilter='all';openId=payingId=null;render()};
-$('l-pick').onchange=e=>{const v=e.target.value;if(!v)return;const [y,m]=v.split('-').map(Number);ledY=y;ledM=m-1;openId=payingId=null;render()};
+// 하루·기간을 보고 있었으면 그 시작 달에서부터 한 달씩
+function ledStep(n){if(ledRange){const d=parseD(ledRange.start);ledY=d.getFullYear();ledM=d.getMonth();ledRange=null}
+  ledM+=n;if(ledM<0){ledM=11;ledY--}if(ledM>11){ledM=0;ledY++}openId=payingId=deletingId=costOpen=costDel=null;render()}
+$('l-prev').onclick=()=>ledStep(-1);
+$('l-next').onclick=()=>ledStep(1);
+$('l-title').onclick=openLedPick;
+$('c-title').onclick=openJump;
+$('c-today').onclick=()=>{calGo(todayIso);render()};
+$('l-searchbtn').onclick=()=>{ledSearch=!(ledSearch||$('l-search').value);if(!ledSearch)$('l-search').value='';renderLedger();if(ledSearch)$('l-search').focus()};
 $('l-search').oninput=renderLedger;
-$('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`아빠장부_${ledY}-${pad(ledM+1)}.csv`,monthCosts(ledY,ledM));
+$('l-csv').onclick=()=>doCsv(ledTrips(),ledRange?`아빠장부_${ledRange.start}_${ledRange.end}.csv`:`아빠장부_${ledY}-${pad(ledM+1)}.csv`,ledCosts());
 $('l-addcost').onclick=()=>{navTab('add');setKind('cost');$('cf-amt').focus()};
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
 $('u-rangebtn').onclick=()=>{uPanel=!uPanel;if(uPanel){uDraft=uRange?{...uRange}:{start:null,end:null};const d=uRange?parseD(uRange.start):TODAY;rpY=d.getFullYear();rpM=d.getMonth();pushOverlay({panel:'range'})}else popOverlay('panel');renderUnpaid()};
@@ -1021,7 +1164,7 @@ $('cf').addEventListener('submit',e=>{
   const date=$('cf-date').value, amount=Number($('cf-amt').value.replace(/\D/g,'')), memo=$('cf-memo').value.trim();
   const miss=[!date&&'날짜',!costCat&&'항목',!amount&&'금액'].filter(Boolean);
   if(miss.length){$('cf-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
-  const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth(); ledKind='cost';
+  const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth(); ledKind='cost'; if(ledRange&&!inRange({date},ledRange))ledRange=null;
   if(costEditId!==null){
     const c=store.get(costEditId);
     if(!c){resetCost();popOverlay('cedit');go(backView);return}
@@ -1044,7 +1187,9 @@ function setTextSize(z){
   document.querySelectorAll('#s-text [data-tsize]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tsize===z));
 }
 setTextSize(ls.get('textSize')||'');
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false);showDraftNote('')}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');['f-more','f-cmore'].forEach(i=>$(i).open=false);setMode(false);showDraftNote('')}
+// 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
+function syncMore(){[['f-cmore','f-clientname','f-clientphone']].forEach(([d,a,b])=>{if($(a).value.trim()||$(b).value.trim())$(d).open=true});if($('f-fee').value.trim())$('f-more').open=true}
 
 // ---------- 적는 중 임시 저장 ----------
 // 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
@@ -1058,7 +1203,7 @@ function saveDraft(){
   const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more;syncMore()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
@@ -1106,7 +1251,7 @@ function startEdit(t){
   formKind='trip'; resetForm(); editingId=t.id; setMode();
   fillTrip(t);
   $('f-paidnow').checked=!!t.paid;
-  $('f-more').open=!!(t.fee||t.paid);
+  syncMore();
   editOrig=snapKey(formSnap()); hideAsk();
   view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
@@ -1134,7 +1279,7 @@ $('f').addEventListener('submit',e=>{
     saveTrip(t);
     const id=t.id; resetForm();
     if(backView==='cal'){const d=parseD(date);calY=d.getFullYear();calM=d.getMonth();calSel=date}
-    if(backView==='ledger'){const d=parseD(date);ledY=d.getFullYear();ledM=d.getMonth()}
+    if(backView==='ledger'&&!(ledRange&&inRange({date},ledRange))){const d=parseD(date);ledY=d.getFullYear();ledM=d.getMonth();ledRange=null}
     view=backView; openId=id; popOverlay('edit'); render(); window.scrollTo(0,0);
     toast('수정했어요',()=>{Object.assign(t,before);saveTrip(t)});
     return;
