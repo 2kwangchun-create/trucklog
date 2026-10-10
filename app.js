@@ -93,15 +93,20 @@ const DB={
 // 지출도 같은 저장소·클라우드(trips 컬렉션)에 함께 넣어 동기화·백업을 그대로 씀
 const store=new Map();
 let trips=[], costs=[];
-function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>t.kind!=='cost');costs=live.filter(t=>t.kind==='cost')}
+function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
 const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),paid:r.paid?String(r.paid):null};
   STR.forEach(k=>t[k]=r[k]==null?'':String(r[k]));
-  if(!t.payType&&t.kind!=='cost')t.payType='인수증';
+  if(!t.payType&&!t.kind)t.payType='인수증';
+  if(t.kind==='profile'){const p=r.prof||{};t.prof={};PROF.forEach(k=>t.prof[k]=p[k]==null?'':String(p[k]))}
   return t;
 }
+// 내 정보(차량 번호·전화·계좌): id 'profile' 기록 하나로 클라우드에 함께 저장해 다른 휴대폰·새 휴대폰에서도 그대로 씀.
+// deleted:true로 두는 건 예전 버전 앱이 운행 기록으로 착각해 목록에 띄우지 않게 하려는 것 (지우면 안 됨)
+const PROF=['carNo','phone','bank','account','holder'];
+const getProfile=()=>{const p=store.get('profile');return (p&&p.prof)||{}};
 function validRecord(r){return r&&r.id&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)}
 // 들어온 기록이 더 최근에 고친 것이면 받아들임
 function mergeIncoming(r){
@@ -314,8 +319,32 @@ function renderRecent(){
 
 // ---------- 설정·백업 ----------
 const fmtDT=ms=>{const d=new Date(ms);return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+// 내 정보: 고치는 중이 아니면 저장된 값으로 채움 (다른 휴대폰에서 바꾼 것도 반영)
+let profDirty=false;
+const acctText=p=>[p.bank,p.account,p.holder].filter(Boolean).join(' ');
+function renderProfile(){
+  const p=getProfile();
+  if(!profDirty)PROF.forEach(k=>$('p-'+k).value=p[k]||'');
+  $('p-copy').hidden=!p.account;
+}
+['input','change'].forEach(ev=>$('p-form').addEventListener(ev,()=>{profDirty=true;$('p-msg').textContent=''}));
+$('p-account').addEventListener('input',e=>{e.target.value=e.target.value.replace(/[^\d-]/g,'')});
+$('p-form').addEventListener('submit',e=>{
+  e.preventDefault();
+  document.activeElement&&document.activeElement.blur(); // 키보드 닫기 (먼저 해야 아래 안내가 지워지지 않음)
+  const prof={};PROF.forEach(k=>prof[k]=$('p-'+k).value.trim());
+  const cur=store.get('profile');
+  const rec=cur||normalize({id:'profile',createdAt:Date.now(),date:'2000-01-01',kind:'profile'});
+  rec.deleted=true; rec.prof=prof; // deleted:true 이유는 PROF 위 설명 참고
+  saveTrip(rec); profDirty=false; renderProfile();
+  $('p-msg').textContent='저장했어요.';
+});
+$('p-copy').onclick=()=>{const v=acctText(getProfile());
+  try{navigator.clipboard.writeText(v).then(()=>toast(`${v} 복사했어요`),()=>toast('복사가 안 됐어요. 계좌번호를 길게 눌러 복사해 주세요'))}
+  catch(_){toast('복사가 안 됐어요. 계좌번호를 길게 눌러 복사해 주세요')}};
 function renderSettings(){
   if(!$('s-cloud'))return;
+  renderProfile();
   let h='';
   if(!Cloud.configured){
     h=`<p class="hint">클라우드 저장이 아직 연결되지 않았어요. 지금은 이 휴대폰에만 저장됩니다.<br>연결 방법은 설치 안내서의 "클라우드 저장 켜기"를 보세요.</p>`;

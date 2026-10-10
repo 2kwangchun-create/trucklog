@@ -64,6 +64,8 @@ header.top h1{margin:0;font-size:22px;font-weight:700}
 .c-paid{color:var(--paid)} .c-due{color:var(--late)} .c-cost{color:var(--due)}
 .stats2{grid-template-columns:repeat(2,1fr)}
 .grp{display:contents}
+.pform{display:flex;flex-direction:column;gap:12px}
+.acct{display:grid;grid-template-columns:2fr 3fr;gap:6px}
 /* 글씨 크기 (설정): 화면 전체를 비율로 키움 */
 html[data-text="l"] body{zoom:1.12}
 html[data-text="xl"] body{zoom:1.25}
@@ -481,6 +483,18 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <!-- 설정·백업 -->
   <section class="view" id="v-set" hidden>
     <header class="top"><h1>설정 · 백업</h1></header>
+    <div class="card"><h2>내 정보</h2>
+      <p class="hint">한 번 적어 두면 화주에게 보내는 정산 문자에 자동으로 들어가요.</p>
+      <form class="pform" id="p-form" novalidate>
+        <div class="field"><label for="p-carNo">차량 번호</label><input type="text" id="p-carNo" placeholder="예: 경기12가3456" autocomplete="off"></div>
+        <div class="field"><label for="p-phone">전화번호</label><input type="tel" id="p-phone" class="phone" inputmode="tel" placeholder="예: 010-1234-5678"></div>
+        <div class="field"><label for="p-bank">입금 계좌</label>
+          <div class="acct"><input type="text" id="p-bank" placeholder="은행 (예: 농협)" aria-label="은행"><input type="text" id="p-account" inputmode="numeric" placeholder="계좌번호" aria-label="계좌번호"></div>
+          <input type="text" id="p-holder" placeholder="예금주 (예: 홍길동)" aria-label="예금주"></div>
+        <div class="btnrow"><button type="submit" class="btn" id="p-save">저장</button><button type="button" class="btn ghost" id="p-copy" hidden>계좌 복사</button></div>
+        <p class="hint small" id="p-msg"></p>
+      </form>
+    </div>
     <div class="card"><h2>클라우드 저장</h2><div id="s-cloud"></div></div>
     <div class="card"><h2>글씨 크기</h2>
       <div class="seg" id="s-text" role="group" aria-label="글씨 크기"><button type="button" data-tsize="" aria-pressed="true">보통</button><button type="button" data-tsize="l" aria-pressed="false">크게</button><button type="button" data-tsize="xl" aria-pressed="false">아주 크게</button></div>
