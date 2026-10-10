@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5e4a" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+<meta name="description" content="화물 운행과 받을 돈을 한눈에 보는 개인 장부">
+<title>운행장부</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-column phone app, bottom tab bar, big numbers first, list below */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --line:#dfe2dd; --fg:#1d2420; --muted:#5f6a63;
+  --accent:#1f5e4a; --accent-fg:#ffffff; --accent-soft:#e1ece6;
+  --due:#b4521b; --due-soft:#fbeadf; --late:#b3261e; --late-soft:#f9e2df;
+  --paid:#2f7a3c; --paid-soft:#e2f0e3;
+  --client:#2747a0; --client-soft:#eef1fa;
+  --a1:#fdecea; --a1-fg:#b3261e; --a2:#f9cdc8; --a2-fg:#9c1f18; --a3:#f09a91; --a3-fg:#5e0f0a;
+  --a4:#d4473c; --a4-fg:#ffffff; --a5:#8a160f; --a5-fg:#ffffff;
+  --font:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121614; --surface:#1b201d; --line:#2e3531; --fg:#eef1ee; --muted:#a3ada6;
+  --accent:#7cc4a4; --accent-fg:#0f1a15; --accent-soft:#1f3229;
+  --due:#f0a06b; --due-soft:#3a2617; --late:#f28b82; --late-soft:#3d1d1a;
+  --paid:#86cf8f; --paid-soft:#1d3220; --client:#9fb6f2; --client-soft:#1c2233; --a1:#341a18; --a1-fg:#f6b3ac; --a2:#522420; --a2-fg:#ffcdc8; --a3:#7d2f28; --a3-fg:#ffe6e3; --a4:#c0392f; --a4-fg:#ffffff; --a5:#ff5a4d; --a5-fg:#1a0705; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121614; --surface:#1b201d; --line:#2e3531; --fg:#eef1ee; --muted:#a3ada6;
+  --accent:#7cc4a4; --accent-fg:#0f1a15; --accent-soft:#1f3229;
+  --due:#f0a06b; --due-soft:#3a2617; --late:#f28b82; --late-soft:#3d1d1a;
+  --paid:#86cf8f; --paid-soft:#1d3220; --client:#9fb6f2; --client-soft:#1c2233; --a1:#341a18; --a1-fg:#f6b3ac; --a2:#522420; --a2-fg:#ffcdc8; --a3:#7d2f28; --a3-fg:#ffe6e3; --a4:#c0392f; --a4-fg:#ffffff; --a5:#ff5a4d; --a5-fg:#1a0705; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:17px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,textarea{font:inherit;color:inherit}
+html{background:var(--bg)}
+body{margin:0;overscroll-behavior-y:none}
+[hidden]{display:none!important}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.app{max-width:560px;margin:0 auto;padding:env(safe-area-inset-top,0px) 16px calc(100px + env(safe-area-inset-bottom,0px))}
+.notice{margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--accent-soft);color:var(--fg);font-size:14px}
+header.top{display:flex;align-items:center;justify-content:space-between;padding-block:16px 8px}
+header.top h1{margin:0;font-size:22px;font-weight:700}
+.view{display:flex;flex-direction:column;gap:14px}
+
+/* summary */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.hero .label{font-size:15px;color:var(--muted);font-weight:500}
+.hero .big{font-size:36px;font-weight:700;color:var(--late);letter-spacing:-.5px}
+.hero .sub{font-size:15px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 10px}
+.stats div{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.stats span{font-size:14px;color:var(--muted)}
+.stats b{font-size:18px}
+.c-paid{color:var(--paid)} .c-due{color:var(--late)}
+
+/* list */
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.open{background:var(--client-soft)}
+.head{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;cursor:pointer;border-radius:8px}
+.head .client{font-size:19px;font-weight:700;color:var(--client);min-width:0;overflow-wrap:anywhere;display:flex;align-items:center;gap:7px}
+.head .client::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--client);flex:none}
+.head .client.none{color:var(--muted);font-weight:500;font-size:16px}
+.head .client.none::before{background:var(--line)}
+.head .route{grid-column:1/-1;font-size:16px;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.head .meta{grid-column:1/-1;font-size:14px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.head .more{margin-left:auto;color:var(--client);font-weight:600}
+.head .amt{font-size:19px;font-weight:700;text-align:right}
+.detail{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px}
+.detail dt{color:var(--muted);font-weight:600}
+.detail dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.detail dd b{font-weight:700;margin-right:6px}
+.detail .na{color:var(--muted)}
+.row .act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sub-input{margin-top:2px}
+textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit;font-size:17px;color:var(--fg);resize:vertical}
+.detail .ph{display:block;margin-top:2px;color:var(--client);font-weight:600}
+.detail .ph a{color:inherit}
+.detail .ph.na{color:var(--muted);font-weight:400}
+.head .client{flex-wrap:wrap}
+.head .cph{font-size:15px;font-weight:600;color:var(--client);white-space:nowrap;text-decoration:underline;text-underline-offset:3px;padding:4px 0}
+.cpy{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 8px;font-size:13px;font-weight:500;color:var(--fg);margin-left:4px}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:13px;font-weight:600}
+.chip.a1{background:var(--a1);color:var(--a1-fg)}
+.chip.a2{background:var(--a2);color:var(--a2-fg)}
+.chip.a3{background:var(--a3);color:var(--a3-fg)}
+.chip.a4{background:var(--a4);color:var(--a4-fg)}
+.chip.a5{background:var(--a5);color:var(--a5-fg);font-weight:700}
+.agelegend{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted);margin:2px}
+.agelegend button.chip{border:0;font-size:14px;padding:6px 11px;font-family:inherit}
+.agelegend button.chip.all{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.agelegend.picking button.chip{opacity:.4}
+.agelegend.picking button.chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--fg)}
+.agelegend button.chip:disabled{opacity:.25;cursor:default}
+.chip.paid{background:var(--paid-soft);color:var(--paid)}
+.chip.pt{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+.btn{border:0;border-radius:10px;padding:10px 16px;font-weight:600;font-size:16px;background:var(--accent);color:var(--accent-fg)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.btn.danger{background:var(--late);color:var(--surface)}
+.btn.small{padding:7px 12px;font-size:15px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.section-title{font-size:15px;color:var(--muted);font-weight:600;margin:4px 2px -6px}
+input[type=date],input[type=text],input[type=search],input[inputmode]{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:17px}
+.payline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}
+.payline input{flex:1;min-width:150px}
+
+/* 받을 돈: 검색 + 기간 */
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filters input{flex:1 1 200px;min-width:0}
+.rangebtn{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:600;font-size:16px;white-space:nowrap}
+.rangebtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+.rangebtn.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.rangepanel{background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;font-size:15px;font-weight:500}
+.rwk{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:13px;color:var(--muted)}
+.sun{color:var(--late)} .sat{color:var(--client)}
+.rgrid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px}
+.rday{border:0;background:transparent;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:17px;font-weight:600;border-radius:0;position:relative;min-width:0}
+.rday small{font-size:11px;font-weight:700;line-height:1}
+.rday .udot{width:5px;height:5px;border-radius:50%;background:var(--late)}
+.rday.blank{visibility:hidden}
+.rday.today{text-decoration:underline;text-underline-offset:3px}
+.rday.in{background:var(--accent-soft)}
+.rday.start,.rday.end{background:var(--accent);color:var(--accent-fg);border-radius:10px}
+.rday.start.hasend{border-radius:10px 0 0 10px} .rday.end{border-radius:0 10px 10px 0} .rday.start.end{border-radius:10px}
+.rday.start .udot,.rday.end .udot{background:var(--accent-fg)}
+.rp-hint{text-align:center;font-weight:600;font-size:16px}
+.rp-act{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+
+/* filter */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{border:0;background:transparent;padding:10px 4px;border-radius:9px;font-weight:600;font-size:16px;color:var(--muted);line-height:1.25}
+.seg button span{display:inline-block;font-size:14px;opacity:.85}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+
+/* month nav */
+.monthnav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.monthnav b{font-size:20px}
+.monthnav button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;font-weight:600}
+
+/* calendar */
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px}
+.cal .wk,.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal .wk div{text-align:center;font-size:13px;color:var(--muted);padding:4px 0}
+.cal .wk div:first-child{color:var(--late)}
+.day{min-height:62px;border-radius:8px;border:1px solid transparent;background:transparent;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.day .d{font-size:15px;font-weight:600}
+.day .s{font-size:11.5px;font-weight:600;white-space:nowrap}
+.day .dots{display:flex;gap:3px}
+.day .dots i{width:7px;height:7px;border-radius:50%;display:block}
+.dot-due{background:var(--late)} .dot-paid{background:var(--paid)}
+.day.today .d{background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:0 7px}
+.day.sel{border-color:var(--accent);background:var(--accent-soft)}
+.day.blank{visibility:hidden}
+.legend{display:flex;gap:16px;font-size:14px;font-weight:600;justify-content:center}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:block}
+.day .s{font-size:11px;letter-spacing:-.3px;line-height:1.2;max-width:100%;overflow:hidden}
+.day .s.c-paid{color:var(--paid)} .day .s.c-due{color:var(--late)}
+.picker{flex:1;min-width:0;max-width:220px;text-align:center;font-size:18px;font-weight:700;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.form-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
+nav.tabs .in{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;max-width:560px;width:100%}
+nav.tabs button{background:transparent;border:0;padding:8px 2px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2}
+nav.tabs button[aria-selected="true"]{color:var(--accent);background:var(--accent-soft)}
+nav.tabs button.add{color:var(--accent-fg);background:var(--accent)}
+
+/* form */
+.form{display:flex;flex-direction:column;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-weight:600;font-size:16px}
+.field label em{color:var(--late);font-style:normal}
+.recent{display:flex;gap:6px;flex-wrap:wrap}
+.recent button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:15px}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;font-size:15px}
+details summary{cursor:pointer;font-weight:600;color:var(--accent);padding:4px 0}
+details .field{margin-top:12px}
+.err{color:var(--late);font-size:15px;min-height:1em}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;font-size:16px;max-width:calc(100% - 32px)}
+.toast button{background:transparent;border:0;color:var(--bg);font-weight:700;text-decoration:underline;pointer-events:auto;padding:4px 2px}
+.toast{pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.row{transition:background .2s}}
+
+/* 실제 앱 추가 화면 */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:18px}
+.hint{margin:0;color:var(--muted);font-size:15px}
+.hint.small{font-size:13px}
+.lastbk{margin:0;font-weight:600}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 140px}
+.filebtn{text-align:center;cursor:pointer;display:block}
+.vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.importbox{background:var(--bg);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.importbox p{margin:0}
+.okline{margin:0;display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+.dot-ok{width:10px;height:10px;border-radius:50%;background:var(--paid);flex:none}
+.errline{margin:0;color:var(--late);font-size:15px}
+.ver{text-align:center;color:var(--muted);font-size:13px;margin:4px 0 0}
+.banner{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--a1);color:var(--fg);border-radius:12px;padding:12px 14px;font-size:15px}
+.banner>span{flex:1 1 200px;min-width:0}
+.first{display:flex;flex-direction:column;gap:4px;background:var(--accent-soft);border-radius:12px;padding:14px;font-size:15px}
+.first>b{font-size:17px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 받을 돈 -->
+  <section class="view" id="v-unpaid">
+    <header class="top"><h1>받을 돈</h1></header>
+    <div class="filters">
+      <input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기">
+      <button type="button" class="rangebtn" id="u-rangebtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="u-rangetxt">기간: 전체</span></button>
+    </div>
+    <div class="rangepanel" id="u-panel" hidden>
+      <div class="presets">
+        <button type="button" data-preset="thism">이번 달</button><button type="button" data-preset="lastm">지난 달</button><button type="button" data-preset="3m">최근 3개월</button><button type="button" data-preset="all">전체</button>
+      </div>
+      <div class="monthnav"><button type="button" id="rp-prev" aria-label="이전 달">◀</button><b id="rp-title" class="num"></b><button type="button" id="rp-next" aria-label="다음 달">▶</button></div>
+      <div class="wk rwk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
+      <div class="rgrid" id="rp-grid"></div>
+      <div class="rp-hint" id="rp-hint"></div>
+      <div class="rp-act"><button type="button" class="btn ghost" id="rp-reset">초기화</button><button type="button" class="btn" id="rp-apply">적용</button></div>
+    </div>
+    <div class="hero">
+      <div class="label" id="u-label">아직 못 받은 돈 (전체 기간)</div>
+      <div class="big num" id="u-total">0원</div>
+      <div class="sub" id="u-sub"></div>
+    </div>
+    <div class="section-title">오래된 순서</div>
+    <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
+    <div class="list" id="u-list"></div>
+  </section>
+
+  <!-- 달력 -->
+  <section class="view" id="v-cal" hidden>
+    <header class="top"><h1>달력</h1></header>
+    <div class="banner" id="c-backup" hidden><span><b>백업해 두세요.</b> <span id="c-backup-txt"></span> 휴대폰을 잃어버리면 기록도 사라질 수 있어요.</span><button type="button" class="btn small" data-goto="set">백업하기</button></div>
+    <div class="first" id="c-first" hidden><b>운행장부를 시작해 볼까요?</b><span>아래 <b>[등록]</b>을 눌러 첫 운행을 적으면, 달력에 받은 돈은 초록, 못 받은 돈은 빨강으로 표시돼요.</span></div>
+    <div class="monthnav"><button id="c-prev" type="button">◀ 이전</button><input type="date" id="c-pick" class="picker num" aria-label="날짜 선택"><button id="c-next" type="button">다음 ▶</button></div>
+    <div class="cal">
+      <div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
+      <div class="grid" id="c-grid"></div>
+    </div>
+    <div class="legend"><span class="c-paid"><i class="dot-paid"></i>받은 돈</span><span class="c-due"><i class="dot-due"></i>못 받은 돈</span></div>
+    <div class="section-title" id="c-daytitle"></div>
+    <div class="seg" id="c-seg" role="group" aria-label="이 날 보기 설정"></div>
+    <div class="list" id="c-list"></div>
+  </section>
+
+  <!-- 장부 -->
+  <section class="view" id="v-ledger" hidden>
+    <header class="top"><h1>월별 장부</h1></header>
+    <div class="monthnav"><button id="l-prev" type="button">◀ 이전</button><input type="month" id="l-pick" class="picker num" aria-label="달 선택"><button id="l-next" type="button">다음 ▶</button></div>
+    <div class="stats">
+      <div><span>총 운임</span><b class="num" id="l-sum"></b></div>
+      <div><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
+      <div><span>못 받은 돈</span><b class="num c-due" id="l-due"></b></div>
+    </div>
+    <div class="seg" id="l-seg" role="group" aria-label="장부 보기 설정"></div>
+    <input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기">
+    <div class="list" id="l-list"></div>
+    <button type="button" class="btn ghost" id="l-csv">이 달 장부를 엑셀 파일로 보내기</button>
+  </section>
+
+  <!-- 입력 -->
+  <section class="view" id="v-add" hidden>
+    <header class="top form-top"><h1 id="f-title">운행 등록</h1><button type="button" class="btn ghost small" id="f-cancel" hidden>수정 취소</button></header>
+    <form class="form" id="f" novalidate>
+      <div class="field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
+      <div class="field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
+        <input type="tel" id="f-clientphone" class="sub-input phone" inputmode="tel" placeholder="화주 연락처 (예: 010-1234-5678)" aria-label="화주 연락처"></div>
+      <div class="field"><label for="f-from">상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div>
+        <input type="text" id="f-fromaddr" class="sub-input" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
+        <input type="tel" id="f-fromphone" class="sub-input phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div>
+      <div class="field"><label for="f-to">하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div>
+        <input type="text" id="f-toaddr" class="sub-input" placeholder="상세주소 (예: 대덕구 대화로 100)" aria-label="하차지 상세주소">
+        <input type="tel" id="f-tophone" class="sub-input phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div>
+      <div class="field"><label for="f-amt">운임 (원) <em>*</em></label>
+        <div class="seg" id="f-pt" role="group" aria-label="운임 받는 방식">
+          <button type="button" data-pt="인수증" aria-pressed="true">인수증</button>
+          <button type="button" data-pt="선착불" aria-pressed="false">선착불</button>
+          <button type="button" data-pt="착불" aria-pressed="false">착불</button>
+        </div>
+        <input type="text" id="f-amt" inputmode="numeric" placeholder="예: 450,000">
+        <div class="quick"><button type="button" data-add="10000">+1만</button><button type="button" data-add="50000">+5만</button><button type="button" data-add="100000">+10만</button><button type="button" data-add="0">지우기</button></div></div>
+      <div class="field"><label for="f-memo">메모 <em>*</em></label><textarea id="f-memo" rows="2" placeholder="예: 인수증 사진 카톡으로 보냄, 지게차 하차"></textarea></div>
+      <details id="f-more"><summary>더보기 (수수료, 받음 표시)</summary>
+        <div class="field"><label for="f-fee">수수료 (원)</label><input type="text" id="f-fee" inputmode="numeric" placeholder="0"></div>
+        <div class="field"><label><input type="checkbox" id="f-paidnow"> 이미 돈을 받았어요</label></div>
+      </details>
+      <div class="err" id="f-err" role="alert"></div>
+      <button class="btn" type="submit" id="f-submit" style="padding:14px;font-size:18px">저장</button>
+    </form>
+  </section>
+
+  <!-- 설정·백업 -->
+  <section class="view" id="v-set" hidden>
+    <header class="top"><h1>설정 · 백업</h1></header>
+    <div class="card"><h2>클라우드 저장</h2><div id="s-cloud"></div></div>
+    <div class="card"><h2>백업 파일</h2>
+      <p class="hint">휴대폰을 바꾸거나 초기화할 때를 대비해 가끔 백업 파일을 만들어 두세요. 카톡 "나와의 채팅"이나 구글 드라이브로 보내 두면 안전해요.</p>
+      <p class="lastbk" id="s-lastbk"></p>
+      <div class="btnrow"><button type="button" class="btn" id="s-share">백업 파일 보내기</button><button type="button" class="btn ghost" id="s-download">휴대폰에 저장</button></div>
+      <label class="btn ghost filebtn" for="s-import">백업 파일 불러오기</label><input type="file" id="s-import" class="vh" accept=".json,application/json,text/plain">
+      <div class="importbox" id="s-importbox" hidden></div>
+    </div>
+    <div class="card"><h2>엑셀로 내보내기</h2>
+      <p class="hint">세무사에게 보내거나 컴퓨터에서 볼 때 씁니다. 엑셀, 구글 시트에서 바로 열려요.</p>
+      <button type="button" class="btn ghost" id="s-csv">전체 기록 엑셀 파일로 보내기</button>
+    </div>
+    <div class="card"><h2>저장 현황</h2><p id="s-stats" class="hint"></p></div>
+    <p class="ver">운행장부 1.0</p>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="화면 이동"><div class="in" role="tablist">
+  <button role="tab" data-v="cal" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>달력</button>
+  <button role="tab" data-v="unpaid" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>받을 돈</button>
+  <button role="tab" data-v="ledger" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>장부</button>
+  <button role="tab" data-v="add" aria-selected="false" class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>등록</button>
+  <button role="tab" data-v="set" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>설정</button>
+</div></nav>
+<div class="toast" id="toast" hidden><span id="toast-msg"></span><button type="button" id="toast-undo">되돌리기</button></div>
+
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
