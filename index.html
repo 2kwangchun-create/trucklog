@@ -66,6 +66,9 @@ header.top h1{margin:0;font-size:24px;font-weight:700}
 .mnav h1{flex:1;min-width:0;display:flex;justify-content:center}
 .mnav .titlebtn{justify-content:center;text-align:center;padding:2px 2px 2px 6px}
 .titlebtn.long{font-size:19px}
+/* 달력: 년·월을 왼쪽에 붙여서 < 2026년 10월 > ……… [오늘] */
+#v-cal .mnav h1{flex:none}
+#v-cal .mnav .titlebtn{justify-content:flex-start;text-align:left}
 .titlebtn span{white-space:nowrap}
 html[data-text] .mnav{gap:4px}
 html[data-text="xl"] .mnav .titlebtn{font-size:18px}
@@ -108,6 +111,9 @@ html[data-text="xl"] /* 달 넘기기: < 날짜 > (화살표가 날짜 양옆) *
 .mnav h1{flex:1;min-width:0;display:flex;justify-content:center}
 .mnav .titlebtn{justify-content:center;text-align:center;padding:2px 2px 2px 6px}
 .titlebtn.long{font-size:19px}
+/* 달력: 년·월을 왼쪽에 붙여서 < 2026년 10월 > ……… [오늘] */
+#v-cal .mnav h1{flex:none}
+#v-cal .mnav .titlebtn{justify-content:flex-start;text-align:left}
 .titlebtn span{white-space:nowrap}
 html[data-text] .mnav{gap:4px}
 html[data-text="xl"] .mnav .titlebtn{font-size:18px}
