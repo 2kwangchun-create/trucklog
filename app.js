@@ -1,5 +1,5 @@
 'use strict';
-/* 운행장부 — 화물 운행·미수금 장부 (휴대폰 저장 + 선택형 구글 클라우드 동기화) */
+/* 아빠장부(구 운행장부) — 화물 운행·미수금 장부 (휴대폰 저장 + 선택형 구글 클라우드 동기화) */
 
 // ---------- 기본 도구 ----------
 const $=id=>document.getElementById(id);
@@ -310,7 +310,7 @@ function backupText(){
 }
 async function doBackup(share){
   if(!store.size){toast('아직 백업할 기록이 없어요.');return}
-  const r=await giveFile(backupText(),`운행장부_백업_${todayIso}.json`,'application/json',share);
+  const r=await giveFile(backupText(),`아빠장부_백업_${todayIso}.json`,'application/json',share);
   if(r==='cancel')return;
   ls.set('lastBackup',todayIso);
   toast(r==='shared'?'백업 파일을 보냈어요':'백업 파일을 휴대폰 "다운로드" 폴더에 저장했어요');
@@ -331,7 +331,7 @@ let pendingImport=null;
 function readImport(file){
   const rd=new FileReader();
   rd.onload=()=>{
-    let data;try{data=JSON.parse(String(rd.result).replace(/^﻿/,''))}catch(_){showImport('이 파일은 운행장부 백업 파일이 아니에요. ".json" 백업 파일을 골라 주세요.');return}
+    let data;try{data=JSON.parse(String(rd.result).replace(/^﻿/,''))}catch(_){showImport('이 파일은 아빠장부 백업 파일이 아니에요. ".json" 백업 파일을 골라 주세요.');return}
     const list=(Array.isArray(data)?data:data&&data.trips||[]).filter(validRecord);
     if(!list.length){showImport('백업 파일 안에 운행 기록이 없어요.');return}
     const newer=list.filter(r=>{const c=store.get(String(r.id));return !c||(c.updatedAt||0)<(Number(r.updatedAt)||0)});
@@ -732,7 +732,7 @@ $('l-next').onclick=()=>{ledM++;if(ledM>11){ledM=0;ledY++}render()};
 $('c-pick').onchange=e=>{const v=e.target.value;if(!v)return;const d=parseD(v);calY=d.getFullYear();calM=d.getMonth();calSel=v;calFilter='all';openId=payingId=null;render()};
 $('l-pick').onchange=e=>{const v=e.target.value;if(!v)return;const [y,m]=v.split('-').map(Number);ledY=y;ledM=m-1;openId=payingId=null;render()};
 $('l-search').oninput=renderLedger;
-$('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`운행장부_${ledY}-${pad(ledM+1)}.csv`);
+$('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`아빠장부_${ledY}-${pad(ledM+1)}.csv`);
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
 $('u-rangebtn').onclick=()=>{uPanel=!uPanel;if(uPanel){uDraft=uRange?{...uRange}:{start:null,end:null};const d=uRange?parseD(uRange.start):TODAY;rpY=d.getFullYear();rpM=d.getMonth();pushOverlay({panel:'range'})}else popOverlay('panel');renderUnpaid()};
 $('rp-prev').onclick=()=>{rpM--;if(rpM<0){rpM=11;rpY--}renderRangePanel()};
@@ -750,7 +750,7 @@ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
   uPanel=false;popOverlay('panel');openId=payingId=null;renderUnpaid()});
 $('s-share').onclick=()=>doBackup(true);
 $('s-download').onclick=()=>doBackup(false);
-$('s-csv').onclick=()=>doCsv(trips,`운행장부_전체_${todayIso}.csv`);
+$('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.csv`);
 $('s-import').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readImport(f)};
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head')){e.preventDefault();e.target.click()}});
 
