@@ -196,6 +196,19 @@ details .field{margin-top:12px}
 .toast{pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .2s}}
 
+/* 시작 로그인 화면 */
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.gate-in img{border-radius:20px}
+.gate-in h1{margin:0;font-size:30px}
+.gate-lead{margin:0;color:var(--muted);font-size:16px}
+.gate-check{margin:8px 0;font-weight:600;color:var(--accent)}
+.gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:15px 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:18px;font-weight:700;margin-top:8px}
+.gbtn svg{width:24px;height:24px;flex:none}
+.gate-msg{margin:0;color:var(--late);font-size:15px;min-height:1em}
+.linkbtn{border:0;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;text-underline-offset:3px;padding:8px}
+body.gated nav.tabs,body.gated .toast{visibility:hidden}
+
 /* 실제 앱 추가 화면 */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
 .card h2{margin:0;font-size:18px}
@@ -325,7 +338,7 @@ details .field{margin-top:12px}
       <button type="button" class="btn ghost" id="s-csv">전체 기록 엑셀 파일로 보내기</button>
     </div>
     <div class="card"><h2>저장 현황</h2><p id="s-stats" class="hint"></p></div>
-    <p class="ver">운행장부 1.0</p>
+    <p class="ver">운행장부 1.1</p>
   </section>
 </div>
 
@@ -336,6 +349,17 @@ details .field{margin-top:12px}
   <button role="tab" data-v="add" aria-selected="false" class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>등록</button>
   <button role="tab" data-v="set" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>설정</button>
 </div></nav>
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="g-title" hidden>
+  <div class="gate-in">
+    <img src="icons/icon-192.png" alt="" width="88" height="88">
+    <h1 id="g-title">운행장부</h1>
+    <p class="gate-lead">구글 계정으로 로그인하면 휴대폰을 바꾸거나 다른 기기에서도 같은 장부를 볼 수 있어요.</p>
+    <p class="gate-check" id="g-checking">로그인 확인 중…</p>
+    <button type="button" class="gbtn" id="g-login" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.8 6.1C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg><span id="g-login-txt">구글 계정으로 시작하기</span></button>
+    <p class="gate-msg" id="g-msg" role="alert"></p>
+    <button type="button" class="linkbtn" id="g-skip" hidden>인터넷이 없을 때: 로그인 없이 이 휴대폰에만 저장</button>
+  </div>
+</div>
 <div class="toast" id="toast" hidden><span id="toast-msg"></span><button type="button" id="toast-undo">되돌리기</button></div>
 
 <script src="firebase-config.js"></script>

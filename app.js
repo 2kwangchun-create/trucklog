@@ -30,6 +30,7 @@ const DB={
     r.onerror=()=>rej(r.error);
   })},
   all(){return new Promise((res,rej)=>{const q=this.db.transaction('trips').objectStore('trips').getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  clear(){return new Promise((res,rej)=>{if(!this.db)return res();const tx=this.db.transaction('trips','readwrite');tx.objectStore('trips').clear();tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})},
   putMany(list){return new Promise((res,rej)=>{
     if(!this.db||!list.length)return res();
     const tx=this.db.transaction('trips','readwrite'),st=tx.objectStore('trips');
@@ -335,7 +336,9 @@ const Cloud={
   async init(){
     const cfg=window.FIREBASE_CONFIG;
     this.configured=!!(cfg&&cfg.apiKey&&cfg.projectId);
-    if(!this.configured){renderSettings();return}
+    if(!this.configured){Gate.hide();renderSettings();return}
+    Gate.show('checking');
+    const slow=setTimeout(()=>{if(!this.authKnown)Gate.show(this.ready?'out':'offline')},9000);
     try{
       for(const m of ['app','auth','firestore'])await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
       firebase.initializeApp(cfg);
@@ -343,12 +346,19 @@ const Cloud={
       try{await this.fs.enablePersistence({synchronizeTabs:true})}catch(_){}
       this.ready=true;
       this.auth.getRedirectResult().catch(e=>this.fail(e));
-      this.auth.onAuthStateChanged(u=>this.onUser(u));
-    }catch(e){this.loadErr=true}
+      this.auth.onAuthStateChanged(u=>{this.authKnown=true;clearTimeout(slow);this.onUser(u)});
+    }catch(e){this.loadErr=true;clearTimeout(slow);Gate.show('offline')}
     renderSettings();
   },
-  onUser(u){
+  async onUser(u){
     if(this.unsub){this.unsub();this.unsub=null}
+    if(u){
+      // 다른 계정으로 바뀌면 이 휴대폰에 남은 이전 계정 기록은 비움 (이전 기록은 그 계정 클라우드에 있음)
+      const owner=ls.get('ownerUid');
+      if(owner&&owner!==u.uid){store.clear();try{await DB.clear()}catch(_){}rebuild();render()}
+      ls.set('ownerUid',u.uid);
+      Gate.hide();
+    } else if(!Gate.skipped){Gate.show('out')}
     this.user=u;this.lastSync=null;this.lastErr='';
     this.col=u?this.fs.collection('users').doc(u.uid).collection('trips'):null;
     if(u){
@@ -389,7 +399,7 @@ const Cloud={
       } else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')this.fail(e);
     }
   },
-  signOut(){this.auth.signOut();toast('로그아웃했어요. 이 휴대폰의 기록은 그대로 있어요.')},
+  signOut(){Gate.skipped=false;this.auth.signOut();toast('로그아웃했어요.')},
   fail(e){
     console.error(e);
     const c=e&&e.code||'';
@@ -398,8 +408,26 @@ const Cloud={
       :c==='auth/network-request-failed'?'인터넷 연결이 불안정해요. 잠시 뒤 다시 해 주세요.'
       :'클라우드 연결 중 문제가 생겼어요 ('+(c||'알 수 없음')+'). 기록은 휴대폰에 저장되고 있어요.';
     renderSettings();
+    if(!$('gate').hidden)$('g-msg').textContent=this.lastErr;
   },
 };
+
+// ---------- 시작 로그인 화면 ----------
+const Gate={
+  skipped:false,
+  show(state){
+    if(this.skipped&&state!=='checking')return;
+    const g=$('gate');g.hidden=false;document.body.classList.add('gated');
+    $('g-checking').hidden=state!=='checking';
+    $('g-login').hidden=state==='checking';
+    $('g-login-txt').textContent=state==='offline'?'다시 시도':'구글 계정으로 시작하기';
+    $('g-msg').textContent=state==='offline'?'인터넷에 연결되지 않아 로그인할 수 없어요. 처음 한 번은 인터넷이 필요해요.':'';
+    $('g-skip').hidden=state==='checking';
+  },
+  hide(){$('gate').hidden=true;document.body.classList.remove('gated')},
+};
+$('g-login').onclick=()=>{$('g-msg').textContent='';if(Cloud.ready)Cloud.signIn();else location.reload()};
+$('g-skip').onclick=()=>{Gate.skipped=true;Gate.hide();render();toast('로그인 없이 이 휴대폰에만 저장해요. 나중에 [설정]에서 로그인하면 함께 올라가요.')};
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s)})}
 
 // ---------- 공통 그리기 ----------
