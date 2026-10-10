@@ -624,7 +624,7 @@ function go(v){view=v;payingId=openId=deletingId=null;render();window.scrollTo(0
 // 기록 단계: 0 맨 아래(종료 경계) · 1 달력 · 2 다른 탭 · 3 그 위에 열린 화면(수정, 기간 선택)
 let pendingTab=null, exitTimer=null;
 const curLvl=()=>(history.state&&history.state.lvl)||0;
-function closeOverlays(){if(editingId!==null)resetForm();uPanel=false}
+function closeOverlays(){if(editingId!==null)leaveEdit();uPanel=false}
 function navTab(v){
   if(selMode)exitSelect();
   const lvl=curLvl();
@@ -654,7 +654,7 @@ window.addEventListener('popstate',e=>{
   if(uPanel&&!s.panel)uPanel=false;
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
-  if(editingId!==null&&!s.edit)resetForm();
+  if(editingId!==null&&!s.edit)leaveEdit();
   if(s.v&&s.v!==view){view=s.v;openId=null;window.scrollTo(0,0)}
   payingId=deletingId=null;
   render();
@@ -761,7 +761,7 @@ function setMode(editing){
   $('f-submit').textContent=editing?'수정 저장':'저장';
   $('f-cancel').hidden=!editing;
 }
-function resetForm(){if(editingId!==null)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false);showDraftNote('')}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false);showDraftNote('')}
 
 // ---------- 적는 중 임시 저장 ----------
 // 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
@@ -771,20 +771,45 @@ const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return nul
 function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
 function saveDraft(){
   if(view!=='add')return;
-  if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,...formSnap()}));return}
+  if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
   const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
 function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
-// 고치던 기록이 있으면 그 수정 화면으로 다시 열기
+// 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
+const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid]);
+let editOrig='';
+// 수정하다가 [수정 저장]·[수정 취소] 없이 나가면(탭 이동·뒤로 버튼) 고친 내용을 보관하고 돌아갈지 물어봄
+function leaveEdit(){
+  const changed=snapKey(formSnap())!==editOrig;
+  if(changed)ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,left:true,...formSnap()}));
+  resetForm(changed);
+  if(changed)showAsk();
+}
+function showAsk(){$('askbar').hidden=false;document.body.classList.add('asking')}
+function hideAsk(){$('askbar').hidden=true;document.body.classList.remove('asking')}
+$('ask-back').onclick=()=>{
+  hideAsk();
+  const s=readDraft('draftEdit'), t=s&&store.get(String(s.id));
+  if(!t||t.deleted){ls.set('draftEdit','');toast('그 기록이 지워져서 돌아갈 수 없어요.');return}
+  if(selMode)exitSelect();
+  uPanel=false;
+  startEdit(t); fillSnap(s);
+  if(s.orig)editOrig=s.orig;
+  if(s.back&&s.back!=='add')backView=s.back;
+  showDraftNote('고치던 내용을 불러왔어요.',false); saveDraft();
+};
+$('ask-drop').onclick=()=>{hideAsk();ls.set('draftEdit','');toast('고치던 내용을 버렸어요.')};
+// 고치던 기록이 있으면 그 수정 화면으로 다시 열기 (실수로 나갔던 거면 돌아갈지 물어봄)
 function loadDraftEdit(){
   const s=readDraft('draftEdit'), t=s&&store.get(String(s.id));
   if(!t||t.deleted){ls.set('draftEdit','');return false}
+  if(s.left){showAsk();return false}
   view=s.back&&s.back!=='add'?s.back:'ledger';
   if(view!=='cal')history.pushState({lvl:2,v:view},'');
-  startEdit(t); fillSnap(s); showDraftNote('고치던 내용을 불러왔어요.',false);
+  startEdit(t); fillSnap(s); if(s.orig)editOrig=s.orig; showDraftNote('고치던 내용을 불러왔어요.',false);
   return true;
 }
 $('f').addEventListener('input',saveDraft);
@@ -805,6 +830,7 @@ function startEdit(t){
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
   $('f-paidnow').checked=!!t.paid;
   $('f-more').open=!!(t.fee||t.paid);
+  editOrig=snapKey(formSnap()); hideAsk();
   view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
 $('f-cancel').onclick=()=>{const id=editingId;resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
