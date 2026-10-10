@@ -307,6 +307,7 @@ function renderLedger(){
   document.querySelectorAll('#l-kind [data-lkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lkind===ledKind));
   const span=!ledRange?'이 달':ledRange.start===ledRange.end?'이 날':'이 기간';
   $('l-titletxt').textContent=ledLabel();
+  $('l-title').classList.toggle('long',!!ledRange&&ledRange.start!==ledRange.end); // 기간은 글자가 길어 조금 작게
   $('l-kicker').textContent=ledRange&&ledRange.start.slice(0,4)!==String(TODAY.getFullYear())?`장부 · ${ledRange.start.slice(0,4)}년`:'장부';
   const all=ledTrips();
   const sum=all.reduce((s,t)=>s+t.amount,0), paid=all.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);

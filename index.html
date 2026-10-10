@@ -61,7 +61,16 @@ header.top h1{margin:0;font-size:24px;font-weight:700}
 .ib{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;padding:0;flex:none;color:var(--fg)}
 .ib.sm{width:40px;height:40px}
 .ib[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.todaybtn{height:44px;padding:0 14px;border-radius:12px;border:0;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:15px;flex:none}
+/* 달 넘기기: < 날짜 > (화살표가 날짜 양옆) */
+.mnav{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+.mnav h1{flex:1;min-width:0;display:flex;justify-content:center}
+.mnav .titlebtn{justify-content:center;text-align:center;padding:2px 2px 2px 6px}
+.titlebtn.long{font-size:19px}
+.titlebtn span{white-space:nowrap}
+html[data-text] .mnav{gap:4px}
+html[data-text="xl"] .mnav .titlebtn{font-size:18px}
+html[data-text="xl"] .titlebtn.long{font-size:15px}
+html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{height:44px;padding:0 14px;border-radius:12px;border:0;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:15px;flex:none}
 
 /* summary */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
@@ -94,7 +103,16 @@ html[data-text] .monthnav{gap:4px}
 html[data-text] .monthnav button{padding:8px 8px;flex:none}
 html[data-text] header.top .ib{width:40px}
 html[data-text="xl"] .titlebtn{font-size:21px}
-html[data-text="xl"] .todaybtn{padding:0 10px}
+html[data-text="xl"] /* 달 넘기기: < 날짜 > (화살표가 날짜 양옆) */
+.mnav{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+.mnav h1{flex:1;min-width:0;display:flex;justify-content:center}
+.mnav .titlebtn{justify-content:center;text-align:center;padding:2px 2px 2px 6px}
+.titlebtn.long{font-size:19px}
+.titlebtn span{white-space:nowrap}
+html[data-text] .mnav{gap:4px}
+html[data-text="xl"] .mnav .titlebtn{font-size:18px}
+html[data-text="xl"] .titlebtn.long{font-size:15px}
+html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 /* 지출 */
 .flabel{font-weight:700;font-size:15px}
 .flabel em{color:var(--late);font-style:normal}
@@ -504,10 +522,12 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <!-- 달력 -->
   <section class="view" id="v-cal" hidden>
     <header class="top">
-      <h1 class="ttl"><button type="button" class="titlebtn" id="c-title" aria-label="날짜 골라서 이동"><span id="c-titletxt" class="num"></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h1>
+      <div class="mnav">
+        <button type="button" class="ib" id="c-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <h1><button type="button" class="titlebtn" id="c-title" aria-label="날짜 골라서 이동"><span id="c-titletxt" class="num"></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h1>
+        <button type="button" class="ib" id="c-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
       <button type="button" class="todaybtn" id="c-today">오늘</button>
-      <button type="button" class="ib" id="c-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
-      <button type="button" class="ib" id="c-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     </header>
     <div class="banner" id="c-backup" hidden><span><b>백업해 두세요.</b> <span id="c-backup-txt"></span> 휴대폰을 잃어버리면 기록도 사라질 수 있어요.</span><button type="button" class="btn small" data-goto="set">백업하기</button></div>
     <div class="first" id="c-first" hidden><b>아빠장부를 시작해 볼까요?</b><span>아래 가운데 <b>[등록]</b>을 눌러 첫 운행을 적으면, 달력에 받은 돈은 초록, 못 받은 돈은 빨강으로 표시돼요.</span></div>
@@ -528,9 +548,11 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <section class="view" id="v-ledger" hidden>
     <header class="top">
       <div class="ttl"><span class="kicker" id="l-kicker">장부</span>
-        <h1><button type="button" class="titlebtn" id="l-title" aria-label="볼 달이나 기간 고르기"><span id="l-titletxt" class="num"></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h1></div>
-      <button type="button" class="ib" id="l-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
-      <button type="button" class="ib" id="l-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+        <div class="mnav">
+          <button type="button" class="ib" id="l-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <h1><button type="button" class="titlebtn" id="l-title" aria-label="볼 달이나 기간 고르기"><span id="l-titletxt" class="num"></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h1>
+          <button type="button" class="ib" id="l-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+        </div></div>
     </header>
     <div class="card">
       <div class="sumtop"><div class="stat"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b></div><span class="cap">운임 − 수수료 − 지출</span></div>
