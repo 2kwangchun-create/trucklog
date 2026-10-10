@@ -628,7 +628,7 @@ function closeOverlays(){if(editingId!==null)resetForm();uPanel=false}
 function navTab(v){
   if(selMode)exitSelect();
   const lvl=curLvl();
-  closeOverlays(); if(v==='add')resetForm();
+  closeOverlays(); if(v==='add'){resetForm();loadDraftNew()}
   if(v==='cal'){ if(lvl>1){pendingTab='cal';history.go(-(lvl-1))} go('cal'); return }
   if(lvl<=1){ if(lvl===0)history.pushState({lvl:1,v:'cal'},''); history.pushState({lvl:2,v},''); go(v); return }
   if(lvl===2){ history.replaceState({lvl:2,v},''); go(v); return }
@@ -761,7 +761,37 @@ function setMode(editing){
   $('f-submit').textContent=editing?'수정 저장':'저장';
   $('f-cancel').hidden=!editing;
 }
-function resetForm(){editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false)}
+function resetForm(){if(editingId!==null)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');$('f-more').open=false;setMode(false);showDraftNote('')}
+
+// ---------- 적는 중 임시 저장 ----------
+// 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
+// draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
+const F_IDS=['f-date','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
+const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
+function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
+function saveDraft(){
+  if(view!=='add')return;
+  if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,...formSnap()}));return}
+  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid;
+  ls.set('draftNew',blank?'':JSON.stringify(s));
+}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more}
+function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg}
+function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
+// 고치던 기록이 있으면 그 수정 화면으로 다시 열기
+function loadDraftEdit(){
+  const s=readDraft('draftEdit'), t=s&&store.get(String(s.id));
+  if(!t||t.deleted){ls.set('draftEdit','');return false}
+  view=s.back&&s.back!=='add'?s.back:'ledger';
+  if(view!=='cal')history.pushState({lvl:2,v:view},'');
+  startEdit(t); fillSnap(s); showDraftNote('고치던 내용을 불러왔어요.',false);
+  return true;
+}
+$('f').addEventListener('input',saveDraft);
+$('f').addEventListener('change',saveDraft);
+$('f').addEventListener('click',()=>setTimeout(saveDraft,0)); // 최근 지역·금액 버튼 등 글자 입력 없이 바뀌는 것
+$('f-more').addEventListener('toggle',saveDraft);
+$('f-discard').onclick=()=>{resetForm();ls.set('draftNew','');$('f-date').focus()};
 function startEdit(t){
   if(!t)return;
   backView=view==='add'?'ledger':view;
@@ -798,7 +828,7 @@ $('f').addEventListener('submit',e=>{
   const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null};
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
-  resetForm(); goCal();
+  resetForm(); ls.set('draftNew',''); goCal();
   toast(`${f.from}→${f.to} 저장했어요`,()=>removeTrip(t));
 });
 
@@ -818,9 +848,13 @@ window.addEventListener('online',renderSettings);window.addEventListener('offlin
   }
   const y=loadSpot();
   history.replaceState({lvl:0},''); history.pushState({lvl:1,v:'cal'},'');
-  if(view!=='cal')history.pushState({lvl:2,v:view},'');
-  rebuild(); render();
-  if(y)requestAnimationFrame(()=>window.scrollTo(0,y));
+  rebuild();
+  if(loadDraftEdit()){/* 수정 화면으로 복원 */}
+  else{
+    if(view!=='cal')history.pushState({lvl:2,v:view},'');
+    loadDraftNew(); render();
+    if(y)requestAnimationFrame(()=>window.scrollTo(0,y));
+  }
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
   Cloud.init();
   if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
