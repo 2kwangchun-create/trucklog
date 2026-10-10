@@ -42,7 +42,7 @@ const DB={
 const store=new Map();
 let trips=[];
 function rebuild(){trips=[...store.values()].filter(t=>!t.deleted)}
-const STR=['date','client','clientPhone','from','fromAddr','fromPhone','to','toAddr','toPhone','payType','memo'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),paid:r.paid?String(r.paid):null};
@@ -96,19 +96,21 @@ function ageChip(t){
 }
 const routeHtml=t=>`${esc(t.from)} → ${esc(t.to)}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
-function phHtml(p){return p?`<span class="ph num">☎ <a href="${telHref(p)}">${esc(p)}</a> <button type="button" class="cpy" data-copy="${esc(p)}">복사</button></span>`:'<span class="ph na">☎ 연락처 없음</span>'}
-function addrHtml(city,addr,phone){return `<b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}${phHtml(phone)}`}
+function phHtml(p,name){const who=name?`<span class="who">${esc(name)}</span>`:'';
+  return p?`<span class="ph num">☎ ${who}<a href="${telHref(p)}">${esc(p)}</a> <button type="button" class="cpy" data-copy="${esc(p)}">복사</button></span>`
+    :name?`<span class="ph">☎ ${who}<span class="na">연락처 없음</span></span>`:'<span class="ph na">☎ 연락처 없음</span>'}
+function addrHtml(city,addr,phone,name){return `<b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}${phHtml(phone,name)}`}
 function rowHtml(t,mode){
   const open=openId===t.id;
   const head=`<div class="head" data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}">
-    <div class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}${t.clientPhone?`<a class="cph num" href="${telHref(t.clientPhone)}">☎ ${esc(t.clientPhone)}</a>`:''}</div>
+    <div class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}${t.clientPhone?`<a class="cph num" href="${telHref(t.clientPhone)}">☎ ${t.clientName?esc(t.clientName)+' ':''}${esc(t.clientPhone)}</a>`:t.clientName?`<span class="cph">${esc(t.clientName)}</span>`:''}</div>
     <div class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</div>
     <div class="route">${routeHtml(t)}</div>
     <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="more">${open?'접기 ▲':'상세 ▼'}</span></div></div>`;
   let detail='';
   if(open){
-    detail=`<dl class="detail"><dt>화주</dt><dd>${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}${phHtml(t.clientPhone)}</dd>`
-      +`<dt>상차</dt><dd>${addrHtml(t.from,t.fromAddr,t.fromPhone)}</dd><dt>하차</dt><dd>${addrHtml(t.to,t.toAddr,t.toPhone)}</dd>`
+    detail=`<dl class="detail"><dt>화주</dt><dd>${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}${phHtml(t.clientPhone,t.clientName)}</dd>`
+      +`<dt>상차</dt><dd>${addrHtml(t.from,t.fromAddr,t.fromPhone,t.fromName)}</dd><dt>하차</dt><dd>${addrHtml(t.to,t.toAddr,t.toPhone,t.toName)}</dd>`
       +(t.fee?`<dt>수수료</dt><dd class="num">${won(t.fee)}</dd>`:'')
       +(t.memo?`<dt>메모</dt><dd>${esc(t.memo)}</dd>`:'')+`</dl>`;
   }
@@ -127,7 +129,7 @@ function rowHtml(t,mode){
 }
 
 // ---------- 받을 돈 ----------
-const hay=t=>[t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone].join(' ').toLowerCase();
+const hay=t=>[t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
 let uRange=null, uDraft={start:null,end:null}, uPanel=false, rpY=TODAY.getFullYear(), rpM=TODAY.getMonth();
 const rangeTxt=r=>r.start===r.end?md(r.start):`${md(r.start)} ~ ${md(r.end)}`;
 function renderRangePanel(){
@@ -290,9 +292,9 @@ async function doBackup(share){
   render();
 }
 function csvText(list){
-  const head=['상차일','화주','화주 연락처','상차지','상차 상세주소','상차 연락처','하차지','하차 상세주소','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','메모'];
+  const head=['상차일','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','메모'];
   const q=v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=list.sort(byOld).map(t=>[t.date,t.client,t.clientPhone,t.from,t.fromAddr,t.fromPhone,t.to,t.toAddr,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.memo]);
+  const rows=list.sort(byOld).map(t=>[t.date,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.memo]);
   return '﻿'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n');
 }
 async function doCsv(list,name){
@@ -446,6 +448,43 @@ function toast(msg,undo){
 $('toast-undo').onclick=()=>{const f=undoFn;undoFn=null;$('toast').hidden=true;if(f)f();render()};
 function go(v){view=v;payingId=openId=deletingId=null;render();window.scrollTo(0,0)}
 
+// ---------- 뒤로가기 (휴대폰 뒤로 버튼) ----------
+// 기록 단계: 0 맨 아래(종료 경계) · 1 달력 · 2 다른 탭 · 3 그 위에 열린 화면(수정, 기간 선택)
+let pendingTab=null, exitTimer=null;
+const curLvl=()=>(history.state&&history.state.lvl)||0;
+function closeOverlays(){if(editingId!==null)resetForm();uPanel=false}
+function navTab(v){
+  const lvl=curLvl();
+  closeOverlays(); if(v==='add')resetForm();
+  if(v==='cal'){ if(lvl>1){pendingTab='cal';history.go(-(lvl-1))} go('cal'); return }
+  if(lvl<=1){ if(lvl===0)history.pushState({lvl:1,v:'cal'},''); history.pushState({lvl:2,v},''); go(v); return }
+  if(lvl===2){ history.replaceState({lvl:2,v},''); go(v); return }
+  pendingTab=v; history.go(-(lvl-2)); go(v);
+}
+function pushOverlay(extra){history.pushState(Object.assign({lvl:curLvl()+1,v:view},extra),'')}
+function popOverlay(key){if(history.state&&history.state[key])history.back()}
+function goCal(){const lvl=curLvl(); if(lvl>1){pendingTab='cal';history.go(-(lvl-1))} go('cal')}
+window.addEventListener('popstate',e=>{
+  let s=e.state||{lvl:0};
+  if(!s.lvl){
+    // 맨 아래까지 왔으면: 한 번 더 누르면 닫힘
+    toast('뒤로 버튼을 한 번 더 누르면 앱이 닫혀요');
+    clearTimeout(exitTimer);
+    exitTimer=setTimeout(()=>{if(!curLvl())history.pushState({lvl:1,v:view},'')},2500);
+    return;
+  }
+  clearTimeout(exitTimer);
+  if(pendingTab){
+    const v=pendingTab;pendingTab=null;
+    if(v!=='cal'&&s.lvl===2){s={lvl:2,v};history.replaceState(s,'')}
+  }
+  if(uPanel&&!s.panel)uPanel=false;
+  if(editingId!==null&&!s.edit)resetForm();
+  if(s.v&&s.v!==view){view=s.v;openId=null;window.scrollTo(0,0)}
+  payingId=deletingId=null;
+  render();
+});
+
 // ---------- 누르기 처리 ----------
 document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="tel:"]'))return; // 전화 앱 키패드로 번호만 넘김
@@ -455,13 +494,13 @@ document.addEventListener('click',e=>{
     catch(_){toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요')}
     return}
   const tab=e.target.closest('nav.tabs button');
-  if(tab){if(tab.dataset.v==='add')resetForm();go(tab.dataset.v);return}
-  if(e.target.closest('[data-goto]')){go(e.target.closest('[data-goto]').dataset.goto);return}
+  if(tab){navTab(tab.dataset.v);return}
+  if(e.target.closest('[data-goto]')){navTab(e.target.closest('[data-goto]').dataset.goto);return}
   const ed=e.target.closest('[data-do="edit"]');
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
   if(fill){$(fill.dataset.fill).value=fill.dataset.v;
-    if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&t.clientPhone);if(p)$('f-clientphone').value=p.clientPhone}
+    if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value&&!$('f-clientname').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&(t.clientPhone||t.clientName));if(p){$('f-clientphone').value=p.clientPhone||'';$('f-clientname').value=p.clientName||''}}
     return}
   const ag=e.target.closest('[data-age]');
   if(ag){const v=ag.dataset.age||null;uAge=(v&&uAge===v)?null:v;openId=payingId=null;renderUnpaid();return}
@@ -504,20 +543,20 @@ $('l-pick').onchange=e=>{const v=e.target.value;if(!v)return;const [y,m]=v.split
 $('l-search').oninput=renderLedger;
 $('l-csv').onclick=()=>doCsv(monthTrips(ledY,ledM),`운행장부_${ledY}-${pad(ledM+1)}.csv`);
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
-$('u-rangebtn').onclick=()=>{uPanel=!uPanel;if(uPanel){uDraft=uRange?{...uRange}:{start:null,end:null};const d=uRange?parseD(uRange.start):TODAY;rpY=d.getFullYear();rpM=d.getMonth()}renderUnpaid()};
+$('u-rangebtn').onclick=()=>{uPanel=!uPanel;if(uPanel){uDraft=uRange?{...uRange}:{start:null,end:null};const d=uRange?parseD(uRange.start):TODAY;rpY=d.getFullYear();rpM=d.getMonth();pushOverlay({panel:'range'})}else popOverlay('panel');renderUnpaid()};
 $('rp-prev').onclick=()=>{rpM--;if(rpM<0){rpM=11;rpY--}renderRangePanel()};
 $('rp-next').onclick=()=>{rpM++;if(rpM>11){rpM=0;rpY++}renderRangePanel()};
-$('rp-reset').onclick=()=>{uRange=null;uDraft={start:null,end:null};uPanel=false;openId=payingId=null;renderUnpaid()};
+$('rp-reset').onclick=()=>{uRange=null;uDraft={start:null,end:null};uPanel=false;popOverlay('panel');openId=payingId=null;renderUnpaid()};
 $('rp-apply').onclick=()=>{
   if(!uDraft.start){$('rp-hint').textContent='시작일을 먼저 눌러 주세요';return}
-  uRange={start:uDraft.start,end:uDraft.end||uDraft.start};uPanel=false;openId=payingId=null;renderUnpaid()};
+  uRange={start:uDraft.start,end:uDraft.end||uDraft.start};uPanel=false;popOverlay('panel');openId=payingId=null;renderUnpaid()};
 document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
   const y=TODAY.getFullYear(),m=TODAY.getMonth(),p=b.dataset.preset;
   if(p==='all')uRange=null;
   else if(p==='thism')uRange={start:iso(new Date(y,m,1)),end:iso(new Date(y,m+1,0))};
   else if(p==='lastm')uRange={start:iso(new Date(y,m-1,1)),end:iso(new Date(y,m,0))};
   else uRange={start:iso(new Date(y,m-2,1)),end:todayIso};
-  uPanel=false;openId=payingId=null;renderUnpaid()});
+  uPanel=false;popOverlay('panel');openId=payingId=null;renderUnpaid()});
 $('s-share').onclick=()=>doBackup(true);
 $('s-download').onclick=()=>doBackup(false);
 $('s-csv').onclick=()=>doCsv(trips,`운행장부_전체_${todayIso}.csv`);
@@ -534,6 +573,7 @@ let formPt='인수증';
 const readForm=()=>({date:$('f-date').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
   clientPhone:$('f-clientphone').value.trim(),fromPhone:$('f-fromphone').value.trim(),toPhone:$('f-tophone').value.trim(),
+  clientName:$('f-clientname').value.trim(),fromName:$('f-fromname').value.trim(),toName:$('f-toname').value.trim(),
   amount:Number($('f-amt').value.replace(/\D/g,'')),fee:Number($('f-fee').value.replace(/\D/g,''))||0,memo:$('f-memo').value.trim()});
 function formMissing(f){return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
 ['f-amt','f-fee'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
@@ -554,32 +594,33 @@ function startEdit(t){
   $('f-amt').value=comma(t.amount); setPt(t.payType||'인수증');
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
+  $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
   $('f-paidnow').checked=!!t.paid;
   $('f-more').open=!!(t.fee||t.paid);
-  view='add'; payingId=deletingId=null; render(); window.scrollTo(0,0);
+  view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
-$('f-cancel').onclick=()=>{const id=editingId;resetForm();view=backView;openId=id;render();window.scrollTo(0,0)};
+$('f-cancel').onclick=()=>{const id=editingId;resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
 $('f').addEventListener('submit',e=>{
   e.preventDefault();
   const f=readForm(), miss=formMissing(f), date=f.date;
   if(miss.length){$('f-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
   if(editingId!==null){
     const t=store.get(editingId);
-    if(!t){resetForm();go(backView);return}
+    if(!t){resetForm();popOverlay('edit');go(backView);return}
     const before={...t};
     Object.assign(t,f,{paid:$('f-paidnow').checked?(t.paid||todayIso):null});
     saveTrip(t);
     const id=t.id; resetForm();
     if(backView==='cal'){const d=parseD(date);calY=d.getFullYear();calM=d.getMonth();calSel=date}
     if(backView==='ledger'){const d=parseD(date);ledY=d.getFullYear();ledM=d.getMonth()}
-    view=backView; openId=id; render(); window.scrollTo(0,0);
+    view=backView; openId=id; popOverlay('edit'); render(); window.scrollTo(0,0);
     toast('수정했어요',()=>{Object.assign(t,before);saveTrip(t)});
     return;
   }
   const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null};
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
-  resetForm(); view='cal'; render(); window.scrollTo(0,0);
+  resetForm(); goCal();
   toast(`${f.from}→${f.to} 저장했어요`,()=>removeTrip(t));
 });
 
@@ -597,6 +638,7 @@ window.addEventListener('online',renderSettings);window.addEventListener('offlin
     console.error(e);
     toast('휴대폰 저장소를 열지 못했어요. 크롬 앱에서 열었는지 확인해 주세요.');
   }
+  history.replaceState({lvl:0},''); history.pushState({lvl:1,v:'cal'},'');
   rebuild(); render();
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
   Cloud.init();

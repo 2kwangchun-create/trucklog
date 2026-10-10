@@ -196,6 +196,12 @@ details .field{margin-top:12px}
 .toast{pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .2s}}
 
+/* 담당자 이름 + 연락처 한 줄 */
+.contact{display:grid;grid-template-columns:2fr 3fr;gap:6px;margin-top:2px}
+.contact input{min-width:0}
+input[type=tel]{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:17px}
+.ph .who{color:var(--fg);font-weight:700;margin-right:4px}
+
 /* 시작 로그인 화면 */
 .gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
@@ -297,13 +303,13 @@ body.gated nav.tabs,body.gated .toast{visibility:hidden}
     <form class="form" id="f" novalidate>
       <div class="field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
       <div class="field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
-        <input type="tel" id="f-clientphone" class="sub-input phone" inputmode="tel" placeholder="화주 연락처 (예: 010-1234-5678)" aria-label="화주 연락처"></div>
+        <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></div>
       <div class="field"><label for="f-from">상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div>
         <input type="text" id="f-fromaddr" class="sub-input" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
-        <input type="tel" id="f-fromphone" class="sub-input phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div>
+        <div class="contact"><input type="text" id="f-fromname" placeholder="상차 담당자" aria-label="상차지 담당자 이름"><input type="tel" id="f-fromphone" class="phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div></div>
       <div class="field"><label for="f-to">하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div>
         <input type="text" id="f-toaddr" class="sub-input" placeholder="상세주소 (예: 대덕구 대화로 100)" aria-label="하차지 상세주소">
-        <input type="tel" id="f-tophone" class="sub-input phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div>
+        <div class="contact"><input type="text" id="f-toname" placeholder="하차 담당자" aria-label="하차지 담당자 이름"><input type="tel" id="f-tophone" class="phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div></div>
       <div class="field"><label for="f-amt">운임 (원) <em>*</em></label>
         <div class="seg" id="f-pt" role="group" aria-label="운임 받는 방식">
           <button type="button" data-pt="인수증" aria-pressed="true">인수증</button>
@@ -338,7 +344,7 @@ body.gated nav.tabs,body.gated .toast{visibility:hidden}
       <button type="button" class="btn ghost" id="s-csv">전체 기록 엑셀 파일로 보내기</button>
     </div>
     <div class="card"><h2>저장 현황</h2><p id="s-stats" class="hint"></p></div>
-    <p class="ver">운행장부 1.1</p>
+    <p class="ver">운행장부 1.2.1</p>
   </section>
 </div>
 
