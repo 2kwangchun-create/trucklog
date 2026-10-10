@@ -576,7 +576,21 @@ document.addEventListener('mousemove',e=>{if(mouseDown)lpMove(e.clientX,e.client
 document.addEventListener('mouseup',()=>{mouseDown=false;lpEnd()});
 document.addEventListener('contextmenu',e=>{if(e.target.closest('.list .row[data-id]'))e.preventDefault()});
 
+// 새로고침해도 보던 화면(탭·달·스크롤)으로 돌아오게 — 앱을 완전히 닫았다 열면 달력부터
+const ss={get(k){try{return sessionStorage.getItem(k)}catch(_){return null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(_){}}};
+function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,y:window.scrollY}))}
+function loadSpot(){
+  let s=null;try{s=JSON.parse(ss.get('spot'))}catch(_){}
+  if(!s||!VIEWS.includes(s.v))return 0;
+  view=s.v;
+  if(Number.isInteger(s.calY)&&Number.isInteger(s.calM)){calY=s.calY;calM=s.calM}
+  if(typeof s.calSel==='string')calSel=s.calSel;
+  if(Number.isInteger(s.ledY)&&Number.isInteger(s.ledM)){ledY=s.ledY;ledM=s.ledM}
+  return s.y||0;
+}
+window.addEventListener('pagehide',saveSpot);
 function render(){
+  saveSpot();
   VIEWS.forEach(v=>$('v-'+v).hidden=v!==view);
   document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===view));
   if(view==='unpaid')renderUnpaid(); else if(view==='cal')renderCal(); else if(view==='ledger')renderLedger();
@@ -786,8 +800,11 @@ window.addEventListener('online',renderSettings);window.addEventListener('offlin
     console.error(e);
     toast('휴대폰 저장소를 열지 못했어요. 크롬 앱에서 열었는지 확인해 주세요.');
   }
+  const y=loadSpot();
   history.replaceState({lvl:0},''); history.pushState({lvl:1,v:'cal'},'');
+  if(view!=='cal')history.pushState({lvl:2,v:view},'');
   rebuild(); render();
+  if(y)requestAnimationFrame(()=>window.scrollTo(0,y));
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
   Cloud.init();
   if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
