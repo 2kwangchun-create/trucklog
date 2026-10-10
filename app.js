@@ -105,7 +105,7 @@ function normalize(r){
 }
 // 내 정보(차량 번호·전화·계좌): id 'profile' 기록 하나로 클라우드에 함께 저장해 다른 휴대폰·새 휴대폰에서도 그대로 씀.
 // deleted:true로 두는 건 예전 버전 앱이 운행 기록으로 착각해 목록에 띄우지 않게 하려는 것 (지우면 안 됨)
-const PROF=['carNo','phone','bank','account','holder'];
+const PROF=['carNo','name','phone','bank','account','holder'];
 const getProfile=()=>{const p=store.get('profile');return (p&&p.prof)||{}};
 function validRecord(r){return r&&r.id&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)}
 // 들어온 기록이 더 최근에 고친 것이면 받아들임
@@ -233,7 +233,23 @@ function renderUnpaid(){
   $('u-rangebtn').setAttribute('aria-expanded',uPanel);
   $('u-panel').hidden=!uPanel;
   if(uPanel)renderRangePanel();
-  $('u-list').innerHTML=list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`;
+  document.querySelectorAll('#u-group [data-ugroup]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ugroup===uGroup));
+  $('u-list').innerHTML=!list.length?`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`
+    :uGroup==='client'?groupHtml(list):list.map(t=>rowHtml(t,'unpaid')).join('');
+}
+// 화주별로 묶어서: 화주마다 건수·합계·가장 오래된 날, 누르면 그 화주의 건들이 펼쳐짐 (건마다 [정산 문자])
+let uGroup=ls.get('uGroup')||'';
+const gOpen=new Set();
+function groupHtml(list){
+  const m=new Map();
+  list.forEach(t=>{const k=t.client||'';if(!m.has(k))m.set(k,[]);m.get(k).push(t)}); // list가 오래된 순이라 각 묶음도 오래된 순
+  return [...m.entries()].sort((a,b)=>a[1][0].date.localeCompare(b[1][0].date)).map(([k,ts])=>{
+    const open=gOpen.has(k), sum=ts.reduce((s,t)=>s+t.amount,0), ph=ts.find(t=>t.clientPhone);
+    return `<div class="row grow${open?' open':''}"><div class="ghead" data-do="gopen" data-c="${esc(k)}" role="button" tabindex="0" aria-expanded="${open}">`
+      +`<span class="gname${k?'':' none'}">${k?esc(k):'화주 미입력'}</span><b class="gsum num">${comma(sum)}</b>`
+      +`<span class="gmeta"><span class="num">${ts.length}건</span>${ageChip(ts[0])}${ph?`<a class="num" href="${telHref(ph.clientPhone)}">☎ ${esc(ph.clientPhone)}</a>`:''}<span class="more">${open?'접기 ▲':'펼치기 ▼'}</span></span></div>`
+      +(open?`<div class="glist">${ts.map(t=>rowHtml(t,'unpaid')).join('')}</div>`:'')+`</div>`;
+  }).join('');
 }
 
 // ---------- 달력 ----------
@@ -697,8 +713,9 @@ let smTrip=null, smTax=false, smOrig='';
 const vat=a=>Math.round(a*1.1);
 function smsText(t,tax){
   const p=getProfile(), amt=tax?vat(t.amount):t.amount, acct=acctText(p);
-  const L=[p.carNo?`안녕하세요, ${p.carNo} 차량입니다.`:'안녕하세요.',
-    `${md(t.date)} ${t.from}→${t.to} 운임 금액 ${comma(amt)}원${tax?'(부가세 포함)':''} 입금확인바랍니다.`];
+  const who=[p.carNo,p.name||p.holder].filter(Boolean).join(' '); // 이름이 비어 있으면 예금주 이름
+  const L=[who?`안녕하세요, ${who}입니다.`:'안녕하세요.',
+    `${md(t.date)} ${t.from}→${t.to}${tax?' 전자 계산서 발행했습니다.':''} 운임 금액 ${comma(amt)}원${tax?'(부가세 포함)':''} 입금확인바랍니다.`];
   if(acct)L.push(acct);
   return L.join('\n');
 }
@@ -716,7 +733,7 @@ function openSms(t){
   $('sm-to').textContent=t.clientPhone?`받는 사람: ${t.clientName?t.clientName+' ':''}${t.clientPhone}`
     :'화주 연락처가 없어요. [문자 보내기]를 누른 뒤 번호를 넣거나, [복사]해서 카톡으로 보내세요.';
   setSmTax(ls.get('tax:'+(t.client||''))==='1');
-  $('sm-hint').textContent=p.carNo&&p.account?'글을 눌러 직접 고칠 수 있어요.':'설정 → 내 정보에 차량 번호·계좌를 적어 두면 자동으로 들어가요.';
+  $('sm-hint').textContent=p.carNo&&(p.name||p.holder)&&p.account?'글을 눌러 직접 고칠 수 있어요.':'설정 → 내 정보에 차량 번호·이름·계좌를 적어 두면 자동으로 들어가요.';
   $('sm-hint').classList.remove('errline','okline2');
   $('smsheet').hidden=false; pushOverlay({sms:true});
 }
@@ -892,6 +909,8 @@ document.addEventListener('click',e=>{
   if(ct){setCat(ct.dataset.cat);return}
   const ca=e.target.closest('[data-cadd]');
   if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
+  const ug=e.target.closest('[data-ugroup]');
+  if(ug){uGroup=ug.dataset.ugroup;ls.set('uGroup',uGroup);openId=payingId=null;renderUnpaid();return}
   const lk=e.target.closest('[data-lkind]');
   if(lk){ledKind=lk.dataset.lkind;openId=payingId=deletingId=costOpen=costDel=null;renderLedger();saveSpot();return}
   const tx=e.target.closest('[data-tsize]');
@@ -931,6 +950,7 @@ document.addEventListener('click',e=>{
     case 'rpick': { const d=el.dataset.d; const r=uDraft;
       if(!r.start||r.end){r.start=d;r.end=null} else if(d<r.start){r.start=d} else {r.end=d}
       break; }
+    case 'gopen': { const k=el.dataset.c; gOpen.has(k)?gOpen.delete(k):gOpen.add(k); break; }
     case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
     case 'cdel': costDel=id; break;
     case 'cdelcancel': costDel=null; break;
@@ -967,7 +987,7 @@ $('s-share').onclick=()=>doBackup(true);
 $('s-download').onclick=()=>doBackup(false);
 $('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.csv`,costs);
 $('s-import').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readImport(f)};
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head,.chead')){e.preventDefault();e.target.click()}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head,.chead,.ghead')){e.preventDefault();e.target.click()}});
 
 // ---------- 입력 양식 ----------
 function fmtPhone(v){const d=v.replace(/\D/g,'').slice(0,11);
