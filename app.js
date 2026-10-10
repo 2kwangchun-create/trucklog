@@ -63,8 +63,10 @@ async function saveTrips(list){
   list.forEach(t=>{t.updatedAt=now;store.set(t.id,t)});
   rebuild();
   ls.set('lastChange',String(now));
-  try{await DB.putMany(list)}catch(e){toast('휴대폰에 저장하지 못했어요. 저장 공간을 확인해 주세요.')}
+  try{await DB.putMany(list);ls.set('lastLocalSave',String(Date.now()));ls.set('localSaveErr','')}
+  catch(e){ls.set('localSaveErr',String(Date.now()));toast('휴대폰에 저장하지 못했어요. 저장 공간을 확인해 주세요.')}
   Cloud.pushMany(list);
+  renderSettings();
 }
 const saveTrip=t=>saveTrips([t]);
 const removeTrip=t=>{t.deleted=true;return saveTrip(t)};
@@ -105,7 +107,7 @@ function rowHtml(t,mode){
   const head=`<div class="head" data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}">
     <div class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}${t.clientPhone?`<a class="cph num" href="${telHref(t.clientPhone)}">☎ ${t.clientName?esc(t.clientName)+' ':''}${esc(t.clientPhone)}</a>`:t.clientName?`<span class="cph">${esc(t.clientName)}</span>`:''}</div>
     <div class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</div>
-    <div class="route">${routeHtml(t)}</div>
+    <div class="route"><span class="rt">${routeHtml(t)}</span>${t.memo?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
     <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="more">${open?'접기 ▲':'상세 ▼'}</span></div></div>`;
   let detail='';
   if(open){
@@ -264,6 +266,16 @@ function renderSettings(){
   $('s-stats').innerHTML=trips.length
     ?`운행 기록 <b class="num">${comma(trips.length)}건</b> (${md(dates[0])}/${dates[0].slice(2,4)} ~ ${md(dates[dates.length-1])}/${dates[dates.length-1].slice(2,4)})<br>못 받은 돈 <b class="num c-due">${comma(due.length)}건 · ${won(due.reduce((s,t)=>s+t.amount,0))}</b>`
     :'아직 운행 기록이 없어요.';
+  // 자동 저장 현황: 기록을 저장·수정·삭제할 때마다 휴대폰과 클라우드에 바로 저장됨
+  const n=k=>Number(ls.get(k))||0, lLocal=n('lastLocalSave'), lErr=n('localSaveErr'), lCloud=n('lastCloudSave')||Cloud.lastSync||0;
+  const ok=(t,s)=>`<span class="c-paid">✓</span> <b>${t}</b> ${s}`, bad=(t,s)=>`<span class="c-due">!</span> <b>${t}</b> ${s}`;
+  const phone=lErr>lLocal?bad('휴대폰','저장에 실패했어요. 저장 공간을 확인해 주세요.')
+    :ok('휴대폰','저장됨'+(lLocal?` · ${fmtDT(lLocal)}`:''));
+  const cloud=!Cloud.configured||!Cloud.user?`<b>클라우드</b> 꺼짐 (로그인하면 함께 저장돼요)`
+    :!navigator.onLine?bad('클라우드',`인터넷 연결을 기다리는 중${Cloud.inflight?` · ${Cloud.inflight}건 대기`:''} (연결되면 자동으로 올라가요)`)
+    :Cloud.inflight||Cloud.pending?`<b>클라우드</b> 올리는 중…${Cloud.inflight?` (${Cloud.inflight}건)`:''}`
+    :Cloud.lastSync?ok('클라우드','모두 올라감'+(lCloud?` · ${fmtDT(lCloud)}`:'')):`<b>클라우드</b> 맞추는 중…`;
+  $('s-stats').innerHTML+=`<span class="autosave">자동 저장<br>${phone}<br>${cloud}</span>`;
 }
 
 // 파일 내보내기: 가능하면 공유(카톡·드라이브), 아니면 다운로드
@@ -334,7 +346,7 @@ async function applyImport(){
 // ---------- 구글 클라우드 동기화 (Firebase) ----------
 const FB_VER='10.12.2';
 const Cloud={
-  configured:false,ready:false,loadErr:false,user:null,col:null,unsub:null,lastSync:null,pending:false,lastErr:'',
+  configured:false,ready:false,loadErr:false,user:null,col:null,unsub:null,lastSync:null,pending:false,lastErr:'',inflight:0,
   async init(){
     const cfg=window.FIREBASE_CONFIG;
     this.configured=!!(cfg&&cfg.apiKey&&cfg.projectId);
@@ -368,7 +380,7 @@ const Cloud={
       this.unsub=this.col.onSnapshot({includeMetadataChanges:true},snap=>{
         const changed=[];
         snap.docChanges().forEach(ch=>{if(ch.type==='removed')return;const t=mergeIncoming(ch.doc.data());if(t)changed.push(t)});
-        if(changed.length){DB.putMany(changed).catch(()=>{});rebuild();render()}
+        if(changed.length){DB.putMany(changed).then(()=>ls.set('lastLocalSave',String(Date.now())),()=>{});rebuild();render()}
         if(first&&!snap.metadata.fromCache){
           first=false;
           const remote=new Map(snap.docs.map(d=>[d.id,Number(d.data().updatedAt)||0]));
@@ -387,8 +399,12 @@ const Cloud={
     if(!this.col||!list.length)return;
     for(let i=0;i<list.length;i+=400){
       const b=this.fs.batch();
-      list.slice(i,i+400).forEach(t=>b.set(this.col.doc(t.id),JSON.parse(JSON.stringify(t))));
-      b.commit().catch(e=>this.fail(e));
+      const part=list.slice(i,i+400);
+      part.forEach(t=>b.set(this.col.doc(t.id),JSON.parse(JSON.stringify(t))));
+      // 인터넷이 없으면 commit은 연결될 때까지 기다림 → inflight가 "아직 안 올라간 건수"
+      this.inflight+=part.length;
+      b.commit().then(()=>{ls.set('lastCloudSave',String(Date.now()))},e=>this.fail(e))
+        .finally(()=>{this.inflight-=part.length;renderSettings()});
     }
   },
   async signIn(){
