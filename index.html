@@ -77,6 +77,7 @@ header.top h1{margin:0;font-size:24px;font-weight:700}
 .sumtop b{font-size:30px;letter-spacing:-.5px;line-height:1.2}
 .sumtop .cap{font-size:13px;color:var(--muted);padding-bottom:6px}
 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.sum4{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .msum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .msum .card{padding:12px 14px;gap:2px}
 .msum span{font-size:13px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
@@ -147,7 +148,9 @@ html[data-text="xl"] .todaybtn{padding:0 10px}
 .head.mini .dt small{font-size:12px;color:var(--muted)}
 .head.mini .client{font-size:17px}
 .head.mini .amt{font-size:17px}
-.head.mini .rt2{font-size:15px;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.head.mini .rt2{font-size:15px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.head.mini .rt2 .memo{font-size:14px;opacity:.85}
+.head.mini .dt small.mon{font-weight:700;color:var(--fg)}
 .head.mini .st{font-size:13px;font-weight:600;text-align:right}
 /* 상세: 화주 · 상차 · 하차를 한 덩어리씩 */
 .detail{display:flex;flex-direction:column;padding:0 2px}
@@ -531,8 +534,9 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     </header>
     <div class="card">
       <div class="sumtop"><div class="stat"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b></div><span class="cap">운임 − 수수료 − 지출</span></div>
-      <div class="sum3">
+      <div class="sum3 sum4">
         <div class="stat"><span>총 운임</span><b class="num" id="l-sum"></b></div>
+        <div class="stat"><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
         <div class="stat"><span>못 받은 돈</span><b class="num c-due" id="l-due"></b></div>
         <div class="stat"><span id="l-costlabel">지출</span><b class="num c-cost" id="l-cost"></b></div>
       </div>

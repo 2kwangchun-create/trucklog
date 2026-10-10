@@ -171,6 +171,8 @@ function ctHtml(p,name){
 function addrBlk(label,mk,city,addr,phone,name){
   return `<div class="blk"><span class="bl"><i class="mk ${mk}"></i>${label}</span><div class="addr"><b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}</div>${ctHtml(phone,name)}</div>`;
 }
+// 장부를 여러 달에 걸친 기간으로 보면 날짜 옆에 월도 표시
+const ledMulti=()=>!!ledRange&&ledRange.start.slice(0,7)!==ledRange.end.slice(0,7);
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode){
   const open=openId===t.id;
@@ -178,8 +180,8 @@ function rowHtml(t,mode){
   const amt=`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
-    ?`<div class="head mini" ${attrs}><span class="dt"><b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span>${client}${amt}
-      <span class="rt2">${routeHtml(t)}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
+    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span>${client}${amt}
+      <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${client}${t.clientPhone&&!open?`<a class="call" href="${telHref(t.clientPhone)}">${ic(P.phone)}전화</a>`:''}</span>${amt}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
@@ -308,7 +310,7 @@ function renderLedger(){
   $('l-kicker').textContent=ledRange&&ledRange.start.slice(0,4)!==String(TODAY.getFullYear())?`장부 · ${ledRange.start.slice(0,4)}년`:'장부';
   const all=ledTrips();
   const sum=all.reduce((s,t)=>s+t.amount,0), paid=all.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);
-  $('l-sum').textContent=short(sum); $('l-due').textContent=short(sum-paid);
+  $('l-sum').textContent=short(sum); $('l-paid').textContent=short(paid); $('l-due').textContent=short(sum-paid);
   const showSearch=ledSearch||!!$('l-search').value;
   $('l-searchbox').hidden=!showSearch; $('l-searchbtn').setAttribute('aria-pressed',showSearch);
   const q=$('l-search').value.trim().toLowerCase();
