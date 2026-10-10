@@ -64,17 +64,6 @@ header.top h1{margin:0;font-size:22px;font-weight:700}
 .c-paid{color:var(--paid)} .c-due{color:var(--late)} .c-cost{color:var(--due)}
 .stats2{grid-template-columns:repeat(2,1fr)}
 .grp{display:contents}
-/* 받을 돈 · 화주별 묶음 */
-.grow{gap:0}
-.ghead{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;cursor:pointer}
-.ghead .gname{font-size:19px;font-weight:700;color:var(--client);min-width:0;overflow-wrap:anywhere}
-.ghead .gname.none{color:var(--muted);font-weight:500;font-size:16px}
-.ghead .gsum{font-size:19px;font-weight:700;color:var(--late);text-align:right}
-.ghead .gmeta{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--muted)}
-.ghead .gmeta a{color:var(--client);font-weight:600}
-.ghead .more{margin-left:auto;color:var(--client);font-weight:600}
-.glist{margin:12px -16px -14px;border-top:1px solid var(--line);background:var(--bg)}
-.glist .row{padding-left:24px}
 .pform{display:flex;flex-direction:column;gap:12px}
 .acct{display:grid;grid-template-columns:2fr 3fr;gap:6px}
 /* 글씨 크기 (설정): 화면 전체를 비율로 키움 */
@@ -390,7 +379,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <div class="seg kind" id="u-group" role="group" aria-label="보는 방법"><button type="button" data-ugroup="" aria-pressed="true">건별로 보기</button><button type="button" data-ugroup="client" aria-pressed="false">화주별로 보기</button></div>
     <div class="section-title">오래된 순서</div>
     <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
     <div class="list" id="u-list"></div>
