@@ -244,6 +244,25 @@ body.selecting nav.tabs{display:none}
 .sheet-in textarea{flex:1;min-height:180px;font-size:15px;line-height:1.5;-webkit-user-select:text;user-select:text;background:var(--bg)}
 
 /* 시작 로그인 화면 */
+/* 시작 화면 */
+.splash{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;transition:opacity .45s ease}
+.splash.out{opacity:0;pointer-events:none}
+.splash-in{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.splash-truck{width:220px;height:150px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.splash-truck img{width:220px;height:220px;flex:none}
+.splash-road{width:240px;height:4px;border-radius:2px;margin-bottom:18px;background:repeating-linear-gradient(90deg,var(--line) 0 18px,transparent 18px 30px)}
+.splash h1{margin:0;font-size:32px;font-weight:700}
+.splash-date{margin:0;color:var(--muted);font-size:16px}
+.splash-msg{margin:14px 0 0;font-size:22px;font-weight:700;color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){
+  .splash-truck img{animation:drive-in .9s cubic-bezier(.2,.8,.3,1) both, bump 1.2s ease-in-out .9s infinite}
+  .splash-road{animation:road .6s linear infinite}
+  .splash-msg{animation:fade-up .6s ease .5s both}
+}
+@keyframes drive-in{from{transform:translateX(-130%)}to{transform:none}}
+@keyframes bump{0%,100%{transform:none}50%{transform:translateY(-2px)}}
+@keyframes road{to{background-position:-30px 0}}
+@keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
 .gate-in img{border-radius:20px}
@@ -282,6 +301,17 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 </style>
 </head>
 <body>
+<!-- 시작 화면: 앱을 열 때 잠깐 보여줌 (새로고침 때는 건너뜀) -->
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splash-in">
+    <div class="splash-truck"><img src="icons/icon-512.png" alt="" width="220" height="220"></div>
+    <div class="splash-road"></div>
+    <h1>운행장부</h1>
+    <p class="splash-date" id="splash-date"></p>
+    <p class="splash-msg">오늘도 안전운전 하세요!</p>
+  </div>
+</div>
+<script>try{if(sessionStorage.getItem('splashed'))document.getElementById('splash').remove()}catch(e){}</script>
 <div class="app">
   <!-- 받을 돈 -->
   <section class="view" id="v-unpaid">
@@ -389,7 +419,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <button type="button" class="btn ghost" id="s-csv">전체 기록 엑셀 파일로 보내기</button>
     </div>
     <div class="card"><h2>저장 현황</h2><p id="s-stats" class="hint"></p></div>
-    <p class="ver">운행장부 1.3.7</p>
+    <p class="ver">운행장부 1.4.0</p>
   </section>
 </div>
 

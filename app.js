@@ -20,6 +20,19 @@ const byOld=(a,b)=>a.date.localeCompare(b.date)||(a.createdAt||0)-(b.createdAt||
 const byNew=(a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0);
 const ls={get(k){try{return localStorage.getItem(k)}catch(_){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(_){}}};
 
+// ---------- 시작 화면 ----------
+// 앱을 열 때 3초쯤 보여주고 사라짐 (누르면 바로 닫힘). 새로고침 때는 index.html에서 미리 지움
+const SPLASH_MS=3000;
+(function splash(){
+  const el=$('splash'); if(!el)return;
+  try{sessionStorage.setItem('splashed','1')}catch(_){}
+  $('splash-date').textContent=TODAY.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+  let done=false;
+  const close=()=>{if(done)return;done=true;el.classList.add('out');setTimeout(()=>el.remove(),500)};
+  el.addEventListener('click',close);
+  setTimeout(close,Math.max(0,SPLASH_MS-performance.now()));
+})();
+
 // ---------- 휴대폰 저장소 (IndexedDB) ----------
 const DB={
   db:null,
