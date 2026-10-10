@@ -172,11 +172,11 @@ function rowHtml(t,mode){
   if(payingId===t.id){
     act=`<div class="act"><div class="payline"><label for="pd-${t.id}" style="font-size:15px;font-weight:600">입금일</label><input type="date" id="pd-${t.id}" value="${todayIso}"><button class="btn small" data-do="paycfm" data-id="${t.id}">입금 확인</button><button class="btn ghost small" data-do="paycancel">취소</button></div></div>`;
   } else if(mode==='unpaid'){
-    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button><button class="btn ghost small" data-do="again" data-id="${t.id}">또 등록</button>`:''}</div>`;
+    act=`<div class="act"><button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>${open?`<button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>`:''}</div>`;
   } else if(open){
     act=`<div class="act">
       <button class="btn ghost small" data-do="edit" data-id="${t.id}">수정</button>
-      <button class="btn ghost small" data-do="again" data-id="${t.id}">또 등록</button>
+      
       ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>`}
       ${deletingId===t.id?`<button class="btn danger small" data-do="delcfm" data-id="${t.id}">정말 삭제</button><button class="btn ghost small" data-do="delcancel">취소</button>`:`<button class="btn ghost small" data-do="del" data-id="${t.id}">삭제</button>`}</div>`;
   }
@@ -799,8 +799,6 @@ document.addEventListener('click',e=>{
   const tab=e.target.closest('nav.tabs button');
   if(tab){navTab(tab.dataset.v);return}
   if(e.target.closest('[data-goto]')){navTab(e.target.closest('[data-goto]').dataset.goto);return}
-  const agn=e.target.closest('[data-do="again"]');
-  if(agn){startAgain(store.get(agn.dataset.id));return}
   const ced=e.target.closest('[data-do="cedit"]');
   if(ced){startCostEdit(store.get(ced.dataset.id));return}
   const kd=e.target.closest('[data-fkind]');
@@ -951,18 +949,6 @@ $('cf').addEventListener('submit',e=>{
   resetCost(); $('cf-date').value=date; renderCostRecent();
   toast(`${c.cat} ${comma(amount)}원 저장했어요`,()=>{removeTrip(c);renderCostRecent()});
 });
-
-// ---------- 이번처럼 또 등록 ----------
-// 지난 운행으로 새 운행 적기: 날짜는 오늘, 입금은 "안 받음"으로
-function startAgain(t){
-  if(!t)return;
-  const d=readDraft('draftNew');
-  if(d&&d.v&&!confirm('적던 새 운행이 있어요. 지우고 이 기록으로 새로 쓸까요?'))return;
-  navTab('add'); formKind='trip'; resetForm(); fillTrip(t);
-  $('f-date').value=todayIso; $('f-paidnow').checked=false; $('f-more').open=!!t.fee;
-  showDraftNote(`${t.from}→${t.to} 기록을 불러왔어요. 날짜·운임을 확인하고 저장하세요.`,true);
-  saveDraft(); window.scrollTo(0,0);
-}
 
 // ---------- 글씨 크기 ----------
 function setTextSize(z){
