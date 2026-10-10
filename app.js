@@ -125,7 +125,7 @@ function rowHtml(t,mode){
       ${t.paid?`<button class="btn ghost small" data-do="unpay" data-id="${t.id}">미수로 되돌리기</button>`:`<button class="btn small" data-do="pay" data-id="${t.id}">입금 완료</button>`}
       ${deletingId===t.id?`<button class="btn danger small" data-do="delcfm" data-id="${t.id}">정말 삭제</button><button class="btn ghost small" data-do="delcancel">취소</button>`:`<button class="btn ghost small" data-do="del" data-id="${t.id}">삭제</button>`}</div>`;
   }
-  return `<div class="row${open?' open':''}">${head}${detail}${act}</div>`;
+  return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${act}</div>`;
 }
 
 // ---------- 받을 돈 ----------
@@ -434,6 +434,148 @@ function loadScript(src){return new Promise((res,rej)=>{const s=document.createE
 
 // ---------- 공통 그리기 ----------
 const VIEWS=['unpaid','cal','ledger','add','set'];
+
+// ---------- 여러 건 선택 + 복사 ----------
+let selMode=false, suppressClick=false;
+const sel=new Set();
+function refreshSel(){
+  document.querySelectorAll('.list .row[data-id]').forEach(r=>r.classList.toggle('checked',sel.has(r.dataset.id)));
+  const n=[...sel].filter(id=>{const t=store.get(id);return t&&!t.deleted}).length;
+  $('sel-count').textContent=`${n}건 선택`;
+  document.querySelectorAll('#selbar [data-kind]').forEach(b=>b.disabled=!n);
+}
+function enterSelect(){
+  selMode=true;sel.clear();payingId=deletingId=null;
+  document.body.classList.add('selecting');$('selbar').hidden=false;
+  pushOverlay({select:true});refreshSel();
+}
+function exitSelect(fromBack){
+  selMode=false;sel.clear();
+  document.body.classList.remove('selecting');$('selbar').hidden=true;
+  refreshSel();
+  if(!fromBack)popOverlay('select');
+}
+const whoLine=(name,phone)=>[name,phone].filter(Boolean).join(' ');
+// 복사 글에 넣을 항목 (날짜·화주·시군) — 고른 값은 이 휴대폰에 기억
+let cpOpts={date:true,client:true,city:true};
+try{Object.assign(cpOpts,JSON.parse(ls.get('copyOpts')||'{}'))}catch(_){}
+let cpKind='all', cpOrig='';
+// 글을 고치면 [되돌리기]가 나타나고, 누르면 처음 만들어진 내용으로 돌아감
+$('cp-text').addEventListener('input',()=>{$('cp-undo').hidden=$('cp-text').value===cpOrig});
+$('cp-undo').onclick=()=>{$('cp-text').value=cpOrig;$('cp-undo').hidden=true;toast('처음 내용으로 되돌렸어요')};
+function copyText(list,kind,o){
+  const many=list.length>1;
+  return list.sort(byOld).map((t,i)=>{
+    const L=[];
+    const parts=[];
+    if(o.client)parts.push(t.client||'화주 미입력');
+    if(o.city)parts.push(`${t.from} → ${t.to}`);
+    let head=parts.join(' · ');
+    if(o.date)head=`[${md(t.date)}]`+(head?' '+head:'');
+    if(head)L.push(head);
+    // 상세주소·담당자·연락처는 비어 있어도 줄을 넣고 "미입력"으로 표시 (복사 전에 고칠 수 있게)
+    const NA='미입력';
+    const who=(n,p)=>`${n||'이름 '+NA} ${p||'연락처 '+NA}`;
+    if(kind==='all'&&o.client)L.push(`화주 담당: ${who(t.clientName,t.clientPhone)}`);
+    if(kind!=='to'){
+      L.push(`상차지: ${[o.city?t.from:'',t.fromAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
+      L.push(`상차 담당: ${who(t.fromName,t.fromPhone)}`);
+    }
+    if(kind!=='from'){
+      L.push(`하차지: ${[o.city?t.to:'',t.toAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
+      L.push(`하차 담당: ${who(t.toName,t.toPhone)}`);
+    }
+    if(t.memo)L.push(`메모: ${t.memo}`);
+    // 번호는 첫 줄 앞에 바로 붙임 (넣을 항목이 없으면 내용 첫 줄 옆에)
+    if(many&&L.length)L[0]=`${i+1}) `+L[0];
+    return L.join('\n');
+  }).join('\n');
+}
+const KIND={all:'전체',from:'상차',to:'하차'};
+function selList(){return [...sel].map(id=>store.get(id)).filter(t=>t&&!t.deleted)}
+function fillCopy(){
+  const list=selList();
+  cpOrig=copyText(list,cpKind,cpOpts);
+  $('cp-text').value=cpOrig;$('cp-undo').hidden=true;
+  $('cp-title').textContent=`${KIND[cpKind]} 복사 · ${list.length}건`;
+  const none=!cpOpts.date&&!cpOpts.client&&!cpOpts.city;
+  document.querySelectorAll('#cp-opts [data-opt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.opt==='none'?none:!!cpOpts[b.dataset.opt]));
+  $('cp-hint').textContent='글을 눌러 직접 고칠 수 있어요. 다 고쳤으면 [복사하기]를 누르세요.';
+  $('cp-hint').classList.remove('errline','okline2');
+}
+function openCopy(kind){
+  if(!selList().length){toast('먼저 건을 선택해 주세요');return}
+  cpKind=kind;fillCopy();
+  $('cpsheet').hidden=false;
+  if(!(history.state&&history.state.sheet))pushOverlay({sheet:true,select:true});
+}
+async function doCopy(){
+  const text=$('cp-text').value;
+  let ok=false;
+  try{await navigator.clipboard.writeText(text);ok=true}catch(_){}
+  if(!ok){try{const ta=$('cp-text');ta.focus();ta.select();ok=document.execCommand('copy');ta.blur();ta.setSelectionRange(0,0);window.getSelection&&window.getSelection().removeAllRanges()}catch(_){}}
+  $('cp-hint').textContent=ok?'복사했어요. 카톡이나 문자에 붙여넣기 하세요.'
+    :'자동 복사가 안 됐어요. 글을 길게 눌러 "모두 선택" → "복사" 해 주세요.';
+  $('cp-hint').classList.toggle('errline',!ok);$('cp-hint').classList.toggle('okline2',ok);
+  if(ok)toast('복사했어요');
+}
+$('cp-opts').addEventListener('click',e=>{
+  const b=e.target.closest('[data-opt]');if(!b)return;
+  if(b.dataset.opt==='none')cpOpts={date:false,client:false,city:false};
+  else cpOpts[b.dataset.opt]=!cpOpts[b.dataset.opt];
+  ls.set('copyOpts',JSON.stringify(cpOpts));fillCopy();
+});
+$('selbar').addEventListener('click',e=>{
+  const k=e.target.closest('[data-kind]');if(k){openCopy(k.dataset.kind);return}
+  if(e.target.closest('#sel-cancel')){exitSelect();return}
+  if(e.target.closest('#sel-all')){document.querySelectorAll(`#v-${view} .list .row[data-id]`).forEach(r=>sel.add(r.dataset.id));refreshSel()}
+});
+$('cp-close').onclick=()=>{$('cpsheet').hidden=true;popOverlay('sheet')};
+$('cp-copy').onclick=doCopy;
+
+// 꾹 누르기(0.45초) → 선택 시작, 누른 채로 끌면 지나가는 건도 선택
+const LP={timer:null,x:0,y:0,drag:false};
+const rowAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest('.list .row[data-id]')};
+function lpStart(row,x,y){
+  suppressClick=false;LP.x=x;LP.y=y;clearTimeout(LP.timer);
+  LP.timer=setTimeout(()=>{
+    LP.timer=null;LP.drag=true;suppressClick=true;
+    if(!selMode)enterSelect();
+    sel.add(row.dataset.id);refreshSel();
+    try{navigator.vibrate&&navigator.vibrate(25)}catch(_){}
+  },450);
+}
+function dragPick(){const r=rowAt(LP.lx,LP.ly);if(r&&!sel.has(r.dataset.id)){sel.add(r.dataset.id);refreshSel()}}
+function lpMove(x,y,ev){
+  if(LP.drag){
+    if(ev&&ev.cancelable)ev.preventDefault();
+    LP.lx=x;LP.ly=y;dragPick();
+    // 손가락이 화면 위·아래 끝에 있으면 계속 스크롤하면서 고르기
+    if(!LP.auto)LP.auto=setInterval(()=>{
+      if(!LP.drag){clearInterval(LP.auto);LP.auto=null;return}
+      const h=window.innerHeight;
+      if(LP.ly<90){window.scrollBy(0,-16);dragPick()}
+      else if(LP.ly>h-170){window.scrollBy(0,16);dragPick()}
+    },40);
+    return;
+  }
+  if(LP.timer&&(Math.abs(x-LP.x)>10||Math.abs(y-LP.y)>10)){clearTimeout(LP.timer);LP.timer=null}
+}
+function lpEnd(){clearTimeout(LP.timer);LP.timer=null;LP.drag=false;clearInterval(LP.auto);LP.auto=null}
+const lpTarget=e=>!e.target.closest('button,a,input,textarea')&&e.target.closest('.list .row[data-id]');
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length>1){lpEnd();return}
+  const row=lpTarget(e);if(row)lpStart(row,e.touches[0].clientX,e.touches[0].clientY);
+},{passive:true});
+document.addEventListener('touchmove',e=>lpMove(e.touches[0].clientX,e.touches[0].clientY,e),{passive:false});
+document.addEventListener('touchend',lpEnd,{passive:true});
+document.addEventListener('touchcancel',lpEnd,{passive:true});
+let mouseDown=false;
+document.addEventListener('mousedown',e=>{if(e.button!==0)return;const row=lpTarget(e);if(row){mouseDown=true;lpStart(row,e.clientX,e.clientY)}});
+document.addEventListener('mousemove',e=>{if(mouseDown)lpMove(e.clientX,e.clientY,null)});
+document.addEventListener('mouseup',()=>{mouseDown=false;lpEnd()});
+document.addEventListener('contextmenu',e=>{if(e.target.closest('.list .row[data-id]'))e.preventDefault()});
+
 function render(){
   VIEWS.forEach(v=>$('v-'+v).hidden=v!==view);
   document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===view));
@@ -454,6 +596,7 @@ let pendingTab=null, exitTimer=null;
 const curLvl=()=>(history.state&&history.state.lvl)||0;
 function closeOverlays(){if(editingId!==null)resetForm();uPanel=false}
 function navTab(v){
+  if(selMode)exitSelect();
   const lvl=curLvl();
   closeOverlays(); if(v==='add')resetForm();
   if(v==='cal'){ if(lvl>1){pendingTab='cal';history.go(-(lvl-1))} go('cal'); return }
@@ -479,6 +622,8 @@ window.addEventListener('popstate',e=>{
     if(v!=='cal'&&s.lvl===2){s={lvl:2,v};history.replaceState(s,'')}
   }
   if(uPanel&&!s.panel)uPanel=false;
+  if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
+  if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)resetForm();
   if(s.v&&s.v!==view){view=s.v;openId=null;window.scrollTo(0,0)}
   payingId=deletingId=null;
@@ -487,6 +632,9 @@ window.addEventListener('popstate',e=>{
 
 // ---------- 누르기 처리 ----------
 document.addEventListener('click',e=>{
+  if(suppressClick){suppressClick=false;if(e.target.closest('.list .row[data-id]')){e.preventDefault();return}}
+  if(selMode){const row=e.target.closest('.list .row[data-id]');
+    if(row){e.preventDefault();const id=row.dataset.id;sel.has(id)?sel.delete(id):sel.add(id);refreshSel();return}}
   if(e.target.closest('a[href^="tel:"]'))return; // 전화 앱 키패드로 번호만 넘김
   const cp=e.target.closest('[data-copy]');
   if(cp){const v=cp.dataset.copy;

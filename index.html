@@ -202,6 +202,36 @@ details .field{margin-top:12px}
 input[type=tel]{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:17px}
 .ph .who{color:var(--fg);font-weight:700;margin-right:4px}
 
+/* 여러 건 선택 */
+.row{position:relative;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.ck{display:none}
+body.selecting .row{padding-left:54px}
+body.selecting .ck{display:block;position:absolute;left:14px;top:16px;width:28px;height:28px;border-radius:50%;border:2px solid var(--muted);background:var(--surface)}
+body.selecting .row.checked{background:var(--accent-soft)}
+body.selecting .row.checked .ck{background:var(--accent);border-color:var(--accent)}
+body.selecting .row.checked .ck::after{content:"";position:absolute;left:8px;top:3px;width:7px;height:13px;border:solid var(--accent-fg);border-width:0 3px 3px 0;transform:rotate(45deg)}
+body.selecting .row .act,body.selecting .row .detail,body.selecting .head .more{display:none}
+body.selecting .row.open:not(.checked){background:transparent}
+body.selecting nav.tabs{display:none}
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:2px solid var(--accent);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.selinfo{display:flex;justify-content:space-between;align-items:center;max-width:560px;width:100%;margin:0 auto;font-size:17px}
+.selbtns{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;max-width:560px;width:100%;margin:0 auto}
+.selbtns .btn{padding:12px 4px;font-size:15px}
+.selbtns .btn:disabled{opacity:.4}
+.sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--surface);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;max-height:85%}
+.sheet-in h2{margin:0;font-size:19px}
+.cpopts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.cpopts span{margin-right:2px}
+.cpopts button{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:600}
+.cpopts button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.cpopts button[aria-pressed="true"]::before{content:"✓ "}
+.cpline{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.cpline .hint{flex:1;min-width:0}
+#cp-undo{flex:none}
+.okline2{color:var(--paid);font-weight:600}
+.sheet-in textarea{flex:1;min-height:180px;font-size:15px;line-height:1.5;-webkit-user-select:text;user-select:text;background:var(--bg)}
+
 /* 시작 로그인 화면 */
 .gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
@@ -344,7 +374,7 @@ body.gated nav.tabs,body.gated .toast{visibility:hidden}
       <button type="button" class="btn ghost" id="s-csv">전체 기록 엑셀 파일로 보내기</button>
     </div>
     <div class="card"><h2>저장 현황</h2><p id="s-stats" class="hint"></p></div>
-    <p class="ver">운행장부 1.2.1</p>
+    <p class="ver">운행장부 1.3.4</p>
   </section>
 </div>
 
@@ -355,6 +385,30 @@ body.gated nav.tabs,body.gated .toast{visibility:hidden}
   <button role="tab" data-v="add" aria-selected="false" class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>등록</button>
   <button role="tab" data-v="set" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>설정</button>
 </div></nav>
+<div class="selbar" id="selbar" hidden>
+  <div class="selinfo"><b id="sel-count">0건 선택</b><button type="button" class="linkbtn" id="sel-all">이 목록 모두 선택</button></div>
+  <div class="selbtns">
+    <button type="button" class="btn" data-kind="all">전체 복사</button>
+    <button type="button" class="btn" data-kind="from">상차 복사</button>
+    <button type="button" class="btn" data-kind="to">하차 복사</button>
+    <button type="button" class="btn ghost" id="sel-cancel">취소</button>
+  </div>
+</div>
+<div class="sheet" id="cpsheet" role="dialog" aria-modal="true" aria-labelledby="cp-title" hidden>
+  <div class="sheet-in">
+    <h2 id="cp-title">복사</h2>
+    <div class="cpopts" id="cp-opts" role="group" aria-label="넣을 항목">
+      <span>넣을 항목</span>
+      <button type="button" data-opt="date" aria-pressed="true">날짜</button>
+      <button type="button" data-opt="client" aria-pressed="true">화주</button>
+      <button type="button" data-opt="city" aria-pressed="true">시·군</button>
+      <button type="button" data-opt="none" aria-pressed="false">선택 안 함</button>
+    </div>
+    <textarea id="cp-text" rows="12" aria-label="복사할 내용 (고칠 수 있음)"></textarea>
+    <div class="cpline"><p class="hint" id="cp-hint"></p><button type="button" class="btn ghost small" id="cp-undo" hidden>↺ 되돌리기</button></div>
+    <div class="btnrow"><button type="button" class="btn" id="cp-copy">복사하기</button><button type="button" class="btn ghost" id="cp-close">닫기</button></div>
+  </div>
+</div>
 <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="g-title" hidden>
   <div class="gate-in">
     <img src="icons/icon-192.png" alt="" width="88" height="88">
