@@ -162,19 +162,37 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .head .cwrap{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;min-width:0}
 /* 어떤 콜: 앱 아이콘처럼 고르기 · 목록에선 화주 옆 작은 표시 */
 .srcgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.srcgrid button{border:2px solid transparent;background:transparent;border-radius:16px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--fg)}
-.srcgrid button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
-.appic{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15)}
-.appic.s1,.srcb.s1{background:#2f6fd6}
-.appic.s2,.srcb.s2{background:#e8742a}
-.appic.s3,.srcb.s3{background:#7b8580}
-.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:4px}
-.srcb{display:inline-block;color:#fff;font-size:12px;font-weight:700;padding:2px 7px;border-radius:6px;flex:none}
-.cinfo{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:600;color:var(--client)}
+.srcgrid button{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:14px;min-height:96px;padding:10px 2px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:600;color:var(--fg)}
+.srcgrid button[aria-pressed="true"]{border:2px solid var(--accent);background:var(--accent-soft);padding:9px 1px 7px}
+.srcgrid button[aria-pressed="true"]::after{content:"";position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat}
+.appic{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.appic.s1{background:#2f6fd6} .appic.s2{background:#e8742a} .appic.s3{background:#7b8580}
+/* 실제 콜 앱 마크 (원콜은 그림 둘레 여백을 잘라서, 24시콜은 동그랗게) */
+.appic.logo{background:transparent;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.appic.s1.logo img{width:70px;height:70px;flex:none}
+.appic.s2.logo{border-radius:50%}
+.appic.s2.logo img{width:48px;height:48px;border-radius:50%}
+.srcb .bl{width:16px;height:16px;border-radius:4px;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;margin:0 4px 0 -3px;flex:none}
+.srcb .bl img{width:23px;height:23px;flex:none}
+.srcb.s2 .bl{border-radius:50%}
+.srcb.s2 .bl img{width:16px;height:16px}
+.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
+/* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
+.srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
+.srcb.s1{background:#e6eefb;color:#1f4fa3} .srcb.s2{background:#fdeadc;color:#a64a12} .srcb.s3{background:var(--track);color:var(--muted)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .srcb.s1{background:#1c2a44;color:#9fbef5}:root:not([data-theme="light"]) .srcb.s2{background:#3a2617;color:#f3a774}}
+:root[data-theme="dark"] .srcb.s1{background:#1c2a44;color:#9fbef5} :root[data-theme="dark"] .srcb.s2{background:#3a2617;color:#f3a774}
+/* 화주 담당자 · 연락처: 화주 아래 한 줄 (번호를 누르면 전화) */
+.cinfo{grid-column:1/-1;display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;font-size:14px;font-weight:600;color:var(--muted);margin-top:-2px}
 .cinfo .cn{color:var(--fg)}
-.cinfo .cp{display:inline-flex;align-items:center;gap:3px;color:var(--client);text-decoration:none}
+.cinfo .cp{display:inline-flex;align-items:center;gap:4px;color:var(--client);text-decoration:none;min-height:28px}
 .cinfo .cp .ic{width:15px;height:15px}
 .head.mini .cwrap{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;min-width:0}
+.head.mini .cinfo{grid-column:2/-1}
+.head.mini .dt{grid-column:1;grid-row:1 / span 3}
+.head.mini .rt2{grid-column:2}
+.head.mini .st{grid-column:3}
 body.selecting .head .cp{pointer-events:none}
 .head .call{display:flex;align-items:center;gap:4px;font-size:15px;font-weight:600;color:var(--client);text-decoration:none;padding:6px 0}
 .head .call .ic{width:18px;height:18px}
@@ -249,8 +267,9 @@ input[type=date],input[type=text],input[type=search],input[inputmode]{width:100%
 .search .ic{color:var(--muted)}
 .search input[type=search]{border:0;padding:0;min-height:46px;flex:1;min-width:0;background:transparent;outline:0}
 /* 찾을 곳 고르기 (자동·전체·화주·지역·주소·메모) */
-.sscope{flex:none;border:0;border-radius:999px;background:var(--accent-soft);color:var(--accent);font:inherit;font-size:14px;font-weight:700;padding:6px 10px;margin-right:-6px}
-.shint{margin:-6px 4px 0;font-size:13px;color:var(--accent);font-weight:600}
+.sscope{flex:none;-webkit-appearance:none;appearance:none;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f5e4a' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 0 center/16px no-repeat;color:var(--accent);font:inherit;font-size:15px;font-weight:700;min-height:34px;padding:0 20px 0 12px;margin-right:-4px;cursor:pointer}
+.shint{margin:-6px 4px 0;font-size:13px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.shint::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
 
 /* 받을 돈: 기간 */
 .rangebtn{display:flex;align-items:center;gap:6px;border:0;box-shadow:inset 0 0 0 1px var(--line2);background:var(--surface);border-radius:12px;min-height:42px;padding:0 14px;font-weight:600;font-size:15px;white-space:nowrap}
@@ -611,10 +630,10 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="seg kind" id="f-kind" role="group" aria-label="무엇을 적을까요"><button type="button" data-fkind="trip" aria-pressed="true">운행</button><button type="button" data-fkind="cost" aria-pressed="false">지출</button></div>
     <p class="notice draftnote" id="f-draft" hidden><span id="f-draftmsg"></span><button type="button" class="linkbtn" id="f-discard">지우고 새로 쓰기</button></p>
     <form class="form" id="f" novalidate>
-      <div class="card field"><span class="flabel">어떤 콜?</span>
+      <div class="card field"><span class="flabel">어떤 콜로 받았나요?<small>(안 골라도 돼요)</small></span>
         <div class="srcgrid" id="f-src" role="group" aria-label="어떤 콜로 받았나요">
-          <button type="button" data-src="원콜" aria-pressed="false"><span class="appic s1">1</span>원콜</button>
-          <button type="button" data-src="전국24시콜" aria-pressed="false"><span class="appic s2">24</span>전국24시콜</button>
+          <button type="button" data-src="원콜" aria-pressed="false"><span class="appic s1 logo"><img src="icons/call-one.webp" alt="" width="48" height="48"></span>원콜</button>
+          <button type="button" data-src="전국24시콜" aria-pressed="false"><span class="appic s2 logo"><img src="icons/call-24.png" alt="" width="48" height="48"></span>전국24시콜</button>
           <button type="button" data-src="기타" aria-pressed="false"><span class="appic s3">···</span>기타</button>
         </div>
         <div class="srcetc" id="f-srcetc" hidden><input type="text" id="f-srctext" placeholder="어떤 콜인지 적어 주세요 (예: 화물맨)" aria-label="기타 콜 이름"><div class="recent" id="r-src"></div></div></div>

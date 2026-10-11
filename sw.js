@@ -6,7 +6,8 @@ const VERSION = '1.7.0';
 const SHELL = 'trucklog-shell-' + VERSION;
 const RUNTIME = 'trucklog-runtime';
 const FILES = ['./', './index.html', './app.js', './firebase-config.js', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'];
+  './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
+  './icons/call-one.webp', './icons/call-24.png'];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];
 
 self.addEventListener('install', e => {

@@ -174,8 +174,10 @@ function addrBlk(label,mk,city,addr,phone,name){
 // 장부를 여러 달에 걸친 기간으로 보면 날짜 옆에 월도 표시
 const ledMulti=()=>!!ledRange&&ledRange.start.slice(0,7)!==ledRange.end.slice(0,7);
 // 어떤 콜로 받은 운행인지 (등록 화면에서 앱 아이콘처럼 고름) · 화주 옆에 작은 표시
-const SRC=[{k:'원콜',ico:'1',cls:'s1'},{k:'전국24시콜',ico:'24',cls:'s2'},{k:'기타',ico:'…',cls:'s3'}];
-const srcBadge=t=>t.src?`<span class="srcb ${(SRC.find(s=>s.k===t.src)||SRC[2]).cls}">${esc(t.src)}</span>`:'';
+const SRC=[{k:'원콜',ico:'1',cls:'s1',img:'icons/call-one.webp'},{k:'전국24시콜',ico:'24',cls:'s2',img:'icons/call-24.png'},{k:'기타',ico:'…',cls:'s3'}];
+// 원콜·전국24시콜은 실제 앱 마크를 작게 붙임
+const srcBadge=t=>{if(!t.src)return '';const s=SRC.find(x=>x.k===t.src)||SRC[2];
+  return `<span class="srcb ${s.cls}">${s.img?`<i class="bl"><img src="${s.img}" alt=""></i>`:''}${esc(t.src)}</span>`};
 // 화주 옆에 늘: 담당자 · 연락처 (번호를 누르면 전화)
 const cInfo=t=>t.clientName||t.clientPhone?`<span class="cinfo">${t.clientName?`<span class="cn">${esc(t.clientName)}</span>`:''}${t.clientPhone?`<a class="cp num" href="${telHref(t.clientPhone)}">${ic(P.phone)}${esc(t.clientPhone)}</a>`:''}</span>`:'';
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
@@ -185,9 +187,9 @@ function rowHtml(t,mode){
   const amt=`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
-    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}${cInfo(t)}</span>${amt}
+    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
-    :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}${cInfo(t)}</span>${amt}
+    :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
