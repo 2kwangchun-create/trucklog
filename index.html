@@ -89,9 +89,14 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{height:44px;padding:
 .sumtop b{font-size:30px;letter-spacing:-.5px;line-height:1.2}
 .sumtop .cap{font-size:13px;color:var(--muted);padding-bottom:6px}
 /* 순수익 아래: 실제로 들어온 돈 기준 */
-.cashline{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin:-2px 0 10px;font-size:14px;color:var(--muted)}
-.cashline b{font-size:17px}
-.cashline small{width:100%;font-size:12px}
+.nettop b{font-size:30px;letter-spacing:-.5px;line-height:1.2}
+.nettop small{font-size:12px;color:var(--muted);margin-top:2px}
+/* 순수익 아래: 실제로 들어온 돈 기준 (연한 상자 한 줄) */
+.cashline{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px}
+.cashline div{display:flex;flex-direction:column;min-width:0}
+.cashline span{font-size:14px;font-weight:600}
+.cashline small{font-size:12px;color:var(--muted)}
+.cashline b{font-size:18px;flex:none}
 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 .sum4{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .msum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -183,9 +188,10 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 /* 콜 표시 "마크만": 이름 없이 마크만 (기타는 마크가 없어 이름 그대로) */
 .srcb.only{padding:0 3px;width:22px;justify-content:center}
 .srcb.only .bl{margin:0}
-.smark button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px}
-.smark .pv{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
-.smark button small{font-size:14px;font-weight:700}
+.smark button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 4px;min-height:72px}
+.smark .pv{display:flex;gap:6px;align-items:center;justify-content:center;white-space:nowrap}
+.smark .pv b{font-size:15px;color:var(--client)}
+.smark button small{font-size:13px;font-weight:600;opacity:1}
 .smark-note{margin:-4px 4px 0}/* 계산서 · 문자 보낸 날 표시 */
 .chip.tax{background:var(--client-soft);color:var(--client)}
 .chip.sms{background:var(--track);color:var(--muted)}
@@ -197,7 +203,11 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .chg summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:15px;color:var(--muted);list-style:none}
 .chg summary::-webkit-details-marker{display:none}
 .chg summary b{font-size:16px;color:var(--fg)}
-.chg summary .num:last-child{margin-left:auto}
+.chg summary .cd{margin-left:auto}
+.chg summary .ic{width:18px;height:18px;color:var(--muted);transition:transform .2s}
+.chg[open] summary .ic{transform:rotate(180deg)}
+.chgmore{border:0;border-top:1px solid var(--line);background:transparent;width:100%;min-height:48px;color:var(--client);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px}
+.chgmore .ic{width:18px;height:18px}
 .chg .newb{background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px}
 .chg ul{margin:8px 0 2px;padding-left:20px;font-size:15px;line-height:1.6}
 .srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
@@ -249,6 +259,9 @@ body.selecting .head .cp{pointer-events:none}
 .mk.from{border-radius:50%;border:2.5px solid var(--accent)}
 .mk.to{border-radius:2px;background:var(--accent)}
 .callbtn{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:10px;background:var(--client-soft);color:var(--client);font-weight:700;font-size:15px;text-decoration:none}
+/* 길 안내: 주소 글씨도 누르면 지도로 */
+.maplink{display:block;color:inherit;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:4px}
+.navbtn{background:var(--accent-soft);color:var(--accent)}
 .callbtn .ic{width:18px;height:18px}
 .cpy{border:1px solid var(--line2);background:var(--surface);border-radius:10px;height:40px;padding:0 12px;font-size:14px;font-weight:600;color:var(--fg)}
 .act{display:flex;flex-direction:column;gap:8px}
@@ -635,8 +648,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         </div></div>
     </header>
     <div class="card">
-      <div class="sumtop"><div class="stat"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b></div><span class="cap">운임 − 수수료 − 지출 (못 받은 돈 포함)</span></div>
-      <div class="cashline"><span>지금까지 들어온 돈 기준</span><b class="num" id="l-cash"></b><small>받은 돈 − 그 건 수수료 − 지출</small></div>
+      <div class="stat nettop"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b><small>운임 − 수수료 − 지출 · 못 받은 돈까지 포함</small></div>
+      <div class="cashline"><div><span>지금까지 들어온 돈 기준</span><small>받은 돈 − 그 건 수수료 − 지출</small></div><b class="num" id="l-cash"></b></div>
       <div class="sum3 sum4">
         <div class="stat"><span>총 운임</span><b class="num" id="l-sum"></b></div>
         <div class="stat"><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
@@ -746,8 +759,9 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="gt">글씨 크기</div>
     <div class="seg tsize" id="s-text" role="group" aria-label="글씨 크기"><button type="button" class="ts" data-tsize="" aria-pressed="true"><span style="font-size:17px">가</span><small>보통</small></button><button type="button" class="ts" data-tsize="l" aria-pressed="false"><span style="font-size:21px">가</span><small>크게</small></button><button type="button" class="ts" data-tsize="xl" aria-pressed="false"><span style="font-size:25px">가</span><small>아주 크게</small></button></div>
     <div class="gt">화주 옆 콜 표시</div>
-    <div class="seg kind smark" id="s-smark" role="group" aria-label="화주 옆 콜 표시"><button type="button" data-smark="both" aria-pressed="false"><span class="pv"><span class="srcb s1"><i class="bl"><img src="icons/call-one.webp" alt=""></i>원콜</span><span class="srcb s2"><i class="bl"><img src="icons/call-24.png" alt=""></i>전국24시콜</span></span><small>마크 + 이름</small></button><button type="button" data-smark="mark" aria-pressed="true"><span class="pv"><span class="srcb s1 only"><i class="bl"><img src="icons/call-one.webp" alt=""></i></span><span class="srcb s2 only"><i class="bl"><img src="icons/call-24.png" alt=""></i></span></span><small>마크만</small></button></div>
-    <p class="hint small smark-note">기타로 직접 적은 콜 이름은 어느 쪽이든 그대로 보여요.</p>    <div class="gt">백업 · 내보내기</div>
+    <div class="seg kind smark" id="s-smark" role="group" aria-label="화주 옆 콜 표시"><button type="button" data-smark="both" aria-pressed="false"><span class="pv"><span class="srcb s1"><i class="bl"><img src="icons/call-one.webp" alt=""></i>원콜</span><b>대한물류</b></span><small>마크 + 이름</small></button><button type="button" data-smark="mark" aria-pressed="true"><span class="pv"><span class="srcb s1 only"><i class="bl"><img src="icons/call-one.webp" alt=""></i></span><b>대한물류</b></span><small>마크만</small></button></div>
+    <p class="hint small smark-note">기타로 직접 적은 콜 이름은 어느 쪽이든 그대로 보여요.</p>
+    <div class="gt">백업 · 내보내기</div>
     <p class="lastbk" id="s-lastbk"></p>
     <div class="card items">
       <button type="button" class="item" id="s-share"><span class="ii" style="background:var(--accent-soft);color:var(--accent)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M7 8l5-5 5 5"/></svg></span><span class="tx"><b>백업 파일 보내기</b><small>카톡 "나와의 채팅" · 구글 드라이브</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>

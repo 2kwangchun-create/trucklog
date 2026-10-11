@@ -209,6 +209,7 @@ const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 const P={arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  nav:'M3 11l18-8-8 18-2-8z',
   phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'};
 const WD='일월화수목금토', wdOf=s=>WD[parseD(s).getDay()];
 const mdK=s=>`${Number(s.slice(5,7))}월 ${Number(s.slice(8,10))}일`;
@@ -220,8 +221,13 @@ function ctHtml(p,name){
   return `<div class="ct">${who}<span class="num">${esc(p)}</span></div>`
     +`<div class="ct"><a class="callbtn" href="${telHref(p)}">${ic(P.phone)}전화</a><button type="button" class="cpy" data-copy="${esc(p)}">번호 복사</button></div>`;
 }
+// 길 안내: 주소를 누르면 휴대폰의 지도·내비 앱으로 (안드로이드는 geo: 주소 → 깔린 앱 중에서 고름, "항상"을 고르면 다음부턴 바로)
+const IOS=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+const mapHref=q=>IOS?'https://maps.apple.com/?q='+encodeURIComponent(q):'geo:0,0?q='+encodeURIComponent(q);
 function addrBlk(label,mk,city,addr,phone,name){
-  return `<div class="blk"><span class="bl"><i class="mk ${mk}"></i>${label}</span><div class="addr"><b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}</div>${ctHtml(phone,name)}</div>`;
+  const q=[city,addr].filter(Boolean).join(' ');
+  return `<div class="blk"><span class="bl"><i class="mk ${mk}"></i>${label}</span><a class="addr maplink" href="${mapHref(q)}"><b>${esc(city)}</b>${addr?esc(addr):'<span class="na">상세주소 없음</span>'}</a>`
+    +`<div class="ct"><a class="callbtn navbtn" href="${mapHref(q)}">${ic(P.nav)}길 안내</a></div>${ctHtml(phone,name)}</div>`;
 }
 // 장부를 여러 달에 걸친 기간으로 보면 날짜 옆에 월도 표시
 const ledMulti=()=>!!ledRange&&ledRange.start.slice(0,7)!==ledRange.end.slice(0,7);
@@ -1328,7 +1334,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익 아래에 실제로 들어온 돈 기준 금액','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익 아래에 실제로 들어온 돈 기준 금액','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
   {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},
@@ -1337,9 +1343,14 @@ const CHANGES=[
   {v:'1.4.1',d:'10/10',items:['이름을 아빠장부로 · 새 트럭 아이콘 · 시작 화면']},
   {v:'1.3.7',d:'10/10',items:['적는 중인 내용 임시 저장 · 고치다 나가면 돌아갈지 물어봄']},
 ];
+// 최신 것만 펼쳐 두고, 예전 것은 3개까지만 보이다가 [이전 업데이트 더 보기]로 전부
+let chgAll=false;
 function renderChanges(){
   const el=$('s-changes'); if(!el)return;
-  el.innerHTML=CHANGES.map((c,i)=>`<details class="chg"${i===0?' open':''}><summary><b class="num">${c.v}</b>${i===0?'<span class="newb">최신</span>':''}<span class="num">${c.d}</span></summary><ul>${c.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`).join('');
+  const SHOW=3, list=chgAll?CHANGES:CHANGES.slice(0,SHOW);
+  el.innerHTML=list.map((c,i)=>`<details class="chg"${i===0?' open':''}><summary><b class="num">${c.v}</b>${i===0?'<span class="newb">최신</span>':''}<span class="num cd">${c.d}</span>${ic(P.chev)}</summary><ul>${c.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`).join('')
+    +(CHANGES.length>SHOW?`<button type="button" class="chgmore" id="s-chgmore">${chgAll?'접기':`이전 업데이트 ${CHANGES.length-SHOW}개 더 보기`}${ic(chgAll?'M6 15l6-6 6 6':P.chev)}</button>`:'');
+  const b=$('s-chgmore'); if(b)b.onclick=()=>{chgAll=!chgAll;renderChanges()};
 }
 renderChanges();
 // ---------- 글씨 크기 ----------
