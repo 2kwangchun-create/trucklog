@@ -436,6 +436,9 @@ function renderLedger(){
   $('l-costlabel').textContent=fees?'수수료·지출':'지출';
   $('l-cost').textContent=short(fees+csum);
   $('l-net').textContent=(net<0?'-':'')+won(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
+  // 실제로 들어온 돈 기준: 받은 돈 − 받은 건의 수수료 − 지출 (못 받은 돈이 많으면 마이너스일 수 있음)
+  const cash=paid-all.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0)-csum;
+  $('l-cash').textContent=(cash<0?'-':'')+won(Math.abs(cash)); $('l-cash').className='num '+(cash<0?'c-due':'');
   $('l-costh').textContent=span+' 지출';
   $('l-costsum').textContent=won(csum);
   $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
@@ -1325,7 +1328,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익 아래에 실제로 들어온 돈 기준 금액','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
   {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},

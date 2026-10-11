@@ -88,6 +88,10 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{height:44px;padding:
 .sumtop{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .sumtop b{font-size:30px;letter-spacing:-.5px;line-height:1.2}
 .sumtop .cap{font-size:13px;color:var(--muted);padding-bottom:6px}
+/* 순수익 아래: 실제로 들어온 돈 기준 */
+.cashline{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin:-2px 0 10px;font-size:14px;color:var(--muted)}
+.cashline b{font-size:17px}
+.cashline small{width:100%;font-size:12px}
 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 .sum4{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .msum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -631,7 +635,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         </div></div>
     </header>
     <div class="card">
-      <div class="sumtop"><div class="stat"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b></div><span class="cap">운임 − 수수료 − 지출</span></div>
+      <div class="sumtop"><div class="stat"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b></div><span class="cap">운임 − 수수료 − 지출 (못 받은 돈 포함)</span></div>
+      <div class="cashline"><span>지금까지 들어온 돈 기준</span><b class="num" id="l-cash"></b><small>받은 돈 − 그 건 수수료 − 지출</small></div>
       <div class="sum3 sum4">
         <div class="stat"><span>총 운임</span><b class="num" id="l-sum"></b></div>
         <div class="stat"><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
