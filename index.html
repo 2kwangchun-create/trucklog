@@ -91,12 +91,12 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{height:44px;padding:
 /* 순수익 아래: 실제로 들어온 돈 기준 */
 .nettop b{font-size:30px;letter-spacing:-.5px;line-height:1.2}
 .nettop small{font-size:12px;color:var(--muted);margin-top:2px}
-/* 순수익 아래: 실제로 들어온 돈 기준 (연한 상자 한 줄) */
-.cashline{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px}
-.cashline div{display:flex;flex-direction:column;min-width:0}
-.cashline span{font-size:14px;font-weight:600}
-.cashline small{font-size:12px;color:var(--muted)}
-.cashline b{font-size:18px;flex:none}
+/* 순수익 기준 바꾸기: 전체(못 받은 돈 포함) ↔ 들어온 돈 */
+.nethead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.nethead>span{font-size:13px;color:var(--muted);font-weight:600}
+.netsw{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--track);border-radius:999px;padding:3px;flex:none}
+.netsw button{border:0;background:transparent;border-radius:999px;min-height:34px;padding:0 12px;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap}
+.netsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 .sum4{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .msum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -648,8 +648,10 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         </div></div>
     </header>
     <div class="card">
-      <div class="stat nettop"><span id="l-netlabel">이 달 순수익</span><b class="num" id="l-net"></b><small>운임 − 수수료 − 지출 · 못 받은 돈까지 포함</small></div>
-      <div class="cashline"><div><span>지금까지 들어온 돈 기준</span><small>받은 돈 − 그 건 수수료 − 지출</small></div><b class="num" id="l-cash"></b></div>
+      <div class="stat nettop">
+        <div class="nethead"><span id="l-netlabel">이 달 순수익</span>
+          <div class="netsw" id="l-netsw" role="group" aria-label="순수익 기준"><button type="button" data-netmode="all" aria-pressed="true">전체</button><button type="button" data-netmode="cash" aria-pressed="false">들어온 돈</button></div></div>
+        <b class="num" id="l-net"></b><b class="num" id="l-cash" hidden></b><small id="l-netcap"></small></div>
       <div class="sum3 sum4">
         <div class="stat"><span>총 운임</span><b class="num" id="l-sum"></b></div>
         <div class="stat"><span>받은 돈</span><b class="num c-paid" id="l-paid"></b></div>
@@ -775,7 +777,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card"><p id="s-stats" class="hint"></p></div>
     <div class="gt">업데이트 내용</div>
     <div class="card chgs" id="s-changes"></div>
-    <p class="ver">아빠장부 1.8.0</p>
+    <p class="ver">아빠장부 1.9.0</p>
   </section>
 </div>
 

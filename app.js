@@ -418,6 +418,7 @@ const ledTrips=()=>ledRange?trips.filter(t=>inRange(t,ledRange)):monthTrips(ledY
 const ledCosts=()=>ledRange?costs.filter(c=>inRange(c,ledRange)):monthCosts(ledY,ledM);
 const ledLabel=()=>!ledRange?`${ledY}년 ${ledM+1}월`:ledRange.start===ledRange.end?dayK(ledRange.start):`${mdK(ledRange.start)} ~ ${mdK(ledRange.end)}`;
 let ledSearch=false;
+let netMode=ls.get('netMode')==='cash'?'cash':'all'; // 장부 순수익을 무엇 기준으로 볼지 (이 휴대폰에 기억)
 function renderLedger(){
   $('l-tripgrp').hidden=ledKind!=='trip'; $('l-costgrp').hidden=ledKind!=='cost';
   document.querySelectorAll('#l-kind [data-lkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lkind===ledKind));
@@ -444,7 +445,12 @@ function renderLedger(){
   $('l-net').textContent=(net<0?'-':'')+won(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
   // 실제로 들어온 돈 기준: 받은 돈 − 받은 건의 수수료 − 지출 (못 받은 돈이 많으면 마이너스일 수 있음)
   const cash=paid-all.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0)-csum;
-  $('l-cash').textContent=(cash<0?'-':'')+won(Math.abs(cash)); $('l-cash').className='num '+(cash<0?'c-due':'');
+  $('l-cash').textContent=(cash<0?'-':'')+won(Math.abs(cash)); $('l-cash').className='num '+(cash<0?'c-due':'c-paid');
+  // 스위치: 전체(못 받은 돈 포함) ↔ 지금까지 들어온 돈 기준
+  const byCash=netMode==='cash';
+  $('l-net').hidden=byCash; $('l-cash').hidden=!byCash;
+  $('l-netcap').textContent=byCash?'받은 돈 − 받은 건 수수료 − 지출 · 지금까지 실제로 들어온 돈':'운임 − 수수료 − 지출 · 못 받은 돈까지 포함';
+  document.querySelectorAll('#l-netsw [data-netmode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.netmode===netMode));
   $('l-costh').textContent=span+' 지출';
   $('l-costsum').textContent=won(csum);
   $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
@@ -1221,6 +1227,7 @@ function ledStep(n){if(ledRange){const d=parseD(ledRange.start);ledY=d.getFullYe
 $('l-prev').onclick=()=>ledStep(-1);
 $('l-next').onclick=()=>ledStep(1);
 $('l-title').onclick=openLedPick;
+$('l-netsw').onclick=e=>{const b=e.target.closest('[data-netmode]');if(!b)return;netMode=b.dataset.netmode;ls.set('netMode',netMode);renderLedger()};
 $('c-title').onclick=openJump;
 $('c-today').onclick=()=>{calGo(todayIso);render()};
 $('l-searchbtn').onclick=()=>{ledSearch=!(ledSearch||$('l-search').value);if(!ledSearch)$('l-search').value='';renderLedger();if(ledSearch)$('l-search').focus()};
@@ -1334,7 +1341,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익 아래에 실제로 들어온 돈 기준 금액','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
   {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},
