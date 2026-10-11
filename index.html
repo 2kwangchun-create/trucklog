@@ -477,7 +477,16 @@ body.gated .updbar{visibility:hidden}
 @keyframes bump{0%,100%{transform:none}50%{transform:translateY(-2px)}}
 @keyframes road{to{background-position:30px 0}}
 @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+/* 앱 설치 안내 (시작 화면 아래, 로그인 화면 위) */
+.inst{position:fixed;inset:0;z-index:55;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.inst-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.inst-in img{border-radius:22px}
+.inst-in h1{margin:0;font-size:28px}
+.inst-lead{margin:0;color:var(--muted);font-size:16px}
+.inst-in .btn.big{width:100%;padding:16px;font-size:19px}
+.inst-how{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:16px;line-height:1.6}
+.inst-how ol{margin:6px 0 0;padding-left:22px}
+.inst-how b{color:var(--accent)}.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
 .gate-in img{border-radius:20px}
 .gate-in h1{margin:0;font-size:30px}
@@ -806,7 +815,17 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="btnrow"><button type="button" class="btn" id="cp-copy">복사하기</button><button type="button" class="btn ghost" id="cp-close">닫기</button></div>
   </div>
 </div>
-<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="g-title" hidden>
+<!-- 앱 설치 안내: 링크를 브라우저로 열면 먼저 보여줌 (설치한 앱에선 안 보임) -->
+<div class="inst" id="inst" role="dialog" aria-modal="true" aria-labelledby="inst-h" hidden>
+  <div class="inst-in">
+    <img src="icons/icon-192.png" alt="" width="96" height="96">
+    <h1 id="inst-h">아빠장부 앱 설치</h1>
+    <p class="inst-lead" id="inst-lead">홈 화면에 설치하면 앱처럼 바로 열리고, 인터넷이 없어도 쓸 수 있어요.</p>
+    <button type="button" class="btn big" id="inst-go">앱 설치하기</button>
+    <div class="inst-how" id="inst-how" hidden></div>
+    <button type="button" class="linkbtn" id="inst-skip">설치하지 않고 그냥 쓰기</button>
+  </div>
+</div><div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="g-title" hidden>
   <div class="gate-in">
     <img src="icons/icon-192.png" alt="" width="88" height="88">
     <h1 id="g-title">아빠장부</h1>

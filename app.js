@@ -44,6 +44,56 @@ const Splash={
 };
 Splash.init();
 
+// ---------- 앱 설치 안내 ----------
+// 링크를 브라우저로 열면 먼저 설치 화면 → [앱 설치하기] 한 번이면 크롬 설치 창이 뜸 (브라우저 규칙상 한 번은 눌러야 함)
+// 카톡 등 앱 안 브라우저에선 설치가 안 되니 바깥 브라우저(크롬)로 바로 넘김. 설치한 앱으로 열면 아무것도 안 함
+const Install={
+  deferred:null,
+  init(){
+    const el=$('inst'); if(!el)return;
+    if(matchMedia('(display-mode: standalone)').matches||navigator.standalone===true)return;
+    const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/i.test(ua), android=/Android/i.test(ua);
+    addEventListener('beforeinstallprompt',e=>{e.preventDefault();this.deferred=e;this.how('')});
+    addEventListener('appinstalled',()=>this.installed());
+    $('inst-go').onclick=()=>this.go();
+    $('inst-skip').onclick=()=>{try{sessionStorage.setItem('instSkip','1')}catch(_){}el.hidden=true};
+    const inApp=/KAKAOTALK|NAVER\(|Line\/|Instagram|FBAN|FBAV|DaumApps|; wv\)/i.test(ua);
+    if(inApp){
+      this.out=()=>{location.href=/KAKAOTALK/i.test(ua)?'kakaotalk://web/openExternal?url='+encodeURIComponent(location.href)
+        :android?`intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;package=com.android.chrome;end`:location.href};
+      el.hidden=false; $('inst-h').textContent='크롬에서 열어 주세요';
+      $('inst-lead').textContent='카톡 같은 앱 안에서는 설치가 안 돼요. 자동으로 크롬으로 넘어가요. 안 넘어가면 아래 버튼을 눌러 주세요.';
+      $('inst-go').textContent='크롬에서 열기'; $('inst-go').onclick=()=>this.out();
+      if(ios)this.how('오른쪽 아래 <b>⋯</b> 또는 <b>공유</b> 버튼 → <b>Safari로 열기</b>를 눌러 주세요.');
+      setTimeout(()=>this.out(),300);
+      return;
+    }
+    try{if(sessionStorage.getItem('instSkip'))return}catch(_){}
+    el.hidden=false;
+    // 이미 설치돼 있으면 그렇게 알려줌 (크롬이 알려줄 때만)
+    if(navigator.getInstalledRelatedApps)navigator.getInstalledRelatedApps().then(l=>{if(l&&l.length)this.already()}).catch(()=>{});
+    // 설치 창을 쓸 수 없는 브라우저(아이폰 등)면 직접 하는 방법을 바로 보여줌
+    this.manual=ios?'<b>Safari</b>에서 아래쪽 <b>공유</b> 버튼(□↑)을 누르고<ol><li><b>홈 화면에 추가</b></li><li>오른쪽 위 <b>추가</b></li></ol>'
+      :'크롬 오른쪽 위 <b>⋮</b> 메뉴를 누르고<ol><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b></li><li><b>설치</b></li></ol>';
+    if(ios){$('inst-go').hidden=true;this.how(this.manual)}
+  },
+  how(h){$('inst-how').innerHTML=h;$('inst-how').hidden=!h},
+  async go(){
+    if(!this.deferred){this.how(this.manual);return}
+    const d=this.deferred; this.deferred=null; d.prompt();
+    try{const c=await d.userChoice;if(c&&c.outcome==='accepted')this.installed();else this.how('')}catch(_){}
+  },
+  installed(){
+    $('inst-h').textContent='설치됐어요!'; $('inst-lead').textContent='이제 홈 화면의 아빠장부 아이콘을 눌러 여세요.';
+    $('inst-go').hidden=true; this.how(''); $('inst-skip').textContent='이 화면 닫기';
+  },
+  already(){
+    $('inst-h').textContent='이미 설치돼 있어요'; $('inst-lead').textContent='홈 화면의 아빠장부 아이콘을 눌러 여세요.';
+    $('inst-go').hidden=true; this.how(''); $('inst-skip').textContent='여기서 그냥 쓰기';
+  },
+};
+Install.init();
+
 // ---------- 새 버전 받기 ----------
 // 새 버전을 올리면 서비스 워커가 받아 둠 → 앱을 막 연 참이면(시작 화면 중·아직 아무것도 안 누름) 바로 새로 열고,
 // 쓰는 중이면 위에 [지금 업데이트] 안내 (적던 내용은 임시 저장돼 있어 안전)
