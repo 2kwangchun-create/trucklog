@@ -168,6 +168,7 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .appic.s1,.srcb.s1{background:#2f6fd6}
 .appic.s2,.srcb.s2{background:#e8742a}
 .appic.s3,.srcb.s3{background:#7b8580}
+.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .srcb{display:inline-block;color:#fff;font-size:12px;font-weight:700;padding:2px 7px;border-radius:6px;flex:none}
 .cinfo{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:600;color:var(--client)}
 .cinfo .cn{color:var(--fg)}
@@ -615,10 +616,11 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
           <button type="button" data-src="원콜" aria-pressed="false"><span class="appic s1">1</span>원콜</button>
           <button type="button" data-src="전국24시콜" aria-pressed="false"><span class="appic s2">24</span>전국24시콜</button>
           <button type="button" data-src="기타" aria-pressed="false"><span class="appic s3">···</span>기타</button>
-        </div></div>      <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
+        </div>
+        <div class="srcetc" id="f-srcetc" hidden><input type="text" id="f-srctext" placeholder="어떤 콜인지 적어 주세요 (예: 화물맨)" aria-label="기타 콜 이름"><div class="recent" id="r-src"></div></div></div>
+      <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
       <div class="card field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
-        <details class="more" id="f-cmore"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>담당자 · 연락처</summary>
-          <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></details></div>
+        <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></div>
       <div class="card field"><label for="f-from"><i class="mk from"></i>상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div>
         <input type="text" id="f-fromaddr" class="addrin" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
         <div class="contact"><input type="text" id="f-fromname" placeholder="상차 담당자" aria-label="상차지 담당자 이름"><input type="tel" id="f-fromphone" class="phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div></div>

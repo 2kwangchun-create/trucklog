@@ -185,9 +185,9 @@ function rowHtml(t,mode){
   const amt=`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
-    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${client}${srcBadge(t)}${cInfo(t)}</span>${amt}
+    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}${cInfo(t)}</span>${amt}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
-    :`<div class="head" ${attrs}><span class="cwrap">${client}${srcBadge(t)}${cInfo(t)}</span>${amt}
+    :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}${cInfo(t)}</span>${amt}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
@@ -218,7 +218,7 @@ function rowHtml(t,mode){
 const hay=t=>[t.src,t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
 
 // ---------- 찾기: 어디서 찾을지 (자동 · 전체 · 화주 · 지역 · 주소 · 메모) ----------
-const SF={client:['client','clientName','clientPhone'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
+const SF={client:['client','clientName','clientPhone','src'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
   phone:['clientPhone','fromPhone','toPhone']};
 const SL={auto:'자동',all:'전체',client:'화주',region:'지역',addr:'주소',memo:'메모',phone:'전화번호'};
 const SPH={auto:'화주, 지역, 주소, 메모로 찾기',all:'화주, 지역, 주소, 메모로 찾기',client:'화주 이름·담당자·번호로 찾기',
@@ -1095,7 +1095,10 @@ document.addEventListener('click',e=>{
   const ag=e.target.closest('[data-age]');
   if(ag){const v=ag.dataset.age||null;uAge=(v&&uAge===v)?null:v;openId=payingId=null;renderUnpaid();return}
   const sr=e.target.closest('[data-src]');
-  if(sr){setSrc(sr.dataset.src===formSrc?'':sr.dataset.src);return} // 한 번 더 누르면 해제
+  if(sr){const k=sr.dataset.src; // 한 번 더 누르면 해제
+    if(k===formSrc)setSrc('');else if(k==='기타'){formSrc='기타';paintSrc();$('f-srctext').focus()}else setSrc(k);return}
+  const sv=e.target.closest('[data-srcv]');
+  if(sv){$('f-srctext').value=sv.dataset.srcv;return}
   const pt=e.target.closest('[data-pt]');
   if(pt){setPt(pt.dataset.pt);return}
   const q=e.target.closest('[data-add]');
@@ -1174,9 +1177,21 @@ function fmtPhone(v){const d=v.replace(/\D/g,'').slice(0,11);
   if(d.length===8&&/^1[5-9]/.test(d)) return d.slice(0,4)+'-'+d.slice(4);
   return d.length<4?d:d.length<7?d.slice(0,3)+'-'+d.slice(3):d.length<11?d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6):d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7)}
 document.querySelectorAll('.phone').forEach(i=>i.addEventListener('input',e=>{e.target.value=fmtPhone(e.target.value)}));
+// 어떤 콜: formSrc는 고른 아이콘(원콜 · 전국24시콜 · 기타). 기타면 직접 쓴 이름이 저장됨 (안 쓰면 '기타')
 let formPt='인수증', formSrc='';
-function setSrc(v){formSrc=v;document.querySelectorAll('#f-src [data-src]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.src===v))}
-const readForm=()=>({src:formSrc,date:$('f-date').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
+const SRC_MAIN=['원콜','전국24시콜'];
+const srcValue=()=>formSrc==='기타'?($('f-srctext').value.trim()||'기타'):formSrc;
+function paintSrc(){
+  document.querySelectorAll('#f-src [data-src]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.src===formSrc));
+  $('f-srcetc').hidden=formSrc!=='기타';
+  if(formSrc==='기타'){ // 전에 직접 쓴 콜 이름을 눌러서 바로 넣기
+    const c={};trips.forEach(t=>{if(t.src&&!SRC_MAIN.includes(t.src)&&t.src!=='기타')c[t.src]=(c[t.src]||0)+1});
+    $('r-src').innerHTML=Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,5).map(v=>`<button type="button" data-srcv="${esc(v)}">${esc(v)}</button>`).join('');
+  }
+}
+// 저장된 값으로 화면 맞추기 (원콜 · 전국24시콜 · 기타 · 직접 쓴 이름)
+function setSrc(v){formSrc=!v?'':SRC_MAIN.includes(v)?v:'기타';$('f-srctext').value=formSrc==='기타'&&v!=='기타'?v:'';paintSrc()}
+const readForm=()=>({src:srcValue(),date:$('f-date').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
   clientPhone:$('f-clientphone').value.trim(),fromPhone:$('f-fromphone').value.trim(),toPhone:$('f-tophone').value.trim(),
   clientName:$('f-clientname').value.trim(),fromName:$('f-fromname').value.trim(),toName:$('f-toname').value.trim(),
@@ -1244,16 +1259,16 @@ function setTextSize(z){
   document.querySelectorAll('#s-text [data-tsize]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tsize===z));
 }
 setTextSize(ls.get('textSize')||'');
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');['f-more','f-cmore'].forEach(i=>$(i).open=false);setMode(false);showDraftNote('')}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('')}
 // 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
-function syncMore(){[['f-cmore','f-clientname','f-clientphone']].forEach(([d,a,b])=>{if($(a).value.trim()||$(b).value.trim())$(d).open=true});if($('f-fee').value.trim())$('f-more').open=true}
+function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 
 // ---------- 적는 중 임시 저장 ----------
 // 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
 // draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
 const F_IDS=['f-date','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
-function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:formSrc,pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
+function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
 function saveDraft(){
   if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
