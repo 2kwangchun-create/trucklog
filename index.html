@@ -485,6 +485,8 @@ body.gated .updbar{visibility:hidden}
 .inst-lead{margin:0;color:var(--muted);font-size:16px}
 .inst-in .btn.big{width:100%;padding:16px;font-size:19px}
 .inst-how{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:16px;line-height:1.6}
+.inst-note{margin:0;width:100%;text-align:left;font-size:14px;line-height:1.55;color:var(--muted);background:var(--due-soft);border-radius:12px;padding:12px 14px}
+.inst-note b{color:var(--fg)}
 .inst-how ol{margin:6px 0 0;padding-left:22px}
 .inst-how b{color:var(--accent)}.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .gate-in{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
@@ -823,6 +825,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <p class="inst-lead" id="inst-lead">홈 화면에 설치하면 앱처럼 바로 열리고, 인터넷이 없어도 쓸 수 있어요.</p>
     <button type="button" class="btn big" id="inst-go">앱 설치하기</button>
     <div class="inst-how" id="inst-how" hidden></div>
+    <p class="inst-note" id="inst-note">설치할 때 <b>"Play 프로텍트 · 안전하지 않은 앱 차단됨"</b>이 뜨면 <b>[자세히] → [무시하고 설치]</b>를 눌러 주세요. 플레이 스토어를 거치지 않은 앱이라 뜨는 안내예요.</p>
     <button type="button" class="linkbtn" id="inst-skip">설치하지 않고 그냥 쓰기</button>
   </div>
 </div><div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="g-title" hidden>

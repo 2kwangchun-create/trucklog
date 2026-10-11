@@ -58,6 +58,7 @@ const Install={
     $('inst-go').onclick=()=>this.go();
     $('inst-skip').onclick=()=>{try{sessionStorage.setItem('instSkip','1')}catch(_){}el.hidden=true};
     const inApp=/KAKAOTALK|NAVER\(|Line\/|Instagram|FBAN|FBAV|DaumApps|; wv\)/i.test(ua);
+    if(inApp||ios)$('inst-note').hidden=true; // 플레이 프로텍트 안내는 안드로이드 크롬 설치 때만
     if(inApp){
       this.out=()=>{location.href=/KAKAOTALK/i.test(ua)?'kakaotalk://web/openExternal?url='+encodeURIComponent(location.href)
         :android?`intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;package=com.android.chrome;end`:location.href};
@@ -85,11 +86,11 @@ const Install={
   },
   installed(){
     $('inst-h').textContent='설치됐어요!'; $('inst-lead').textContent='이제 홈 화면의 아빠장부 아이콘을 눌러 여세요.';
-    $('inst-go').hidden=true; this.how(''); $('inst-skip').textContent='이 화면 닫기';
+    $('inst-go').hidden=true; $('inst-note').hidden=true; this.how(''); $('inst-skip').textContent='이 화면 닫기';
   },
   already(){
     $('inst-h').textContent='이미 설치돼 있어요'; $('inst-lead').textContent='홈 화면의 아빠장부 아이콘을 눌러 여세요.';
-    $('inst-go').hidden=true; this.how(''); $('inst-skip').textContent='여기서 그냥 쓰기';
+    $('inst-go').hidden=true; $('inst-note').hidden=true; this.how(''); $('inst-skip').textContent='여기서 그냥 쓰기';
   },
 };
 Install.init();
