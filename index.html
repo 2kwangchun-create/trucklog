@@ -182,7 +182,21 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .smark button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px}
 .smark .pv{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
 .smark button small{font-size:14px;font-weight:700}
-.smark-note{margin:-4px 4px 0}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.smark-note{margin:-4px 4px 0}/* 계산서 · 문자 보낸 날 표시 */
+.chip.tax{background:var(--client-soft);color:var(--client)}
+.chip.sms{background:var(--track);color:var(--muted)}
+.head.mini .st .taxm{display:block;font-size:11px;color:var(--client);font-weight:700}
+/* 설정: 업데이트 내용 */
+.chgs{gap:0;padding:4px 16px}
+.chg{border-top:1px solid var(--line);padding:10px 0}
+.chg:first-child{border-top:0}
+.chg summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:15px;color:var(--muted);list-style:none}
+.chg summary::-webkit-details-marker{display:none}
+.chg summary b{font-size:16px;color:var(--fg)}
+.chg summary .num:last-child{margin-left:auto}
+.chg .newb{background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px}
+.chg ul{margin:8px 0 2px;padding-left:20px;font-size:15px;line-height:1.6}
+.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -307,8 +321,8 @@ input[type=date],input[type=text],input[type=search],input[inputmode]{width:100%
 .seg.g button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);box-shadow:none}
 .seg.kind{grid-template-columns:repeat(2,1fr)}
 /* 장부: 전체·받은 돈·못 받은 돈 + 찾기 */
-.frow{display:flex;gap:8px;align-items:center}
-.fchips{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.frow{display:flex;gap:8px;align-items:flex-start}
+.fchips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
 .fchips::-webkit-scrollbar{display:none}
 .fchips button{flex:none;border:1px solid var(--line2);background:var(--surface);min-height:40px;padding:0 10px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap}
 .fchips button span{font-weight:500}
@@ -673,6 +687,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
           <button type="button" data-pt="착불" aria-pressed="false">착불</button>
         </div>
         <label class="check"><input type="checkbox" id="f-paidnow">이미 돈을 받았어요</label>
+        <label class="check"><input type="checkbox" id="f-taxnow">전자 계산서 발행했어요</label>
         <details class="more" id="f-more"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>수수료</summary>
           <div class="field"><input type="text" id="f-fee" inputmode="numeric" placeholder="수수료 (원)" aria-label="수수료 (원)"></div></details></div>
       <div class="card field"><label for="f-memo">메모 <em>*</em></label><textarea id="f-memo" rows="2" placeholder="예: 인수증 사진 카톡으로 보냄, 지게차 하차"></textarea></div>
@@ -739,6 +754,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="importbox" id="s-importbox" hidden></div>
     <div class="gt">저장 현황</div>
     <div class="card"><p id="s-stats" class="hint"></p></div>
+    <div class="gt">업데이트 내용</div>
+    <div class="card chgs" id="s-changes"></div>
     <p class="ver">아빠장부 1.8.0</p>
   </section>
 </div>

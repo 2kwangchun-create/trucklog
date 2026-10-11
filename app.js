@@ -145,7 +145,7 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),paid:r.paid?String(r.paid):null};
@@ -187,11 +187,12 @@ let ledY=calY, ledM=calM;
 let ledFilter='all', calFilter='all', ledKind='trip'; // ledKind: 장부에서 운행/지출 중 무엇을 볼지
 let editingId=null, backView='ledger';
 let ledRange=null; // 장부: 하루·기간을 고르면 {start,end}, 아니면 ledY/ledM 한 달
-const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:true;
-const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.'};
+const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:f==='notax'?!t.tax:true;
+const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.',notax:'계산서 안 낸 건이 없어요.'};
 function segHtml(which,list,cur){
-  const n={all:list.length,paid:list.filter(t=>t.paid).length,due:list.filter(t=>!t.paid).length};
-  return [['all','전체'],['paid','받은 돈'],['due','못 받은 돈']].map(([k,l])=>
+  const n={all:list.length,paid:list.filter(t=>t.paid).length,due:list.filter(t=>!t.paid).length,notax:list.filter(t=>!t.tax).length};
+  // 장부에는 '계산서 미발행'도 (세금 정리할 때 안 낸 건만 모아 보기)
+  return [['all','전체'],['paid','받은 돈'],['due','못 받은 돈'],...(which==='led'?[['notax','미발행']]:[])].map(([k,l])=>
     `<button type="button" data-do="filter" data-which="${which}" data-f="${k}" aria-pressed="${cur===k}">${l} <span class="num">${n[k]}건</span></button>`).join('');
 }
 
@@ -235,6 +236,8 @@ const srcBadge=t=>{if(!t.src)return '';const s=SRC.find(x=>x.k===t.src)||SRC[2];
 function setSrcMark(v){srcMark=v==='both'?'both':'mark';ls.set('srcMark',srcMark);document.querySelectorAll('#s-smark [data-smark]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.smark===srcMark))}
 // 화주 옆에 늘: 담당자 · 연락처 (번호를 누르면 전화)
 const cInfo=t=>t.clientName||t.clientPhone?`<span class="cinfo">${t.clientName?`<span class="cn">${esc(t.clientName)}</span>`:''}${t.clientPhone?`<a class="cp num" href="${telHref(t.clientPhone)}">${ic(P.phone)}${esc(t.clientPhone)}</a>`:''}</span>`:'';
+// 계산서 발행 · 정산 문자 보낸 날 (며칠 전에 독촉했는지)
+const docChips=t=>(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?`<span class="chip sms">문자 ${t.smsAt===todayIso?'오늘':daysSince(t.smsAt)+'일 전'}</span>`:'');
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode){
   const open=openId===t.id;
@@ -243,16 +246,17 @@ function rowHtml(t,mode){
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
     ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
-      <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}</span></div>`
+      <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
-      <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
+      <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
   if(open){
     detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
       +addrBlk('상차','from',t.from,t.fromAddr,t.fromPhone,t.fromName)+addrBlk('하차','to',t.to,t.toAddr,t.toPhone,t.toName)
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
       +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
+      +(t.tax||t.smsAt?`<div class="blk"><span class="bl">정산</span><div>${t.tax?`계산서 발행 ${md(t.tax)}`:'계산서 미발행'}${t.smsAt?` · 문자 보낸 날 ${md(t.smsAt)}`:''}</div></div>`:'')
       +(t.memo?`<div class="blk"><span class="bl">메모</span><div>${esc(t.memo)}</div></div>`:'')+`</div>`;
   }
   const B=(cls,act,label,icon)=>`<button type="button" class="btn ${cls}" data-do="${act}" data-id="${t.id}">${icon?ic(icon):''}${label}</button>`;
@@ -654,9 +658,9 @@ async function doBackup(share){
   render();
 }
 function csvText(list,costList){
-  const head=['상차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','메모'];
+  const head=['상차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','계산서 발행일','문자 보낸 날','메모'];
   const q=v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=list.sort(byOld).map(t=>[t.date,t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.memo]);
+  const rows=list.sort(byOld).map(t=>[t.date,t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.tax||'',t.smsAt||'',t.memo]);
   const out=[head,...rows];
   // 아래에 지출 표와 합계(순수익)를 이어 붙임
   if(costList){
@@ -959,7 +963,7 @@ function openSms(t){
   $('sm-title').textContent=`정산 문자 · ${t.client||'화주 미입력'}`;
   $('sm-to').textContent=t.clientPhone?`받는 사람: ${t.clientName?t.clientName+' ':''}${t.clientPhone}`
     :'화주 연락처가 없어요. [문자 보내기]를 누른 뒤 번호를 넣거나, [복사]해서 카톡으로 보내세요.';
-  setSmTax(ls.get('tax:'+(t.client||''))==='1');
+  setSmTax(!!t.tax||ls.get('tax:'+(t.client||''))==='1');
   $('sm-hint').textContent=p.carNo&&(p.name||p.holder)&&p.account?'글을 눌러 직접 고칠 수 있어요.':'설정 → 내 정보에 차량 번호·이름·계좌를 적어 두면 자동으로 들어가요.';
   $('sm-hint').classList.remove('errline','okline2');
   $('smsheet').hidden=false; pushOverlay({sms:true});
@@ -973,14 +977,21 @@ $('sm-tax').addEventListener('click',e=>{
 $('sm-text').addEventListener('input',()=>{$('sm-undo').hidden=$('sm-text').value===smOrig});
 $('sm-undo').onclick=()=>{$('sm-text').value=smOrig;$('sm-undo').hidden=true;toast('처음 내용으로 되돌렸어요')};
 // 휴대폰 문자 앱을 화주 번호와 내용이 채워진 채로 열기
-$('sm-send').onclick=()=>{location.href=`sms:${(smTrip.clientPhone||'').replace(/\D/g,'')}?body=${encodeURIComponent($('sm-text').value)}`};
+// 보내기·복사를 누르면 그 건에 '문자 보낸 날'을, 계산서 발행 문구로 보냈으면 '계산서 발행'도 남김
+function markSent(){
+  const t=store.get(smTrip.id); if(!t)return;
+  t.smsAt=todayIso; if(smTax&&!t.tax)t.tax=todayIso;
+  saveTrip(t); render();
+}
+$('sm-send').onclick=()=>{markSent();location.href=`sms:${(smTrip.clientPhone||'').replace(/\D/g,'')}?body=${encodeURIComponent($('sm-text').value)}`};
 $('sm-copy').onclick=async()=>{
   const ta=$('sm-text'); let ok=false;
   try{await navigator.clipboard.writeText(ta.value);ok=true}catch(_){}
   if(!ok){try{ta.focus();ta.select();ok=document.execCommand('copy');ta.blur();ta.setSelectionRange(0,0)}catch(_){}}
   $('sm-hint').textContent=ok?'복사했어요. 카톡에 붙여넣기 하세요.':'자동 복사가 안 됐어요. 글을 길게 눌러 "모두 선택" → "복사" 해 주세요.';
   $('sm-hint').classList.toggle('errline',!ok);$('sm-hint').classList.toggle('okline2',ok);
-  if(ok)toast('복사했어요');
+  markSent(); // 복사가 안 돼 손으로 복사해도 보내는 건 같으니 기록
+  if(ok)toast('복사했어요 · 보낸 날을 기록했어요')
 };
 $('sm-close').onclick=()=>{$('smsheet').hidden=true;popOverlay('sms')};
 
@@ -1311,6 +1322,23 @@ $('cf').addEventListener('submit',e=>{
   toast(`${c.cat} ${comma(amount)}원 저장했어요`,()=>{removeTrip(c);renderCostRecent()});
 });
 
+// ---------- 업데이트 내용 (설정 맨 아래) ----------
+// 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
+const CHANGES=[
+  {v:'1.9.0',d:'10/11',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
+  {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
+  {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},
+  {v:'1.5.0',d:'10/10',items:['지출 기록과 순수익','장부에서 운행 / 지출 나눠 보기','글씨 크기 설정']},
+  {v:'1.4.2',d:'10/10',items:['새 버전이 나오면 앱을 열 때 자동으로 바뀜','클라우드는 바뀐 기록만 주고받음']},
+  {v:'1.4.1',d:'10/10',items:['이름을 아빠장부로 · 새 트럭 아이콘 · 시작 화면']},
+  {v:'1.3.7',d:'10/10',items:['적는 중인 내용 임시 저장 · 고치다 나가면 돌아갈지 물어봄']},
+];
+function renderChanges(){
+  const el=$('s-changes'); if(!el)return;
+  el.innerHTML=CHANGES.map((c,i)=>`<details class="chg"${i===0?' open':''}><summary><b class="num">${c.v}</b>${i===0?'<span class="newb">최신</span>':''}<span class="num">${c.d}</span></summary><ul>${c.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`).join('');
+}
+renderChanges();
 // ---------- 글씨 크기 ----------
 function setTextSize(z){
   ls.set('textSize',z);
@@ -1328,18 +1356,18 @@ function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 // draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
 const F_IDS=['f-date','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
-function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,more:$('f-more').open}}
+function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
 function saveDraft(){
   if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
-  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid&&!s.src;
+  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-more').open=!!s.more;syncMore()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
-const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,s.src||'']);
+const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,!!s.tax,s.src||'']);
 let editOrig='';
 // 수정하다가 [수정 저장]·[수정 취소] 없이 나가면(탭 이동·뒤로 버튼) 고친 내용을 보관하고 돌아갈지 물어봄
 function leaveEdit(){
@@ -1382,7 +1410,7 @@ function startEdit(t){
   backView=view==='add'?'ledger':view;
   formKind='trip'; resetForm(); editingId=t.id; setMode();
   fillTrip(t);
-  $('f-paidnow').checked=!!t.paid;
+  $('f-paidnow').checked=!!t.paid; $('f-taxnow').checked=!!t.tax;
   syncMore();
   editOrig=snapKey(formSnap()); hideAsk();
   view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
@@ -1408,7 +1436,7 @@ $('f').addEventListener('submit',e=>{
     const t=store.get(editingId);
     if(!t){resetForm();popOverlay('edit');go(backView);return}
     const before={...t};
-    Object.assign(t,f,{paid:$('f-paidnow').checked?(t.paid||todayIso):null});
+    Object.assign(t,f,{paid:$('f-paidnow').checked?(t.paid||todayIso):null,tax:$('f-taxnow').checked?(t.tax||todayIso):''});
     saveTrip(t);
     const id=t.id; resetForm();
     if(backView==='cal'){const d=parseD(date);calY=d.getFullYear();calM=d.getMonth();calSel=date}
@@ -1417,7 +1445,7 @@ $('f').addEventListener('submit',e=>{
     toast('수정했어요',()=>{Object.assign(t,before);saveTrip(t)});
     return;
   }
-  const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null};
+  const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null,tax:$('f-taxnow').checked?todayIso:''};
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
   resetForm(); ls.set('draftNew',''); goCal();
@@ -1426,7 +1454,13 @@ $('f').addEventListener('submit',e=>{
 
 // ---------- 시작 ----------
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&iso(new Date())!==todayIso){setToday();if(view!=='add')render()}
+  if(document.visibilityState==='visible'&&iso(new Date())!==todayIso){
+    // 밤새 켜 둔 앱: 등록 칸이 어제 날짜 그대로면 오늘로 (고치는 중이거나 일부러 바꾼 날짜는 그대로)
+    const old=todayIso; setToday();
+    if(editingId===null&&$('f-date').value===old){$('f-date').value=todayIso;saveDraft()}
+    if(costEditId===null&&$('cf-date').value===old)$('cf-date').value=todayIso;
+    if(view!=='add')render()
+  }
 });
 window.addEventListener('online',renderSettings);window.addEventListener('offline',renderSettings);
 (async function boot(){
