@@ -211,6 +211,50 @@ function rowHtml(t,mode){
 
 // ---------- 받을 돈 ----------
 const hay=t=>[t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
+
+// ---------- 찾기: 어디서 찾을지 (자동 · 전체 · 화주 · 지역 · 주소 · 메모) ----------
+const SF={client:['client','clientName','clientPhone'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
+  phone:['clientPhone','fromPhone','toPhone']};
+const SL={auto:'자동',all:'전체',client:'화주',region:'지역',addr:'주소',memo:'메모',phone:'전화번호'};
+const SPH={auto:'화주, 지역, 주소, 메모로 찾기',all:'화주, 지역, 주소, 메모로 찾기',client:'화주 이름·담당자·번호로 찾기',
+  region:'상차지·하차지 (예: 평택)',addr:'상세주소·현장 담당자로 찾기',memo:'메모 내용으로 찾기'};
+const sNorm=s=>String(s||'').toLowerCase().replace(/\s+/g,''); // 띄어쓰기 무시 ("대한 물류" = "대한물류")
+const sDigits=s=>String(s||'').replace(/\D/g,'');
+// 자동: 적은 말을 실제 기록과 맞춰 보고 무엇을 찾는지 판단
+// 숫자만이면 전화번호 · 그 밖엔 이름이 딱 맞음(100점) > 앞부분이 맞음(10점) > 중간에 들어 있음(1점)을 모두 더해 가장 높은 쪽
+function guessScope(list,raw){
+  const d=sDigits(raw);
+  if(d.length>=3&&d.length===raw.replace(/[\s-]/g,'').length)return 'phone';
+  const q=sNorm(raw); let best=null;
+  ['client','region','addr','memo'].forEach(g=>{
+    let score=0;
+    list.forEach(t=>SF[g].forEach(k=>{const v=sNorm(t[k]);if(!v)return;score+=v===q?100:v.startsWith(q)?10:v.includes(q)?1:0}));
+    if(score&&(!best||score>best.score))best={g,score};
+  });
+  return best?best.g:'all';
+}
+function searchHit(t,used,raw){
+  const q=sNorm(raw), d=sDigits(raw);
+  const phoneHit=()=>d.length>=3&&SF.phone.some(k=>sDigits(t[k]).includes(d));
+  if(used==='phone')return phoneHit();
+  if(used==='all')return sNorm(hay(t)).includes(q)||phoneHit();
+  return SF[used].some(k=>sNorm(t[k]).includes(q));
+}
+// 결과 + 아래 안내 한 줄 ("자동으로 화주에서 찾았어요 · 3건")
+function runSearch(list,raw,scope,hintEl){
+  raw=raw.trim();
+  if(!raw){hintEl.hidden=true;return list}
+  const used=scope==='auto'?guessScope(list,raw):scope, out=list.filter(t=>searchHit(t,used,raw));
+  hintEl.hidden=false;
+  hintEl.textContent=(scope==='auto'?(used==='all'?'자동: 딱 맞는 곳이 없어 전체에서 찾았어요':`자동: ${SL[used]}에서 찾았어요`):`${SL[used]}에서 찾았어요`)+` · ${out.length}건`;
+  return out;
+}
+const scopeOf=id=>$(id).value||'auto';
+function initScope(id,inputId,key,onChange){
+  const sel=$(id); sel.value=ls.get(key)||'auto'; if(!sel.value)sel.value='auto';
+  const ph=()=>{$(inputId).placeholder=SPH[sel.value]||SPH.auto};ph();
+  sel.addEventListener('change',()=>{ls.set(key,sel.value);ph();onChange()});
+}
 let uRange=null, uDraft={start:null,end:null}, uPanel=false, rpY=TODAY.getFullYear(), rpM=TODAY.getMonth();
 const rangeTxt=r=>r.start===r.end?md(r.start):`${md(r.start)} ~ ${md(r.end)}`;
 function renderRangePanel(){
@@ -234,9 +278,9 @@ function renderRangePanel(){
     `${rangeTxt(uDraft)} (${Math.round((parseD(end)-parseD(start))/86400000)+1}일)`;
 }
 function renderUnpaid(){
-  const q=$('u-search').value.trim().toLowerCase();
+  const q=$('u-search').value.trim();
   const allDue=trips.filter(t=>!t.paid);
-  const base=allDue.filter(t=>(!q||hay(t).includes(q))&&(!uRange||(t.date>=uRange.start&&t.date<=uRange.end)));
+  const base=runSearch(allDue.filter(t=>!uRange||(t.date>=uRange.start&&t.date<=uRange.end)),q,scopeOf('u-scope'),$('u-shint'));
   const cnt={};base.forEach(t=>{const a=ageLevel(t);cnt[a]=(cnt[a]||0)+1});
   if(uAge&&!cnt[uAge])uAge=null;
   $('u-age').classList.toggle('picking',!!uAge);
@@ -314,8 +358,8 @@ function renderLedger(){
   $('l-sum').textContent=short(sum); $('l-paid').textContent=short(paid); $('l-due').textContent=short(sum-paid);
   const showSearch=ledSearch||!!$('l-search').value;
   $('l-searchbox').hidden=!showSearch; $('l-searchbtn').setAttribute('aria-pressed',showSearch);
-  const q=$('l-search').value.trim().toLowerCase();
-  const found=all.filter(t=>!q||hay(t).includes(q));
+  const q=$('l-search').value.trim();
+  const found=runSearch(all,q,scopeOf('l-scope'),$('l-shint'));
   $('l-seg').innerHTML=segHtml('led',found,ledFilter);
   const list=found.filter(t=>pass(t,ledFilter)).sort(byNew);
   $('l-list').innerHTML=list.length?list.map(t=>rowHtml(t,'month')).join(''):`<div class="empty">${q?'찾는 기록이 없어요.':span+'은 '+EMPTY[ledFilter]}</div>`;
@@ -1092,6 +1136,8 @@ $('c-title').onclick=openJump;
 $('c-today').onclick=()=>{calGo(todayIso);render()};
 $('l-searchbtn').onclick=()=>{ledSearch=!(ledSearch||$('l-search').value);if(!ledSearch)$('l-search').value='';renderLedger();if(ledSearch)$('l-search').focus()};
 $('l-search').oninput=renderLedger;
+initScope('l-scope','l-search','scope:l',renderLedger);
+initScope('u-scope','u-search','scope:u',()=>{openId=payingId=null;renderUnpaid()});
 $('l-csv').onclick=()=>doCsv(ledTrips(),ledRange?`아빠장부_${ledRange.start}_${ledRange.end}.csv`:`아빠장부_${ledY}-${pad(ledM+1)}.csv`,ledCosts());
 $('l-addcost').onclick=()=>{navTab('add');setKind('cost');$('cf-amt').focus()};
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
