@@ -176,7 +176,13 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .srcb .bl img{width:23px;height:23px;flex:none}
 .srcb.s2 .bl{border-radius:50%}
 .srcb.s2 .bl img{width:16px;height:16px}
-.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+/* 콜 표시 "마크만": 이름 없이 마크만 (기타는 마크가 없어 이름 그대로) */
+.srcb.only{padding:0 3px;width:22px;justify-content:center}
+.srcb.only .bl{margin:0}
+.smark button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px}
+.smark .pv{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.smark button small{font-size:14px;font-weight:700}
+.smark-note{margin:-4px 4px 0}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -708,7 +714,9 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card"><h2>클라우드 저장</h2><div id="s-cloud"></div></div>
     <div class="gt">글씨 크기</div>
     <div class="seg tsize" id="s-text" role="group" aria-label="글씨 크기"><button type="button" class="ts" data-tsize="" aria-pressed="true"><span style="font-size:17px">가</span><small>보통</small></button><button type="button" class="ts" data-tsize="l" aria-pressed="false"><span style="font-size:21px">가</span><small>크게</small></button><button type="button" class="ts" data-tsize="xl" aria-pressed="false"><span style="font-size:25px">가</span><small>아주 크게</small></button></div>
-    <div class="gt">백업 · 내보내기</div>
+    <div class="gt">화주 옆 콜 표시</div>
+    <div class="seg kind smark" id="s-smark" role="group" aria-label="화주 옆 콜 표시"><button type="button" data-smark="both" aria-pressed="true"><span class="pv"><span class="srcb s1"><i class="bl"><img src="icons/call-one.webp" alt=""></i>원콜</span><span class="srcb s2"><i class="bl"><img src="icons/call-24.png" alt=""></i>전국24시콜</span></span><small>마크 + 이름</small></button><button type="button" data-smark="mark" aria-pressed="false"><span class="pv"><span class="srcb s1 only"><i class="bl"><img src="icons/call-one.webp" alt=""></i></span><span class="srcb s2 only"><i class="bl"><img src="icons/call-24.png" alt=""></i></span></span><small>마크만</small></button></div>
+    <p class="hint small smark-note">기타로 직접 적은 콜 이름은 어느 쪽이든 그대로 보여요.</p>    <div class="gt">백업 · 내보내기</div>
     <p class="lastbk" id="s-lastbk"></p>
     <div class="card items">
       <button type="button" class="item" id="s-share"><span class="ii" style="background:var(--accent-soft);color:var(--accent)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M7 8l5-5 5 5"/></svg></span><span class="tx"><b>백업 파일 보내기</b><small>카톡 "나와의 채팅" · 구글 드라이브</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>

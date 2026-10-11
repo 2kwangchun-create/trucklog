@@ -176,8 +176,12 @@ const ledMulti=()=>!!ledRange&&ledRange.start.slice(0,7)!==ledRange.end.slice(0,
 // 어떤 콜로 받은 운행인지 (등록 화면에서 앱 아이콘처럼 고름) · 화주 옆에 작은 표시
 const SRC=[{k:'원콜',ico:'1',cls:'s1',img:'icons/call-one.webp'},{k:'전국24시콜',ico:'24',cls:'s2',img:'icons/call-24.png'},{k:'기타',ico:'…',cls:'s3'}];
 // 원콜·전국24시콜은 실제 앱 마크를 작게 붙임
+// 설정 '화주 옆 콜 표시': both(마크 + 이름) · mark(마크만). 기타(마크 없음)는 직접 쓴 이름을 늘 보여줌
+let srcMark=ls.get('srcMark')==='mark'?'mark':'both';
 const srcBadge=t=>{if(!t.src)return '';const s=SRC.find(x=>x.k===t.src)||SRC[2];
+  if(s.img&&srcMark==='mark')return `<span class="srcb ${s.cls} only" title="${esc(t.src)}" aria-label="${esc(t.src)}"><i class="bl"><img src="${s.img}" alt=""></i></span>`;
   return `<span class="srcb ${s.cls}">${s.img?`<i class="bl"><img src="${s.img}" alt=""></i>`:''}${esc(t.src)}</span>`};
+function setSrcMark(v){srcMark=v==='mark'?'mark':'both';ls.set('srcMark',srcMark);document.querySelectorAll('#s-smark [data-smark]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.smark===srcMark))}
 // 화주 옆에 늘: 담당자 · 연락처 (번호를 누르면 전화)
 const cInfo=t=>t.clientName||t.clientPhone?`<span class="cinfo">${t.clientName?`<span class="cn">${esc(t.clientName)}</span>`:''}${t.clientPhone?`<a class="cp num" href="${telHref(t.clientPhone)}">${ic(P.phone)}${esc(t.clientPhone)}</a>`:''}</span>`:'';
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
@@ -1086,6 +1090,8 @@ document.addEventListener('click',e=>{
   if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
   const lk=e.target.closest('[data-lkind]');
   if(lk){ledKind=lk.dataset.lkind;openId=payingId=deletingId=costOpen=costDel=null;renderLedger();saveSpot();return}
+  const smk=e.target.closest('[data-smark]');
+  if(smk){setSrcMark(smk.dataset.smark);render();return}
   const tx=e.target.closest('[data-tsize]');
   if(tx){setTextSize(tx.dataset.tsize);return}
   const ed=e.target.closest('[data-do="edit"]');
@@ -1261,6 +1267,7 @@ function setTextSize(z){
   document.querySelectorAll('#s-text [data-tsize]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tsize===z));
 }
 setTextSize(ls.get('textSize')||'');
+setSrcMark(srcMark);
 function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('')}
 // 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
 function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
