@@ -218,10 +218,10 @@ function rowHtml(t,mode){
 const hay=t=>[t.src,t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
 
 // ---------- 찾기: 어디서 찾을지 (자동 · 전체 · 화주 · 지역 · 주소 · 메모) ----------
-const SF={client:['client','clientName','clientPhone','src'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
+const SF={client:['client','clientName','clientPhone'],src:['src'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
   phone:['clientPhone','fromPhone','toPhone']};
-const SL={auto:'자동',all:'전체',client:'화주',region:'지역',addr:'주소',memo:'메모',phone:'전화번호'};
-const SPH={auto:'화주, 지역, 주소, 메모로 찾기',all:'화주, 지역, 주소, 메모로 찾기',client:'화주 이름·담당자·번호로 찾기',
+const SL={auto:'자동',all:'전체',client:'화주',src:'콜',region:'지역',addr:'주소',memo:'메모',phone:'전화번호'};
+const SPH={auto:'화주, 지역, 주소, 메모로 찾기',all:'화주, 지역, 주소, 메모로 찾기',client:'화주 이름·담당자·번호로 찾기',src:'콜 이름으로 찾기 (예: 원콜)',
   region:'상차지·하차지 (예: 평택)',addr:'상세주소·현장 담당자로 찾기',memo:'메모 내용으로 찾기'};
 const sNorm=s=>String(s||'').toLowerCase().replace(/\s+/g,''); // 띄어쓰기 무시 ("대한 물류" = "대한물류")
 const sDigits=s=>String(s||'').replace(/\D/g,'');
@@ -231,7 +231,7 @@ function guessScope(list,raw){
   const d=sDigits(raw);
   if(d.length>=3&&d.length===raw.replace(/[\s-]/g,'').length)return 'phone';
   const q=sNorm(raw); let best=null;
-  ['client','region','addr','memo'].forEach(g=>{
+  ['client','src','region','addr','memo'].forEach(g=>{
     let score=0;
     list.forEach(t=>SF[g].forEach(k=>{const v=sNorm(t[k]);if(!v)return;score+=v===q?100:v.startsWith(q)?10:v.includes(q)?1:0}));
     if(score&&(!best||score>best.score))best={g,score};
