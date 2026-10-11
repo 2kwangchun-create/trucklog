@@ -159,7 +159,22 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .head .route .memo{flex:1;min-width:0;font-size:14px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .head .meta{grid-column:1/-1;font-size:14px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .head .meta .end{margin-left:auto;display:flex;align-items:center;gap:14px}
-.head .cwrap{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;min-width:0}
+.head .cwrap{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;min-width:0}
+/* 어떤 콜: 앱 아이콘처럼 고르기 · 목록에선 화주 옆 작은 표시 */
+.srcgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.srcgrid button{border:2px solid transparent;background:transparent;border-radius:16px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--fg)}
+.srcgrid button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.appic{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.appic.s1,.srcb.s1{background:#2f6fd6}
+.appic.s2,.srcb.s2{background:#e8742a}
+.appic.s3,.srcb.s3{background:#7b8580}
+.srcb{display:inline-block;color:#fff;font-size:12px;font-weight:700;padding:2px 7px;border-radius:6px;flex:none}
+.cinfo{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:600;color:var(--client)}
+.cinfo .cn{color:var(--fg)}
+.cinfo .cp{display:inline-flex;align-items:center;gap:3px;color:var(--client);text-decoration:none}
+.cinfo .cp .ic{width:15px;height:15px}
+.head.mini .cwrap{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;min-width:0}
+body.selecting .head .cp{pointer-events:none}
 .head .call{display:flex;align-items:center;gap:4px;font-size:15px;font-weight:600;color:var(--client);text-decoration:none;padding:6px 0}
 .head .call .ic{width:18px;height:18px}
 .head .more{color:var(--client);font-weight:600;display:flex;align-items:center;gap:2px}
@@ -522,7 +537,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="u-shint" hidden></p>
     <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
     <div class="section-title">오래된 순서</div>
@@ -576,7 +591,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="seg kind" id="l-kind" role="group" aria-label="장부에서 볼 것"><button type="button" data-lkind="trip" aria-pressed="true">운행 <span class="num" id="l-ntrip"></span></button><button type="button" data-lkind="cost" aria-pressed="false">지출 <span class="num" id="l-ncost"></span></button></div>
     <div class="grp" id="l-tripgrp">
     <div class="frow"><div class="fchips" id="l-seg" role="group" aria-label="장부 보기 설정"></div><button type="button" class="ib sm" id="l-searchbtn" aria-label="찾기" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button></div>
-    <label class="search" id="l-searchbox" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="l-scope" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <label class="search" id="l-searchbox" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="l-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="l-shint" hidden></p>
     <div class="list" id="l-list"></div>
     </div>
@@ -595,7 +610,12 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="seg kind" id="f-kind" role="group" aria-label="무엇을 적을까요"><button type="button" data-fkind="trip" aria-pressed="true">운행</button><button type="button" data-fkind="cost" aria-pressed="false">지출</button></div>
     <p class="notice draftnote" id="f-draft" hidden><span id="f-draftmsg"></span><button type="button" class="linkbtn" id="f-discard">지우고 새로 쓰기</button></p>
     <form class="form" id="f" novalidate>
-      <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
+      <div class="card field"><span class="flabel">어떤 콜?</span>
+        <div class="srcgrid" id="f-src" role="group" aria-label="어떤 콜로 받았나요">
+          <button type="button" data-src="원콜" aria-pressed="false"><span class="appic s1">1</span>원콜</button>
+          <button type="button" data-src="전국24시콜" aria-pressed="false"><span class="appic s2">24</span>전국24시콜</button>
+          <button type="button" data-src="기타" aria-pressed="false"><span class="appic s3">···</span>기타</button>
+        </div></div>      <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
       <div class="card field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
         <details class="more" id="f-cmore"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>담당자 · 연락처</summary>
           <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></details></div>
