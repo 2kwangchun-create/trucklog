@@ -218,7 +218,17 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .chip.role{font-weight:700}
 .chip.role.load{background:var(--accent-soft);color:var(--accent)}
 .chip.role.unload{background:var(--accent);color:var(--accent-fg)}
-.chip.role.both{background:var(--track);color:var(--fg)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.chip.role.both{background:var(--track);color:var(--fg)}/* 달력 [전체 | 상차 | 하차] · 건마다 상차 완료 / 하차 완료 */
+.seg.lu{grid-template-columns:repeat(3,1fr)}
+.seg.lu button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.seg.lu button[aria-pressed="true"] .mk.from{border-color:var(--accent-fg)}
+.seg.lu button[aria-pressed="true"] .mk.to{background:var(--accent-fg)}
+.prog{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pbtn{display:flex;align-items:center;justify-content:center;gap:4px;min-height:40px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);font-size:14px;font-weight:700;color:var(--muted)}
+.pbtn.done{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent)}
+.pbtn .ic{width:16px;height:16px}
+.chip.go{background:#fff2d6;color:#8a5a00}
+.chip.done{background:var(--paid-soft);color:var(--paid)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -442,7 +452,7 @@ body.selecting .ck{display:block;position:absolute;left:14px;top:16px;width:28px
 body.selecting .row.checked{background:var(--accent-soft)}
 body.selecting .row.checked .ck{background:var(--accent);border-color:var(--accent)}
 body.selecting .row.checked .ck::after{content:"";position:absolute;left:8px;top:3px;width:7px;height:13px;border:solid var(--accent-fg);border-width:0 3px 3px 0;transform:rotate(45deg)}
-body.selecting .row .act,body.selecting .row .detail,body.selecting .head .end,body.selecting .head .call{display:none}
+body.selecting .row .prog,body.selecting .row .act,body.selecting .row .detail,body.selecting .head .end,body.selecting .head .call{display:none}
 body.selecting .row.open:not(.checked){box-shadow:none}
 body.selecting .row.open>.head{background:transparent;margin:0;padding:0}
 body.selecting nav.tabs{display:none}
@@ -636,6 +646,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="card"><span><i class="dot-paid"></i>이 달 받은 돈</span><b class="num c-paid" id="c-mpaid"></b></div>
       <div class="card"><span><i class="dot-due"></i>못 받은 돈</span><b class="num c-due" id="c-mdue"></b></div>
     </div>
+    <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">전체</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차</button></div>
     <div class="cal">
       <div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
       <div class="grid" id="c-grid"></div>
