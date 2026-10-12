@@ -284,8 +284,8 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   }
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
-  const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 다음에':'누르면 완료'}</small>`}</button>`;
-  const prog=role||open?`<div class="prog">${PB('load',1,'상차',t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,'하차',t.unloadedAt,!t.loadedAt)}</div>`:'';
+  const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 끝나고':'눌러서 완료'}</small>`}</button>`;
+  const prog=role||open?`<div class="prog">${PB('load',1,`${esc(t.from)} 상차`,t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,`${esc(t.to)} 하차`,t.unloadedAt,!t.loadedAt)}</div>`:'';
   return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
 
@@ -1212,7 +1212,7 @@ document.addEventListener('click',e=>{
   if(sr){const k=sr.dataset.src; // 한 번 더 누르면 해제
     if(k===formSrc)setSrc('');else if(k==='기타'){formSrc='기타';paintSrc();$('f-srctext').focus()}else setSrc(k);return}
   const tod=e.target.closest('[data-tod]');
-  if(tod){const n=Number(tod.dataset.tod),d=$('f-date').value;$('f-todate').value=!n||!d?'':iso(new Date(parseD(d).getTime()+n*86400000));return}
+  if(tod){const n=Number(tod.dataset.tod),d=$('f-date').value;$('f-todate').value=!n||!d?'':iso(new Date(parseD(d).getTime()+n*86400000));paintTod();return}
   const sv=e.target.closest('[data-srcv]');
   if(sv){$('f-srctext').value=sv.dataset.srcv;return}
   const pt=e.target.closest('[data-pt]');
@@ -1407,7 +1407,11 @@ function setTextSize(z){
 }
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('')}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');paintTod()}
+// 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
+function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
+  document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
+['input','change'].forEach(ev=>{$('f-date').addEventListener(ev,paintTod);$('f-todate').addEventListener(ev,paintTod)});
 // 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
 function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 
@@ -1423,7 +1427,7 @@ function saveDraft(){
   const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
@@ -1476,7 +1480,7 @@ function startEdit(t){
   view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
 function fillTrip(t){
-  setSrc(t.src||''); $('f-todate').value=t.toDate||'';
+  setSrc(t.src||''); $('f-todate').value=t.toDate||''; paintTod();
   $('f-date').value=t.date; $('f-client').value=t.client||'';
   $('f-from').value=t.from; $('f-fromaddr').value=t.fromAddr||'';
   $('f-to').value=t.to; $('f-toaddr').value=t.toAddr||'';
