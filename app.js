@@ -283,8 +283,9 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
     else if(open)act=`<div class="act">${main}${sub}</div>`;
   }
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
-  const PB=(k,l,v)=>`<button type="button" class="pbtn${v?' done':''}" data-do="lu" data-k="${k}" data-id="${t.id}">${v?ic(P.check)+l+' '+stampTxt(v):l+' 완료'}</button>`;
-  const prog=role||open?`<div class="prog">${PB('load','상차',t.loadedAt)}${PB('unload','하차',t.unloadedAt)}</div>`:'';
+  // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
+  const PB=(k,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''}>${v?ic(P.check)+l+' '+stampTxt(v):wait?'상차 후 하차':l+' 완료'}</button>`;
+  const prog=role||open?`<div class="prog">${PB('load','상차',t.loadedAt)}${PB('unload','하차',t.unloadedAt,!t.loadedAt)}</div>`:'';
   return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
 
@@ -1238,8 +1239,10 @@ document.addEventListener('click',e=>{
     case 'lu': { // 상차 완료 · 하차 완료 (다시 누르면 취소)
       const load=el.dataset.k==='load', k=load?'loadedAt':'unloadedAt', l=load?'상차':'하차', before={loadedAt:t.loadedAt,unloadedAt:t.unloadedAt};
       const d=new Date(), now=`${iso(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      if(t[k])t[k]='';else{t[k]=now;if(!load&&!t.loadedAt)t.loadedAt=now} // 하차했으면 상차도 끝난 것
-      saveTrip(t); toast(before[k]?`${l} 완료를 취소했어요`:`${l} 완료로 표시했어요`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+      if(!load&&!t.loadedAt){toast('상차 완료를 먼저 눌러 주세요');break}
+      if(t[k]){t[k]='';if(load)t.unloadedAt=''} // 상차를 취소하면 하차도 같이 취소
+      else t[k]=now;
+      saveTrip(t); toast(before[k]?(load&&before.unloadedAt?'상차 · 하차 완료를 취소했어요':`${l} 완료를 취소했어요`):`${l} 완료로 표시했어요`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
     case 'cdelcfm': removeTrip(t); costDel=costOpen=null; toast('지출을 삭제했어요',()=>restoreTrip(t)); break;
     case 'filter': if(el.dataset.which==='led')ledFilter=el.dataset.f; else calFilter=el.dataset.f; openId=payingId=deletingId=null; break;
   }
@@ -1367,7 +1370,8 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','하차일 따로 적기 · 달력에서 그날 상차 / 하차할 건 나눠 보기','달력 [전체 · 상차 · 하차] 골라 보기 · 건마다 상차 완료 / 하차 완료 표시','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.10.0',d:'10/12',items:['하차일 따로 적기 · 달력에서 그날 상차 / 하차할 건 나눠 보기','달력 [전체 · 상차 · 하차] 골라 보기','건마다 상차 완료 → 하차 완료 순서로 표시 (운송 중 · 하차 완료)']},
+  {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
   {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},
