@@ -210,7 +210,15 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .chgmore .ic{width:18px;height:18px}
 .chg .newb{background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px}
 .chg ul{margin:8px 0 2px;padding-left:20px;font-size:15px;line-height:1.6}
-.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+/* 하차일 · 달력의 상차/하차 표시 */
+.todate{display:flex;flex-direction:column;gap:6px;margin-top:4px;padding-top:10px;border-top:1px dashed var(--line)}
+.todate label{font-weight:600;font-size:15px}
+.day .s.ul{display:inline-flex;align-items:center;gap:2px;color:var(--accent);font-weight:700}
+.day .s.ul .mk{width:7px;height:7px}
+.chip.role{font-weight:700}
+.chip.role.load{background:var(--accent-soft);color:var(--accent)}
+.chip.role.unload{background:var(--accent);color:var(--accent-fg)}
+.chip.role.both{background:var(--track);color:var(--fg)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -697,7 +705,10 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="flow" aria-hidden="true"><span><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></span></div>
       <div class="card field"><label for="f-to"><i class="mk to"></i>하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div>
         <input type="text" id="f-toaddr" class="addrin" placeholder="상세주소 (예: 대덕구 대화로 100)" aria-label="하차지 상세주소">
-        <div class="contact"><input type="text" id="f-toname" placeholder="하차 담당자" aria-label="하차지 담당자 이름"><input type="tel" id="f-tophone" class="phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div></div>
+        <div class="contact"><input type="text" id="f-toname" placeholder="하차 담당자" aria-label="하차지 담당자 이름"><input type="tel" id="f-tophone" class="phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div>
+        <div class="todate"><label for="f-todate">하차일</label><input type="date" id="f-todate">
+          <div class="quick"><button type="button" data-tod="0">같은 날</button><button type="button" data-tod="1">다음 날</button><button type="button" data-tod="2">모레</button></div>
+          <small class="hint small">비워 두면 상차일과 같은 날로 봐요</small></div></div>
       <div class="card field"><label for="f-amt">운임 <em>*</em></label>
         <div class="amtbox"><input type="text" id="f-amt" class="num" inputmode="numeric" placeholder="예: 450,000"><span>원</span></div>
         <div class="quick"><button type="button" data-add="10000">+1만</button><button type="button" data-add="50000">+5만</button><button type="button" data-add="100000">+10만</button><button type="button" data-add="0">지우기</button></div>

@@ -145,7 +145,7 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),paid:r.paid?String(r.paid):null};
@@ -245,7 +245,7 @@ const cInfo=t=>t.clientName||t.clientPhone?`<span class="cinfo">${t.clientName?`
 // 계산서 발행 · 정산 문자 보낸 날 (며칠 전에 독촉했는지)
 const docChips=t=>(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?`<span class="chip sms">문자 ${t.smsAt===todayIso?'오늘':daysSince(t.smsAt)+'일 전'}</span>`:'');
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
-function rowHtml(t,mode){
+function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
   const client=`<span class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}</span>`;
   const amt=`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
@@ -255,11 +255,11 @@ function rowHtml(t,mode){
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
-      <div class="meta"><span class="num">${md(t.date)}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
+      <div class="meta">${role?`<span class="chip role ${role}">${role==='load'?'상차':role==='unload'?'하차':'상차 · 하차'}</span>`:''}<span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
   if(open){
     detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
-      +addrBlk('상차','from',t.from,t.fromAddr,t.fromPhone,t.fromName)+addrBlk('하차','to',t.to,t.toAddr,t.toPhone,t.toName)
+      +addrBlk('상차 · '+dayK(t.date),'from',t.from,t.fromAddr,t.fromPhone,t.fromName)+addrBlk('하차 · '+dayK(t.toDate||t.date),'to',t.to,t.toAddr,t.toPhone,t.toName)
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
       +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
       +(t.tax||t.smsAt?`<div class="blk"><span class="bl">정산</span><div>${t.tax?`계산서 발행 ${md(t.tax)}`:'계산서 미발행'}${t.smsAt?` · 문자 보낸 날 ${md(t.smsAt)}`:''}</div></div>`:'')
@@ -393,23 +393,29 @@ function renderCal(){
   for(let d=1;d<=days;d++){
     const ds=`${calY}-${pad(calM+1)}-${pad(d)}`;
     const ts=trips.filter(t=>t.date===ds);
+    // 다른 날 상차해서 이 날 하차하는 건 (같은 날 상·하차는 금액 표시로 충분)
+    const unloads=trips.filter(t=>t.toDate&&t.toDate!==t.date&&t.toDate===ds).length;
     const paidSum=ts.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);
     const dueSum=ts.filter(t=>!t.paid).reduce((s,t)=>s+t.amount,0);
     const cls=['day',ds===todayIso?'today':'',ds===calSel?'sel':''].join(' ');
     const wd=(first+d-1)%7, wcls=wd===0?' sun':wd===6?' sat':'';
-    h+=`<button type="button" class="${cls}" data-do="day" data-d="${ds}" aria-label="${calM+1}월 ${d}일 ${ts.length}건, 받은 돈 ${comma(paidSum)}원, 못 받은 돈 ${comma(dueSum)}원"><span class="d num${wcls}">${d}</span>${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}</button>`;
+    h+=`<button type="button" class="${cls}" data-do="day" data-d="${ds}" aria-label="${calM+1}월 ${d}일 상차 ${ts.length}건${unloads?`, 하차 ${unloads}건`:''}, 받은 돈 ${comma(paidSum)}원, 못 받은 돈 ${comma(dueSum)}원"><span class="d num${wcls}">${d}</span>${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}${unloads?`<span class="s ul num"><i class="mk to"></i>하차${unloads}</span>`:''}</button>`;
   }
   $('c-grid').innerHTML=h;
-  const ts=trips.filter(t=>t.date===calSel).sort(byOld);
-  const sum=ts.reduce((s,t)=>s+t.amount,0);
+  // 고른 날: 그날 상차하는 건 + 다른 날 상차해서 그날 하차하는 건
+  const loads=trips.filter(t=>t.date===calSel).sort(byOld);
+  const drops=trips.filter(t=>t.toDate&&t.toDate!==t.date&&t.toDate===calSel).sort(byOld);
+  const roleOf=t=>t.date!==calSel?'unload':t.toDate&&t.toDate!==t.date?'load':'both';
+  const ts=[...loads,...drops];
+  const sum=loads.reduce((s,t)=>s+t.amount,0);
   const dcost=costs.filter(c=>c.date===calSel).reduce((s,c)=>s+c.amount,0);
   $('c-daytitle').textContent=dayK(calSel);
-  $('c-daysum').textContent=`운행 ${ts.length}건`+(ts.length?` · ${short(sum)}원`:'')+(dcost?` · 지출 ${short(dcost)}원`:'');
+  $('c-daysum').textContent=[loads.length&&`상차 ${loads.length}건 · ${short(sum)}원`,drops.length&&`하차 ${drops.length}건`,dcost&&`지출 ${short(dcost)}원`].filter(Boolean).join(' · ')||'운행 0건';
   $('c-seg').hidden=!ts.length;
   $('c-seg').innerHTML=segHtml('cal',ts,calFilter);
   const shown=ts.filter(t=>pass(t,calFilter));
-  $('c-list').innerHTML=!ts.length?'<div class="empty">이 날은 운행 기록이 없어요.</div>'
-    :shown.length?shown.map(t=>rowHtml(t,'ledger')).join(''):`<div class="empty">이 날은 ${EMPTY[calFilter]}</div>`;
+  $('c-list').innerHTML=!ts.length?'<div class="empty">이 날은 상차·하차 기록이 없어요.</div>'
+    :shown.length?shown.map(t=>rowHtml(t,'ledger',roleOf(t))).join(''):`<div class="empty">이 날은 ${EMPTY[calFilter]}</div>`;
 }
 
 // ---------- 장부 ----------
@@ -673,9 +679,9 @@ async function doBackup(share){
   render();
 }
 function csvText(list,costList){
-  const head=['상차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','계산서 발행일','문자 보낸 날','메모'];
+  const head=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','미수 일수','계산서 발행일','문자 보낸 날','메모'];
   const q=v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=list.sort(byOld).map(t=>[t.date,t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.tax||'',t.smsAt||'',t.memo]);
+  const rows=list.sort(byOld).map(t=>[t.date,t.toDate||t.date,t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':'못 받음',t.paid||'',t.paid?'':Math.max(0,daysSince(t.date)),t.tax||'',t.smsAt||'',t.memo]);
   const out=[head,...rows];
   // 아래에 지출 표와 합계(순수익)를 이어 붙임
   if(costList){
@@ -1182,6 +1188,8 @@ document.addEventListener('click',e=>{
   const sr=e.target.closest('[data-src]');
   if(sr){const k=sr.dataset.src; // 한 번 더 누르면 해제
     if(k===formSrc)setSrc('');else if(k==='기타'){formSrc='기타';paintSrc();$('f-srctext').focus()}else setSrc(k);return}
+  const tod=e.target.closest('[data-tod]');
+  if(tod){const n=Number(tod.dataset.tod),d=$('f-date').value;$('f-todate').value=!n||!d?'':iso(new Date(parseD(d).getTime()+n*86400000));return}
   const sv=e.target.closest('[data-srcv]');
   if(sv){$('f-srctext').value=sv.dataset.srcv;return}
   const pt=e.target.closest('[data-pt]');
@@ -1277,7 +1285,7 @@ function paintSrc(){
 }
 // 저장된 값으로 화면 맞추기 (원콜 · 전국24시콜 · 기타 · 직접 쓴 이름)
 function setSrc(v){formSrc=!v?'':SRC_MAIN.includes(v)?v:'기타';$('f-srctext').value=formSrc==='기타'&&v!=='기타'?v:'';paintSrc()}
-const readForm=()=>({src:srcValue(),date:$('f-date').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
+const readForm=()=>({src:srcValue(),date:$('f-date').value,toDate:$('f-todate').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
   clientPhone:$('f-clientphone').value.trim(),fromPhone:$('f-fromphone').value.trim(),toPhone:$('f-tophone').value.trim(),
   clientName:$('f-clientname').value.trim(),fromName:$('f-fromname').value.trim(),toName:$('f-toname').value.trim(),
@@ -1341,7 +1349,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
+  {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','하차일 따로 적기 · 달력에서 그날 상차 / 하차할 건 나눠 보기','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
   {v:'1.6.0',d:'10/10',items:['설정에 내 정보 (차량 번호 · 이름 · 계좌)','건마다 정산 문자 (계산서 발행 시 +10%)']},
@@ -1375,7 +1383,7 @@ function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 // ---------- 적는 중 임시 저장 ----------
 // 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
 // draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
-const F_IDS=['f-date','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
+const F_IDS=['f-date','f-todate','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
 function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
 function saveDraft(){
@@ -1437,7 +1445,7 @@ function startEdit(t){
   view='add'; payingId=deletingId=null; pushOverlay({edit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
 function fillTrip(t){
-  setSrc(t.src||'');
+  setSrc(t.src||''); $('f-todate').value=t.toDate||'';
   $('f-date').value=t.date; $('f-client').value=t.client||'';
   $('f-from').value=t.from; $('f-fromaddr').value=t.fromAddr||'';
   $('f-to').value=t.to; $('f-toaddr').value=t.toAddr||'';
@@ -1453,6 +1461,8 @@ $('f').addEventListener('submit',e=>{
   e.preventDefault();
   const f=readForm(), miss=formMissing(f), date=f.date;
   if(miss.length){$('f-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
+  if(f.toDate&&f.toDate<f.date){$('f-err').textContent='하차일이 상차일보다 빨라요. 날짜를 확인해 주세요.';return}
+  if(f.toDate===f.date)f.toDate=''; // 같은 날이면 비워 둠 (상차일과 같은 날로 봄)
   if(editingId!==null){
     const t=store.get(editingId);
     if(!t){resetForm();popOverlay('edit');go(backView);return}
