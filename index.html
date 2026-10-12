@@ -223,13 +223,34 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .seg.lu button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .seg.lu button[aria-pressed="true"] .mk.from{border-color:var(--accent-fg)}
 .seg.lu button[aria-pressed="true"] .mk.to{background:var(--accent-fg)}
-.prog{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 상차 → 하차 두 단계: ①상차 ──── ②하차 */
+.prog{display:grid;grid-template-columns:1fr 24px 1fr;align-items:center}
+.pline{height:3px;border-radius:2px;background:var(--line2)}
+.pline.on{background:var(--accent)}
+/* 달력 목록: [상차] [하차] 묶음 제목 · 일정 보기의 칸 건수 */
+.lsec{display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--bg);border-top:1px solid var(--line);font-size:15px}
+.lsec:first-child{border-top:0}
+.lsec .num{color:var(--muted);font-weight:600}
+.lsec small{margin-left:auto;color:var(--muted);font-size:12px}
+.day .s.cnt{display:inline-flex;align-items:center;gap:3px;font-weight:800;color:var(--accent);font-size:13px}
+.day .s.cnt .mk{width:8px;height:8px}
 .pbtn{display:flex;align-items:center;justify-content:center;gap:4px;min-height:40px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);font-size:14px;font-weight:700;color:var(--muted)}
 .pbtn.done{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent)}
 .pbtn.wait{opacity:.45;border-style:solid;font-weight:600}
 .pbtn .ic{width:16px;height:16px}
 .chip.go{background:#fff2d6;color:#8a5a00}
-.chip.done{background:var(--paid-soft);color:var(--paid)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.chip.done{background:var(--paid-soft);color:var(--paid)}
+/* 상차·하차 단계 버튼 (위의 .pbtn 기본 모양을 덮어씀) */
+.pbtn{flex-direction:row;justify-content:flex-start;padding:6px 10px;gap:8px;text-align:left;min-height:48px}
+.pbtn .no{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--line2);color:var(--muted)}
+.pbtn.done .no{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.pbtn.done .no .ic{width:14px;height:14px;stroke-width:3}
+.pbtn b{display:block;font-size:15px;color:var(--fg)}
+.pbtn small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.pbtn.done small{color:var(--accent)}
+.pbtn>b,.pbtn>small{grid-column:2}
+.pbtn{display:grid;grid-template-columns:auto 1fr;column-gap:8px;row-gap:0}
+.pbtn .no{grid-row:span 2}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -647,7 +668,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="card"><span><i class="dot-paid"></i>이 달 받은 돈</span><b class="num c-paid" id="c-mpaid"></b></div>
       <div class="card"><span><i class="dot-due"></i>못 받은 돈</span><b class="num c-due" id="c-mdue"></b></div>
     </div>
-    <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">전체</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차</button></div>
+    <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">운임 보기</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차 일정</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차 일정</button></div>
     <div class="cal">
       <div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
       <div class="grid" id="c-grid"></div>

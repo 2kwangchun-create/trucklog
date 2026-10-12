@@ -247,7 +247,7 @@ const cInfo=t=>t.clientName||t.clientPhone?`<span class="cinfo">${t.clientName?`
 // 진행 상황: 상차 완료 · 하차 완료를 누른 날짜·시간 (예: '2026-10-12 14:30')
 const progChip=t=>t.unloadedAt?'<span class="chip done">하차 완료</span>':t.loadedAt?'<span class="chip go">운송 중</span>':'';
 const stampTxt=s=>`${md(s)} ${s.slice(11,16)}`;
-const docChips=t=>progChip(t)+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?`<span class="chip sms">문자 ${t.smsAt===todayIso?'오늘':daysSince(t.smsAt)+'일 전'}</span>`:'');
+const docChips=(t,prog=true)=>(prog?progChip(t):'')+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?`<span class="chip sms">문자 ${t.smsAt===todayIso?'오늘':daysSince(t.smsAt)+'일 전'}</span>`:'');
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
@@ -259,7 +259,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
-      <div class="meta">${role?`<span class="chip role ${role}">${role==='load'?'상차':role==='unload'?'하차':'상차 · 하차'}</span>`:''}<span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
+      <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t,!(role||open))}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
   let detail='';
   if(open){
     detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
@@ -284,8 +284,8 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   }
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
-  const PB=(k,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''}>${v?ic(P.check)+l+' '+stampTxt(v):wait?'상차 후 하차':l+' 완료'}</button>`;
-  const prog=role||open?`<div class="prog">${PB('load','상차',t.loadedAt)}${PB('unload','하차',t.unloadedAt,!t.loadedAt)}</div>`:'';
+  const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 다음에':'누르면 완료'}</small>`}</button>`;
+  const prog=role||open?`<div class="prog">${PB('load',1,'상차',t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,'하차',t.unloadedAt,!t.loadedAt)}</div>`:'';
   return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
 
@@ -403,31 +403,40 @@ function renderCal(){
   document.querySelectorAll('#c-lu [data-lu]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lu===calLU));
   for(let d=1;d<=days;d++){
     const ds=`${calY}-${pad(calM+1)}-${pad(d)}`;
-    const ts=calLU==='unload'?trips.filter(t=>unl(t)===ds):trips.filter(t=>t.date===ds);
-    // 전체: 다른 날 상차해서 이 날 하차하는 건을 작게 (같은 날 상·하차는 금액 표시로 충분)
-    const unloads=calLU==='all'?trips.filter(t=>t.toDate&&t.toDate!==t.date&&t.toDate===ds).length:0;
+    const ts=trips.filter(t=>t.date===ds);
+    const nLoad=ts.length, nDrop=trips.filter(t=>unl(t)===ds).length;
+    // 다른 날 상차해서 이 날 하차하는 건 (전체 보기에서 작게)
+    const later=trips.filter(t=>t.toDate&&t.toDate!==t.date&&t.toDate===ds).length;
     const paidSum=ts.filter(t=>t.paid).reduce((s,t)=>s+t.amount,0);
     const dueSum=ts.filter(t=>!t.paid).reduce((s,t)=>s+t.amount,0);
     const cls=['day',ds===todayIso?'today':'',ds===calSel?'sel':''].join(' ');
     const wd=(first+d-1)%7, wcls=wd===0?' sun':wd===6?' sat':'';
-    h+=`<button type="button" class="${cls}" data-do="day" data-d="${ds}" aria-label="${calM+1}월 ${d}일 ${calLU==='unload'?'하차':'상차'} ${ts.length}건${unloads?`, 하차 ${unloads}건`:''}, 받은 돈 ${comma(paidSum)}원, 못 받은 돈 ${comma(dueSum)}원"><span class="d num${wcls}">${d}</span>${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}${unloads?`<span class="s ul num"><i class="mk to"></i>하차${unloads}</span>`:''}</button>`;
+    // 전체: 금액(상차일 기준) · 상차 일정: 상차 건수 · 하차 일정: 하차 건수
+    const body=calLU==='load'?(nLoad?`<span class="s cnt num"><i class="mk from"></i>${nLoad}</span>`:'')
+      :calLU==='unload'?(nDrop?`<span class="s cnt num"><i class="mk to"></i>${nDrop}</span>`:'')
+      :`${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}${later?`<span class="s ul num"><i class="mk to"></i>하차${later}</span>`:''}`;
+    h+=`<button type="button" class="${cls}" data-do="day" data-d="${ds}" aria-label="${calM+1}월 ${d}일 상차 ${nLoad}건, 하차 ${nDrop}건, 받은 돈 ${comma(paidSum)}원, 못 받은 돈 ${comma(dueSum)}원"><span class="d num${wcls}">${d}</span>${body}</button>`;
   }
   $('c-grid').innerHTML=h;
-  // 고른 날: 그날 상차하는 건 + 그날 하차하는 건 (전체면 다른 날 상차한 하차 건까지)
+  // 고른 날 목록: [상차] 묶음(이 날 상차하는 건) + [하차] 묶음(이 날 하차하는 건). 같은 날 상·하차는 상차 묶음에만
   const loads=calLU==='unload'?[]:trips.filter(t=>t.date===calSel).sort(byOld);
   const drops=calLU==='load'?[]:trips.filter(t=>unl(t)===calSel&&(calLU==='unload'||t.date!==calSel)).sort(byOld);
-  const roleOf=t=>calLU==='load'?'load':calLU==='unload'?'unload':t.date!==calSel?'unload':t.toDate&&t.toDate!==t.date?'load':'both';
-  const ts=[...loads,...drops];
   const sum=loads.reduce((s,t)=>s+t.amount,0);
   const dcost=costs.filter(c=>c.date===calSel).reduce((s,c)=>s+c.amount,0);
   $('c-daytitle').textContent=dayK(calSel);
-  $('c-daysum').textContent=[loads.length&&`상차 ${loads.length}건 · ${short(sum)}원`,drops.length&&`하차 ${drops.length}건`,dcost&&`지출 ${short(dcost)}원`].filter(Boolean).join(' · ')||(calLU==='load'?'상차 0건':calLU==='unload'?'하차 0건':'운행 0건');
-  $('c-seg').hidden=!ts.length;
+  $('c-daysum').textContent=calLU==='all'?([loads.length&&`이 날 상차분 운임 ${short(sum)}원`,dcost&&`지출 ${short(dcost)}원`].filter(Boolean).join(' · ')||'')
+    :calLU==='load'?`상차 ${loads.length}건`:`하차 ${drops.length}건`;
+  // 받은 돈·못 받은 돈 고르기는 '전체' 보기에서만 (일정 보기에선 헷갈려서 숨김)
+  const ts=[...loads,...drops], money=calLU==='all';
+  if(!money)calFilter='all';
+  $('c-seg').hidden=!money||!ts.length;
   $('c-seg').innerHTML=segHtml('cal',ts,calFilter);
-  const shown=ts.filter(t=>pass(t,calFilter));
+  const sec=(mk,l,list,note)=>{const sh=list.filter(t=>pass(t,calFilter));if(!list.length)return '';
+    return `<div class="lsec"><i class="mk ${mk}"></i><b>${l}</b><span class="num">${sh.length}건</span>${note?`<small>${note}</small>`:''}</div>`
+      +(sh.length?sh.map(t=>rowHtml(t,'ledger',mk==='from'?'load':'unload')).join(''):`<div class="empty">${EMPTY[calFilter]}</div>`)};
   const none=calLU==='load'?'상차할':calLU==='unload'?'하차할':'상차·하차';
   $('c-list').innerHTML=!ts.length?`<div class="empty">이 날은 ${none} 기록이 없어요.</div>`
-    :shown.length?shown.map(t=>rowHtml(t,'ledger',roleOf(t))).join(''):`<div class="empty">이 날은 ${EMPTY[calFilter]}</div>`;
+    :sec('from','상차',loads,calLU==='all'&&drops.length?'':'')+sec('to','하차',drops,calLU==='all'?'다른 날 상차한 건':'');
 }
 
 // ---------- 장부 ----------
@@ -1370,7 +1379,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.10.0',d:'10/12',items:['하차일 따로 적기 · 달력에서 그날 상차 / 하차할 건 나눠 보기','달력 [전체 · 상차 · 하차] 골라 보기','건마다 상차 완료 → 하차 완료 순서로 표시 (운송 중 · 하차 완료)']},
+  {v:'1.10.0',d:'10/12',items:['하차일 따로 적기','달력 [운임 보기 · 상차 일정 · 하차 일정] · 날짜 목록을 상차 / 하차로 나눠 보기','건마다 ① 상차 → ② 하차 순서로 완료 표시 (운송 중 · 하차 완료)']},
   {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},
   {v:'1.7.0',d:'10/11',items:['새 디자인 (가운데 큰 등록 버튼)','날짜를 눌러 원하는 날 · 달 · 기간으로 이동','장부 위에 순수익 표시']},
