@@ -19,7 +19,8 @@ const newId=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now(
 const byOld=(a,b)=>a.date.localeCompare(b.date)||(a.createdAt||0)-(b.createdAt||0);
 const byNew=(a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0);
 // 체험 모드: 주소에 ?demo=1 → 실제 기록과 따로(다른 저장소 · 'demo:' 설정), 클라우드·로그인 안 씀, 처음엔 확인용 기록을 채움
-const DEMO=new URLSearchParams(location.search).has('demo');
+// 이 컴퓨터에서 확인할 때만 (localhost · 127.0.0.1). 올린 앱 주소에선 ?demo=1을 붙여도 체험 모드가 안 켜짐
+const DEMO=new URLSearchParams(location.search).has('demo')&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const LSP=DEMO?'demo:':'';
 const ls={get(k){try{return localStorage.getItem(LSP+k)}catch(_){return null}},set(k,v){try{localStorage.setItem(LSP+k,v)}catch(_){}}};
 
@@ -1416,7 +1417,6 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.12.0',d:'10/17',items:['체험 모드: 주소 끝에 ?demo=1 → 실제 기록과 따로, 확인용 기록이 채워진 채로 둘러보기 (껐다 켜도 그대로)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
   {v:'1.10.0',d:'10/12',items:['하차일 따로 적기','달력 [운임 보기 · 상차 일정 · 하차 일정] · 날짜 목록을 상차 / 하차로 나눠 보기','건마다 ① 상차 → ② 하차 순서로 완료 표시 (운송 중 · 하차 완료)']},
   {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
