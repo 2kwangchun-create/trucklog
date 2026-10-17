@@ -650,28 +650,12 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <section class="view" id="v-unpaid">
     <header class="top"><h1>받을 돈</h1>
       <button type="button" class="rangebtn" id="u-rangebtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="u-rangetxt">기간: 전체</span></button></header>
-    <div class="rangepanel" id="u-panel" hidden>
-      <div class="presets">
-        <button type="button" data-preset="thism">이번 달</button><button type="button" data-preset="lastm">지난 달</button><button type="button" data-preset="3m">최근 3개월</button><button type="button" data-preset="all">전체</button>
-      </div>
-      <div class="monthnav"><button type="button" id="rp-prev" aria-label="이전 달">◀</button><b id="rp-title" class="num"></b><button type="button" id="rp-next" aria-label="다음 달">▶</button></div>
-      <div class="wk rwk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
-      <div class="rgrid" id="rp-grid"></div>
-      <div class="rp-hint" id="rp-hint"></div>
-      <div class="rp-act"><button type="button" class="btn ghost" id="rp-reset">초기화</button><button type="button" class="btn" id="rp-apply">적용</button></div>
-    </div>
     <div class="hero">
       <div class="label" id="u-label">아직 못 받은 돈</div>
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <!-- 받을 돈 달력: 날짜마다 아직 받을 금액 (누르면 그날 건만) -->
-    <div class="card ucal">
-      <div class="ucal-h"><button type="button" class="ib sm" id="uc-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="uc-title"></b><button type="button" class="ib sm" id="uc-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
-      <div class="cal"><div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
-      <div class="grid" id="uc-grid"></div></div>
-      <p class="hint small" id="uc-hint">날짜를 누르면 그날 받을 돈만 보여요</p>
-    </div>    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="u-shint" hidden></p>
     <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
     <div class="sortrow"><span class="section-title">순서</span><div class="sortsw" id="u-sort" role="group" aria-label="순서"><button type="button" data-usort="old" aria-pressed="true">오래된 것 위로</button><button type="button" data-usort="new" aria-pressed="false">최근 것 위로</button></div></div>
@@ -690,10 +674,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     </header>
     <div class="banner" id="c-backup" hidden><span><b>백업해 두세요.</b> <span id="c-backup-txt"></span> 휴대폰을 잃어버리면 기록도 사라질 수 있어요.</span><button type="button" class="btn small" data-goto="set">백업하기</button></div>
     <div class="first" id="c-first" hidden><b>아빠장부를 시작해 볼까요?</b><span>아래 가운데 <b>[등록]</b>을 눌러 첫 운행을 적으면, 달력에 받은 돈은 초록, 못 받은 돈은 빨강으로 표시돼요.</span></div>
-    <div class="msum">
-      <div class="card"><span><i class="dot-paid"></i>이 달 받은 돈</span><b class="num c-paid" id="c-mpaid"></b></div>
-      <div class="card"><span><i class="dot-due"></i>못 받은 돈</span><b class="num c-due" id="c-mdue"></b></div>
-    </div>
     <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">운임 보기</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차 일정</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차 일정</button></div>
     <div class="cal">
       <div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
@@ -728,8 +708,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     </div>
     <div class="seg kind" id="l-kind" role="group" aria-label="장부에서 볼 것"><button type="button" data-lkind="trip" aria-pressed="true">운행 <span class="num" id="l-ntrip"></span></button><button type="button" data-lkind="cost" aria-pressed="false">지출 <span class="num" id="l-ncost"></span></button></div>
     <div class="grp" id="l-tripgrp">
-    <div class="frow"><div class="fchips" id="l-seg" role="group" aria-label="장부 보기 설정"></div><button type="button" class="ib sm" id="l-searchbtn" aria-label="찾기" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button></div>
-    <label class="search" id="l-searchbox" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="l-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <label class="search" id="l-searchbox"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="l-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="l-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <div class="frow"><div class="fchips" id="l-seg" role="group" aria-label="장부 보기 설정"></div></div>
     <p class="shint" id="l-shint" hidden></p>
     <div class="list" id="l-list"></div>
     </div>
@@ -883,7 +863,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <div class="sheet-in">
     <div class="sheethead"><h2 id="lp-h">언제 장부를 볼까요?</h2><button type="button" class="ib" id="lp-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="seg" id="lp-mode" role="group" aria-label="보는 단위"><button type="button" data-lpm="month" aria-pressed="true">한 달</button><button type="button" data-lpm="day" aria-pressed="false">하루</button><button type="button" data-lpm="range" aria-pressed="false">기간 직접</button></div>
-    <div class="presets"><button type="button" data-lpq="week">이번 주</button><button type="button" data-lpq="lastm">지난달</button><button type="button" data-lpq="3m">최근 3개월</button><button type="button" data-lpq="year">올해</button></div>
+    <div class="presets"><button type="button" data-lpq="week">이번 주</button><button type="button" data-lpq="lastm">지난달</button><button type="button" data-lpq="3m">최근 3개월</button><button type="button" data-lpq="year">올해</button><button type="button" data-lpq="all" id="lp-all" hidden>전체 기간</button></div>
     <div id="lp-mbox" style="display:flex;flex-direction:column;gap:12px">
       <div class="ynav"><button type="button" class="ib" id="lp-yprev" aria-label="이전 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="lp-year"></b><button type="button" class="ib" id="lp-ynext" aria-label="다음 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
       <div class="mgrid" id="lp-months" role="group" aria-label="달 고르기"></div>
