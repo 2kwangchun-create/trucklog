@@ -280,11 +280,7 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .ucal .day.uhas.a5{background:var(--a5)} .ucal .day.uhas.a5 .s,.ucal .day.uhas.a5 .d{color:var(--a5-fg)}
 .ucal .day.uoff{opacity:.35}
 .ucal .day.upick{outline:3px solid var(--fg);outline-offset:-3px}
-.ucal-h .ib:disabled{opacity:.3}.demobar{position:sticky;top:0;z-index:25;display:flex;align-items:center;gap:8px;margin:0 -16px;padding:8px 16px;background:#fff4d6;color:#6b4a00;font-size:13px;border-bottom:1px solid #f0d58a}
-.demobar b{background:#e8a400;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px}
-.demobar span{flex:1;min-width:0}
-.demobar a{color:#6b4a00;font-weight:700}
-.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.ucal-h .ib:disabled{opacity:.3}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -673,8 +669,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 </div>
 <script>try{if(sessionStorage.getItem('splashed'))document.getElementById('splash').remove()}catch(e){}</script>
 <div class="app">
-  <!-- 체험 모드(?demo=1): 실제 기록과 따로 저장되는 확인용 -->
-  <div class="demobar" id="demobar" hidden><b>체험용</b><span>실제 기록과 따로 저장돼요 · 클라우드에 안 올라가요</span><a href="./" id="demo-exit">나가기</a></div>
   <!-- 받을 돈 -->
   <section class="view" id="v-unpaid">
     <header class="top"><h1>받을 돈</h1>
@@ -969,6 +963,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 <div class="toast" id="toast" hidden><span id="toast-msg"></span><button type="button" id="toast-undo">되돌리기</button></div>
 
 <script src="firebase-config.js"></script>
+<script>/* 이 컴퓨터에서만: ?demo=1 이면 demo.js(깃에 안 올라감)를 불러 확인용으로 */if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&/[?&]demo/.test(location.search))document.write('<script src="demo.js"><\/script>')</script>
 <script src="app.js"></script>
 </body>
 </html>

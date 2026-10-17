@@ -18,11 +18,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const newId=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
 const byOld=(a,b)=>a.date.localeCompare(b.date)||(a.createdAt||0)-(b.createdAt||0);
 const byNew=(a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0);
-// 체험 모드: 주소에 ?demo=1 → 실제 기록과 따로(다른 저장소 · 'demo:' 설정), 클라우드·로그인 안 씀, 처음엔 확인용 기록을 채움
-// 이 컴퓨터에서 확인할 때만 (localhost · 127.0.0.1). 올린 앱 주소에선 ?demo=1을 붙여도 체험 모드가 안 켜짐
-const DEMO=new URLSearchParams(location.search).has('demo')&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const LSP=DEMO?'demo:':'';
-const ls={get(k){try{return localStorage.getItem(LSP+k)}catch(_){return null}},set(k,v){try{localStorage.setItem(LSP+k,v)}catch(_){}}};
+const ls={get(k){try{return localStorage.getItem(k)}catch(_){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(_){}}};
 
 // ---------- 시작 화면 ----------
 // 앱을 열 때 3초쯤 보여주고 사라짐 (누르면 바로 닫힘). 새로고침 때는 index.html에서 미리 지움
@@ -54,7 +50,7 @@ Splash.init();
 const Install={
   deferred:null,
   init(){
-    const el=$('inst'); if(!el||DEMO)return; // 체험 모드에선 설치 안내 안 띄움
+    const el=$('inst'); if(!el)return;
     if(matchMedia('(display-mode: standalone)').matches||navigator.standalone===true)return;
     const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/i.test(ua), android=/Android/i.test(ua);
     addEventListener('beforeinstallprompt',e=>{e.preventDefault();this.deferred=e;this.how('')});
@@ -98,7 +94,6 @@ const Install={
   },
 };
 Install.init();
-if(DEMO)$('demobar').hidden=false;
 
 // ---------- 새 버전 받기 ----------
 // 새 버전을 올리면 서비스 워커가 받아 둠 → 앱을 막 연 참이면(시작 화면 중·아직 아무것도 안 누름) 바로 새로 열고,
@@ -131,7 +126,7 @@ $('upd-go').onclick=()=>{Updater.reloading=true;location.reload()};
 const DB={
   db:null,
   open(){return new Promise((res,rej)=>{
-    const r=indexedDB.open(DEMO?'trucklog-demo':'trucklog',1);
+    const r=indexedDB.open('trucklog',1);
     r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('trips'))r.result.createObjectStore('trips',{keyPath:'id'})};
     r.onsuccess=()=>{this.db=r.result;res()};
     r.onerror=()=>rej(r.error);
@@ -416,7 +411,7 @@ function ucJump(n){const months=[...new Set(trips.filter(t=>left(t)>0).map(t=>t.
 function monthTrips(y,m){const p=`${y}-${pad(m+1)}`;return trips.filter(t=>t.date.startsWith(p))}
 function renderBackupBanner(){
   const last=ls.get('lastBackup');
-  const need=!DEMO&&!Cloud.user&&trips.length>0&&(!last||daysSince(last)>=14); // 체험 모드엔 백업 안내 안 띄움
+  const need=!Cloud.user&&trips.length>0&&(!last||daysSince(last)>=14);
   $('c-backup').hidden=!need;
   if(need)$('c-backup-txt').textContent=last?`마지막 백업이 ${daysSince(last)}일 전이에요.`:'아직 백업한 적이 없어요.';
 }
@@ -678,9 +673,7 @@ function renderSettings(){
   if(!$('s-cloud'))return;
   renderProfile();
   let h='';
-  if(DEMO){
-    h=`<p class="hint">체험용 화면이라 클라우드에 저장하지 않아요. 기록은 이 브라우저에만 따로 남아요.</p><button type="button" class="btn ghost" id="s-demoreset">체험용 기록 처음으로 되돌리기</button>`;
-  } else if(!Cloud.configured){
+  if(!Cloud.configured){
     h=`<p class="hint">클라우드 저장이 아직 연결되지 않았어요. 지금은 이 휴대폰에만 저장됩니다.<br>연결 방법은 설치 안내서의 "클라우드 저장 켜기"를 보세요.</p>`;
   } else if(Cloud.loadErr){
     h=`<p class="hint">클라우드에 연결하지 못했어요. 인터넷 연결을 확인한 뒤 앱을 다시 열어 주세요. 기록은 이 휴대폰에 안전하게 저장되고 있어요.</p>`;
@@ -797,7 +790,6 @@ const FULL_EVERY=7*86400000; // 전체 맞춤 주기 (예전 버전 휴대폰이
 const Cloud={
   configured:false,ready:false,loadErr:false,user:null,col:null,unsub:null,lastSync:null,pending:false,lastErr:'',inflight:0,
   async init(){
-    if(DEMO){this.configured=false;Gate.hide();renderSettings();return} // 체험 모드는 클라우드 안 씀
     const cfg=window.FIREBASE_CONFIG;
     this.configured=!!(cfg&&cfg.apiKey&&cfg.projectId);
     if(!this.configured){Gate.hide();renderSettings();return}
@@ -1144,7 +1136,7 @@ document.addEventListener('mouseup',()=>{mouseDown=false;lpEnd()});
 document.addEventListener('contextmenu',e=>{if(e.target.closest('.list .row[data-id]'))e.preventDefault()});
 
 // 새로고침해도 보던 화면(탭·달·스크롤)으로 돌아오게 — 앱을 완전히 닫았다 열면 달력부터
-const ss={get(k){try{return sessionStorage.getItem(LSP+k)}catch(_){return null}},set(k,v){try{sessionStorage.setItem(LSP+k,v)}catch(_){}}};
+const ss={get(k){try{return sessionStorage.getItem(k)}catch(_){return null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(_){}}};
 function saveSpot(){ss.set('spot',JSON.stringify({v:editingId!==null?backView:view,calY,calM,calSel,ledY,ledM,lr:ledRange,lk:ledKind,y:window.scrollY}))}
 function loadSpot(){
   let s=null;try{s=JSON.parse(ss.get('spot'))}catch(_){}
@@ -1279,7 +1271,6 @@ document.addEventListener('click',e=>{
   if(sid==='s-login'){Cloud.signIn();return}
   if(sid==='s-logout'){Cloud.signOut();return}
   if(sid==='s-resync'){Cloud.fullResync();return}
-  if(sid==='s-demoreset'){if(confirm('체험용 기록을 처음 상태로 되돌릴까요? 체험 중에 바꾼 것은 사라져요.'))demoReset();return}
   if(sid==='s-import-go'){applyImport();return}
   if(sid==='s-import-no'){pendingImport=null;$('s-importbox').hidden=true;$('s-import').value='';return}
   const el=e.target.closest('[data-do]'); if(!el)return;
@@ -1568,35 +1559,6 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 window.addEventListener('online',renderSettings);window.addEventListener('offline',renderSettings);
-// 체험용 기록: 오늘 기준으로 날짜를 잡아서 (받은 것 · 못 받은 것 · 일부 받은 것 · 계산서 · 문자 · 상하차 진행 · 지출)
-function demoSeed(){
-  const D=n=>iso(new Date(TODAY.getTime()+n*86400000)), S=(n,h)=>`${D(n)} ${h}`, now=Date.now(), list=[];
-  let k=0; const T=o=>list.push(normalize(Object.assign({id:'demo'+(++k),createdAt:now+k,updatedAt:now,memo:'-',payType:'인수증'},o)));
-  const pr=normalize({id:'profile',createdAt:now,updatedAt:now,date:'2000-01-01',kind:'profile'}); pr.deleted=true;
-  pr.prof={carNo:'경기12가3456',name:'홍길동',phone:'010-1234-5678',bank:'농협',account:'123-4567-8901-23',holder:'홍길동'}; list.push(pr);
-  T({date:D(-45),src:'원콜',client:'대한물류',clientName:'김과장',clientPhone:'010-9495-7317',from:'평택',fromAddr:'포승읍 평택항로 156',to:'부산',toAddr:'강서구 녹산산단',amount:650000,fee:30000,memo:'야간 운행',smsAt:D(-12),tax:D(-40),loadedAt:S(-45,'08:30'),unloadedAt:S(-44,'06:10'),toDate:D(-44)});
-  T({date:D(-38),src:'전국24시콜',client:'서울운수',clientName:'박대리',clientPhone:'010-2222-3333',from:'서울',to:'광주',amount:420000,memo:'지게차 하차',paid:D(-30),got:420000,gotLog:D(-30)+':420000',loadedAt:S(-38,'09:00'),unloadedAt:S(-38,'17:20')});
-  T({date:D(-33),src:'원콜',client:'대한물류',clientName:'김과장',clientPhone:'010-9495-7317',from:'인천',to:'대구',amount:500000,memo:'파렛트 12개',got:200000,gotLog:D(-20)+':200000',smsAt:D(-5),loadedAt:S(-33,'07:40'),unloadedAt:S(-33,'15:00')});
-  T({date:D(-27),src:'콜마너',client:'부산상사',clientName:'이부장',clientPhone:'010-5555-6666',from:'창원',to:'울산',amount:180000,memo:'소량',smsAt:D(-9),loadedAt:S(-27,'10:00'),unloadedAt:S(-27,'13:30')});
-  T({date:D(-20),src:'전국24시콜',client:'경기화물',clientName:'최실장',clientPhone:'010-7777-8888',from:'수원',fromAddr:'권선구 산업로 88',to:'대전',toAddr:'대덕구 대화로 100',amount:300000,fee:15000,memo:'오전 하차',paid:D(-10),tax:D(-18),loadedAt:S(-20,'06:00'),unloadedAt:S(-20,'11:00')});
-  T({date:D(-14),src:'원콜',client:'한빛물산',clientPhone:'010-3333-4444',from:'평택',to:'광양',amount:720000,memo:'장거리',smsAt:D(-3),tax:D(-12),loadedAt:S(-14,'05:30'),unloadedAt:S(-13,'09:00'),toDate:D(-13)});
-  T({date:D(-10),src:'기타',client:'서울운수',clientName:'박대리',clientPhone:'010-2222-3333',from:'이천',to:'청주',amount:150000,memo:'급한 건',loadedAt:S(-10,'14:00'),unloadedAt:S(-10,'17:00')});
-  T({date:D(-7),src:'전국24시콜',client:'대한물류',clientName:'김과장',clientPhone:'010-9495-7317',from:'평택',to:'전주',amount:380000,smsAt:D(0),loadedAt:S(-7,'08:00'),unloadedAt:S(-7,'14:40')});
-  T({date:D(-5),src:'원콜',client:'경기화물',clientName:'최실장',clientPhone:'010-7777-8888',from:'안산',to:'천안',amount:220000,paid:D(-2),loadedAt:S(-5,'09:30'),unloadedAt:S(-5,'12:10')});
-  T({date:D(-3),src:'콜마너',client:'부산상사',clientName:'이부장',clientPhone:'010-5555-6666',from:'김해',to:'포항',amount:260000,memo:'냉장',got:100000,gotLog:D(-1)+':100000',loadedAt:S(-3,'07:00'),unloadedAt:S(-3,'12:00')});
-  T({date:D(-1),src:'원콜',client:'한빛물산',clientPhone:'010-3333-4444',from:'평택',fromAddr:'포승읍 평택항로 156',to:'부산',amount:680000,memo:'야간 · 다음 날 하차',toDate:D(0),loadedAt:S(-1,'20:00')});
-  T({date:D(0),src:'전국24시콜',client:'대한물류',clientName:'김과장',clientPhone:'010-9495-7317',from:'화성',to:'세종',amount:250000,memo:'오늘 오후',loadedAt:S(0,'09:15')});
-  T({date:D(0),src:'원콜',client:'서울운수',clientName:'박대리',clientPhone:'010-2222-3333',from:'서울',to:'인천',amount:120000,memo:'오늘 단거리'});
-  T({date:D(1),src:'원콜',client:'경기화물',clientName:'최실장',clientPhone:'010-7777-8888',from:'용인',to:'대구',amount:450000,memo:'내일 상차 · 모레 하차',toDate:D(2)});
-  T({date:D(3),src:'기타',client:'부산상사',clientName:'이부장',clientPhone:'010-5555-6666',from:'부산',to:'서울',amount:700000,memo:'예약'});
-  let c=0; const C=o=>list.push(normalize(Object.assign({id:'democ'+(++c),createdAt:now+100+c,updatedAt:now,kind:'cost',memo:''},o)));
-  C({date:D(-44),cat:'주유',amount:180000,memo:'평택 휴게소'}); C({date:D(-44),cat:'통행료',amount:32000});
-  C({date:D(-30),cat:'수리·정비',amount:250000,memo:'엔진오일 교환'}); C({date:D(-14),cat:'주유',amount:210000});
-  C({date:D(-13),cat:'요소수',amount:25000}); C({date:D(-7),cat:'식비',amount:12000});
-  C({date:D(-5),cat:'주유',amount:150000,memo:'안산'}); C({date:D(-1),cat:'통행료',amount:41000});
-  list.forEach(t=>store.set(t.id,t)); DB.putMany(list).catch(()=>{});
-}
-async function demoReset(){store.clear();try{await DB.clear()}catch(_){}demoSeed();rebuild();render();toast('체험용 기록을 처음 상태로 되돌렸어요')}
 (async function boot(){
   Updater.init();
   resetForm(); resetCost();
@@ -1609,7 +1571,6 @@ async function demoReset(){store.clear();try{await DB.clear()}catch(_){}demoSeed
   }
   const y=loadSpot();
   history.replaceState({lvl:0},''); history.pushState({lvl:1,v:'cal'},'');
-  if(DEMO&&!store.size)demoSeed(); // 체험 기록이 비어 있으면(처음 · 저장소가 지워졌을 때) 다시 채움
   rebuild();
   if(loadDraftEdit()){/* 수정 화면으로 복원 */}
   else{
