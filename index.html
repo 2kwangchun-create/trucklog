@@ -280,7 +280,30 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .ucal .day.uhas.a5{background:var(--a5)} .ucal .day.uhas.a5 .s,.ucal .day.uhas.a5 .d{color:var(--a5-fg)}
 .ucal .day.uoff{opacity:.35}
 .ucal .day.upick{outline:3px solid var(--fg);outline-offset:-3px}
-.ucal-h .ib:disabled{opacity:.3}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.ucal-h .ib:disabled{opacity:.3}/* 자주 가는 상하차지: 같은 시·군으로 전에 적은 주소·담당자 */
+.places{display:flex;flex-direction:column;gap:4px}
+.places:empty{display:none}
+.places button{display:flex;align-items:center;gap:6px;text-align:left;border:1px dashed var(--line2);background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;color:var(--fg)}
+.places button::before{content:"📍";font-size:13px}
+.places button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+/* 예정(아직 운행 전): 회색 */
+.lsec.plan{color:var(--muted)}
+.row.plan .amt{color:var(--muted)!important}
+.day .s.c-plan{color:var(--muted)}
+.ucal .day.uplan{cursor:pointer;border-radius:10px;background:var(--track)}
+.ucal .day.uplan .s{color:var(--muted);font-weight:700}
+/* 화주 한눈에 보기 */
+.head .client.tap{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px;cursor:pointer}
+.clbody{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.clstats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.clstats div{background:var(--bg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.clstats span{font-size:13px;color:var(--muted);font-weight:600}
+.clstats b{font-size:18px}
+.clct{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
+.clrecent{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.clrecent div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;align-items:center}
+.clrecent div:first-child{border-top:0}
+.clrecent small{color:var(--muted)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -769,11 +792,11 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
       <div class="card field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
         <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></div>
-      <div class="card field"><label for="f-from"><i class="mk from"></i>상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div>
+      <div class="card field"><label for="f-from"><i class="mk from"></i>상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div><div class="places" id="pl-from"></div>
         <input type="text" id="f-fromaddr" class="addrin" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
         <div class="contact"><input type="text" id="f-fromname" placeholder="상차 담당자" aria-label="상차지 담당자 이름"><input type="tel" id="f-fromphone" class="phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div></div>
       <div class="flow" aria-hidden="true"><span><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></span></div>
-      <div class="card field"><label for="f-to"><i class="mk to"></i>하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div>
+      <div class="card field"><label for="f-to"><i class="mk to"></i>하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div><div class="places" id="pl-to"></div>
         <input type="text" id="f-toaddr" class="addrin" placeholder="상세주소 (예: 대덕구 대화로 100)" aria-label="하차지 상세주소">
         <div class="contact"><input type="text" id="f-toname" placeholder="하차 담당자" aria-label="하차지 담당자 이름"><input type="tel" id="f-tophone" class="phone" inputmode="tel" placeholder="하차지 연락처" aria-label="하차지 연락처"></div>
         <div class="todate"><label for="f-todate">하차일</label><input type="date" id="f-todate">
@@ -908,7 +931,13 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     </div>
   </div>
 </div>
-<!-- 정산 문자: 운행 한 건마다 화주에게 운임 입금 확인 문자 -->
+<!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
+<div class="sheet" id="clsheet" role="dialog" aria-modal="true" aria-labelledby="cl-h" hidden>
+  <div class="sheet-in">
+    <div class="sheethead"><h2 id="cl-h">화주</h2><button type="button" class="ib" id="cl-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="clbody" id="cl-body"></div>
+  </div>
+</div><!-- 정산 문자: 운행 한 건마다 화주에게 운임 입금 확인 문자 -->
 <div class="sheet" id="smsheet" role="dialog" aria-modal="true" aria-labelledby="sm-title" hidden>
   <div class="sheet-in">
     <h2 id="sm-title">정산 문자</h2>

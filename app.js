@@ -191,6 +191,8 @@ let ledRange=null; // 장부: 하루·기간을 고르면 {start,end}, 아니면
 // 일부만 받기: got=지금까지 받은 금액 합, gotLog='2026-10-12:200000,2026-10-15:100000' (받은 날:금액)
 const recv=t=>t.paid?t.amount:Math.min(t.amount,t.got||0);   // 받은 돈
 const left=t=>t.paid?0:Math.max(0,t.amount-(t.got||0));       // 남은 받을 돈
+// 예정: 아직 운행 전(상차일이 오늘 뒤이고 상차 완료도 안 누름) → 미수와 따로, 회색으로
+const isPlan=t=>!t.paid&&t.date>todayIso&&!t.loadedAt;
 const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:f==='notax'?!t.tax:true;
 const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.',notax:'계산서 안 낸 건이 없어요.'};
 function segHtml(which,list,cur){
@@ -256,7 +258,7 @@ const docChips=(t,prog=true)=>(prog?progChip(t):'')+(!t.paid&&t.got>0?`<span cla
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
-  const client=`<span class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}</span>`;
+  const client=t.client?`<span class="client tap" data-do="client" data-c="${esc(t.client)}" role="button" title="${esc(t.client)} 한눈에 보기">${esc(t.client)}</span>`:'<span class="client none">화주 미입력</span>';
   const part=!t.paid&&t.got>0;
   const amt=part?`<b class="amt num c-due">${comma(left(t))}<small class="of">남은 돈 · 전체 ${short(t.amount)}원</small></b>`:`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
@@ -295,7 +297,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
   const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 끝나고':'눌러서 완료'}</small>`}</button>`;
   const prog=role||open?`<div class="prog">${PB('load',1,`${esc(t.from)} 상차`,t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,`${esc(t.to)} 하차`,t.unloadedAt,!t.loadedAt)}</div>`:'';
-  return `<div class="row${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
+  return `<div class="row${isPlan(t)?' plan':''}${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
 
 // ---------- 받을 돈 ----------
@@ -353,8 +355,9 @@ function renderUnpaid(){
   ['u-searchbox','u-age','u-sortrow','u-rangebtn'].forEach(id=>$(id).hidden=calMode); $('u-calbox').hidden=!calMode;
   if(calMode){$('u-shint').hidden=true;renderUnpaidCal();return}
   const q=$('u-search').value.trim();
-  const allDue=trips.filter(t=>!t.paid);
-  const base=runSearch(allDue.filter(t=>!uRange||(t.date>=uRange.start&&t.date<=uRange.end)),q,scopeOf('u-scope'),$('u-shint'));
+  const allDue=trips.filter(t=>!t.paid&&!isPlan(t));
+  const found=runSearch(trips.filter(t=>!t.paid).filter(t=>!uRange||(t.date>=uRange.start&&t.date<=uRange.end)),q,scopeOf('u-scope'),$('u-shint'));
+  const base=found.filter(t=>!isPlan(t)), plans=found.filter(isPlan).sort(byOld); // 예정은 아래에 따로
   const cnt={};base.forEach(t=>{const a=ageLevel(t);cnt[a]=(cnt[a]||0)+1});
   if(uAge&&!cnt[uAge])uAge=null;
   $('u-age').classList.toggle('picking',!!uAge);
@@ -367,17 +370,19 @@ function renderUnpaid(){
   const ageTxt=uAge?` · ${AGES.find(a=>a[0]===uAge)[1]}`:'';
   $('u-label').textContent=`아직 못 받은 돈 (${uRange?rLabel(uRange):'전체 기간'}${ageTxt}${q?` · "${$('u-search').value.trim()}"`:''})`;
   const late=list.filter(t=>daysSince(t.date)>=30).length;
-  $('u-sub').textContent=`${list.length}건`+(late?` · 30일 넘은 건 ${late}건`:'')+(filtered?` · 전체 미수 ${won(allDue.reduce((s,t)=>s+left(t),0))}`:'');
+  const planSum=plans.reduce((s,t)=>s+left(t),0);
+  $('u-sub').textContent=`${list.length}건`+(late?` · 30일 넘은 건 ${late}건`:'')+(filtered?` · 전체 미수 ${won(allDue.reduce((s,t)=>s+left(t),0))}`:'')+(plans.length&&!uAge?` · 예정 ${plans.length}건 ${short(planSum)}원`:'');
   $('u-rangetxt').textContent=uRange?rLabel(uRange):'전체 기간';
   $('u-rangebtn').classList.toggle('on',!!uRange);
-  $('u-list').innerHTML=list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`;
+  const planHtml=plans.length&&!uAge?`<div class="lsec plan"><i class="mk from"></i><b>예정</b><span class="num">${plans.length}건 · ${short(planSum)}원</span><small>아직 운행 전</small></div>`+plans.map(t=>rowHtml(t,'unpaid')).join(''):'';
+  $('u-list').innerHTML=(list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`)+planHtml;
 }
 // 받을 돈: 순서(오래된 것 위로 · 최근 것 위로)
 let uSort=ls.get('uSort')==='new'?'new':'old';
 // 받을 돈 [목록 | 달력]: 달력은 안 받은 날만 금액이 뜨고 누를 수 있음 · 화살표는 미수 있는 달로만
 let uView=ls.get('uView')==='cal'?'cal':'list', ucY=null, ucM=null, uDay=null;
 function renderUnpaidCal(){
-  const due=trips.filter(t=>left(t)>0);
+  const due=trips.filter(t=>left(t)>0), real=due.filter(t=>!isPlan(t));
   const months=[...new Set(due.map(t=>t.date.slice(0,7)))].sort();
   if(ucY===null||!months.includes(`${ucY}-${pad(ucM+1)}`)){ // 처음엔 이번 달, 이번 달에 없으면 가장 최근 미수 달
     const cur=todayIso.slice(0,7), pick=months.includes(cur)?cur:months[months.length-1]||cur;
@@ -392,16 +397,17 @@ function renderUnpaidCal(){
   for(let d=1;d<=days;d++){
     const ds=`${pfx}-${pad(d)}`, ts=mine.filter(t=>t.date===ds), wd=(first+d-1)%7, dc=`d num${wd===0?' sun':wd===6?' sat':''}`;
     if(!ts.length){h+=`<div class="day uoff${ds===todayIso?' today':''}"><span class="${dc}">${d}</span></div>`;continue}
-    const s=ts.reduce((a,t)=>a+left(t),0);
-    h+=`<button type="button" class="day uhas ${ageLevel(ts[0])}${ds===uDay?' upick':''}" data-ucd="${ds}" aria-label="${ucM+1}월 ${d}일 ${ts.length}건 받을 돈 ${comma(s)}원"><span class="${dc}">${d}</span><span class="s num">${short(s)}</span></button>`;
+    const s=ts.reduce((a,t)=>a+left(t),0), plan=ts.every(isPlan);
+    h+=`<button type="button" class="day ${plan?'uplan':'uhas '+ageLevel(ts[0])}${ds===uDay?' upick':''}" data-ucd="${ds}" aria-label="${ucM+1}월 ${d}일 ${ts.length}건 받을 돈 ${comma(s)}원"><span class="${dc}">${d}</span><span class="s num">${short(s)}</span></button>`;
   }
   $('uc-grid').innerHTML=h;
   // 아래 목록: 고른 날이 있으면 그날, 없으면 이 달 전체
-  const list=(uDay?mine.filter(t=>t.date===uDay):mine).sort(byOld), total=list.reduce((s,t)=>s+left(t),0);
+  const list=(uDay?mine.filter(t=>t.date===uDay):mine).sort(byOld), total=list.filter(t=>!isPlan(t)).reduce((s,t)=>s+left(t),0);
   $('uc-hint').textContent=uDay?`${dayK(uDay)} · ${list.length}건 · 다시 누르면 이 달 전체`:mine.length?'빨간 날을 누르면 그날 받을 돈만 보여요':'이 달은 받을 돈이 없어요';
   $('u-label').textContent=`아직 못 받은 돈 (${uDay?dayK(uDay):`${ucY}년 ${ucM+1}월`})`;
   $('u-total').textContent=won(total);
-  $('u-sub').textContent=`${list.length}건 · 전체 미수 ${won(due.reduce((s,t)=>s+left(t),0))}`;
+  const pl=list.filter(isPlan);
+  $('u-sub').textContent=`${list.length-pl.length}건 · 전체 미수 ${won(real.reduce((s,t)=>s+left(t),0))}`+(pl.length?` · 예정 ${pl.length}건 ${short(pl.reduce((s,t)=>s+left(t),0))}원`:'');
   $('u-list').innerHTML=list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):'<div class="empty">받을 돈이 없어요.</div>';
 }
 $('uc-prev').onclick=()=>ucJump(-1);
@@ -433,13 +439,13 @@ function renderCal(){
     // 다른 날 상차해서 이 날 하차하는 건 (전체 보기에서 작게)
     const later=trips.filter(t=>t.toDate&&t.toDate!==t.date&&t.toDate===ds).length;
     const paidSum=ts.reduce((s,t)=>s+recv(t),0);
-    const dueSum=ts.reduce((s,t)=>s+left(t),0);
+    const dueSum=ts.filter(t=>!isPlan(t)).reduce((s,t)=>s+left(t),0), planSum=ts.filter(isPlan).reduce((s,t)=>s+left(t),0);
     const cls=['day',ds===todayIso?'today':'',ds===calSel?'sel':''].join(' ');
     const wd=(first+d-1)%7, wcls=wd===0?' sun':wd===6?' sat':'';
     // 전체: 금액(상차일 기준) · 상차 일정: 상차 건수 · 하차 일정: 하차 건수
     const body=calLU==='load'?(nLoad?`<span class="s cnt num"><i class="mk from"></i>${nLoad}</span>`:'')
       :calLU==='unload'?(nDrop?`<span class="s cnt num"><i class="mk to"></i>${nDrop}</span>`:'')
-      :`${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}${later?`<span class="s ul num"><i class="mk to"></i>하차${later}</span>`:''}`;
+      :`${paidSum?`<span class="s num c-paid">${short(paidSum)}</span>`:''}${dueSum?`<span class="s num c-due">${short(dueSum)}</span>`:''}${planSum?`<span class="s num c-plan">${short(planSum)}</span>`:''}${later?`<span class="s ul num"><i class="mk to"></i>하차${later}</span>`:''}`;
     h+=`<button type="button" class="${cls}" data-do="day" data-d="${ds}" aria-label="${calM+1}월 ${d}일 상차 ${nLoad}건, 하차 ${nDrop}건, 받은 돈 ${comma(paidSum)}원, 못 받은 돈 ${comma(dueSum)}원"><span class="d num${wcls}">${d}</span>${body}</button>`;
   }
   $('c-grid').innerHTML=h;
@@ -1017,6 +1023,33 @@ async function doCopy(){
   $('cp-hint').classList.toggle('errline',!ok);$('cp-hint').classList.toggle('okline2',ok);
   if(ok)toast('복사했어요');
 }
+// ---------- 화주 한눈에 보기 ----------
+// 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
+let clName='';
+function openClient(name){
+  clName=name; const ts=trips.filter(t=>(t.client||'')===name).sort(byNew);
+  const sum=ts.reduce((s,t)=>s+t.amount,0), got=ts.reduce((s,t)=>s+recv(t),0);
+  const due=ts.filter(t=>!t.paid&&!isPlan(t)), dueSum=due.reduce((s,t)=>s+left(t),0), plan=ts.filter(isPlan);
+  const paidT=ts.filter(t=>t.paid), avg=paidT.length?Math.round(paidT.reduce((s,t)=>s+Math.max(0,(parseD(t.paid)-parseD(t.date))/86400000),0)/paidT.length):null;
+  const oldest=due.length?due.reduce((a,t)=>t.date<a.date?t:a):null, ct=ts.find(t=>t.clientPhone||t.clientName);
+  $('cl-h').textContent=name;
+  $('cl-body').innerHTML=`<div class="clstats">`
+    +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${won(sum)}</b></div>`
+    +`<div><span>받은 돈</span><b class="num c-paid">${won(got)}</b></div><div><span>못 받은 돈</span><b class="num c-due">${won(dueSum)}</b><small class="num">${due.length}건${oldest?' · 가장 오래된 것 '+daysSince(oldest.date)+'일째':''}</small></div>`
+    +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b>${plan.length?`<small>예정 ${plan.length}건</small>`:''}</div></div>`
+    +(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
+    +(due.length?`<button type="button" class="btn" id="cl-due">이 화주 못 받은 돈 ${due.length}건 보기</button>`:'')
+    +`<div class="section-title">최근 운행</div><div class="clrecent">`+ts.slice(0,6).map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.amount)}<small> ${t.paid?'받음':isPlan(t)?'예정':'미수'}</small></b></div>`).join('')+'</div>';
+  $('clsheet').hidden=false; pushOverlay({csheet:true});
+}
+function closeClient(){$('clsheet').hidden=true;popOverlay('csheet')}
+$('clsheet').addEventListener('click',e=>{
+  if(e.target===$('clsheet')||e.target.closest('#cl-close')){closeClient();return}
+  if(e.target.closest('#cl-due')){ // 받을 돈 목록에서 이 화주만
+    closeClient(); setTimeout(()=>{uView='list';uRange=null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
+  }
+});
+
 // ---------- 정산 문자 ----------
 // 운행 한 건마다 화주에게: "운임 금액 {금액}원 입금확인바랍니다." · 계산서 발행이면 운임에 10%(부가세)를 더해서
 // 화주마다 마지막에 고른 발행/미발행을 기억해 다음에도 그대로 고름
@@ -1199,6 +1232,7 @@ window.addEventListener('popstate',e=>{
   if(uPanel&&!s.panel)uPanel=false;
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
+  if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
@@ -1250,7 +1284,7 @@ document.addEventListener('click',e=>{
   const ed=e.target.closest('[data-do="edit"]');
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
-  if(fill){$(fill.dataset.fill).value=fill.dataset.v;
+  if(fill){$(fill.dataset.fill).value=fill.dataset.v; if(fill.dataset.fill==='f-from')renderPlaces('from'); if(fill.dataset.fill==='f-to')renderPlaces('to');
     if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value&&!$('f-clientname').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&(t.clientPhone||t.clientName));if(p){$('f-clientphone').value=p.clientPhone||'';$('f-clientname').value=p.clientName||'';syncMore()}}
     return}
   const ag=e.target.closest('[data-age]');
@@ -1260,6 +1294,8 @@ document.addEventListener('click',e=>{
     if(k===formSrc)setSrc('');else if(k==='기타'){formSrc='기타';paintSrc();$('f-srctext').focus()}else setSrc(k);return}
   const tod=e.target.closest('[data-tod]');
   if(tod){const n=Number(tod.dataset.tod),d=$('f-date').value;$('f-todate').value=!n||!d?'':iso(new Date(parseD(d).getTime()+n*86400000));paintTod();return}
+  const pl=e.target.closest('[data-place]');
+  if(pl){const s=pl.dataset.place,o=placeOpts[s][+pl.dataset.i];if(o){$('f-'+s+'addr').value=o.addr||'';$('f-'+s+'name').value=o.name||'';$('f-'+s+'phone').value=o.phone||'';renderPlaces(s)}return}
   const sv=e.target.closest('[data-srcv]');
   if(sv){$('f-srctext').value=sv.dataset.srcv;return}
   const pt=e.target.closest('[data-pt]');
@@ -1294,6 +1330,18 @@ document.addEventListener('click',e=>{
     case 'delcancel': deletingId=null; break;
     case 'delcfm': removeTrip(t); deletingId=openId=null; toast('삭제했어요',()=>restoreTrip(t)); break;
     case 'day': if(calSel!==el.dataset.d)calFilter='all'; calSel=el.dataset.d; openId=payingId=null; break;
+    case 'client': openClient(el.dataset.c); break;
+    case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
+    case 'cdel': costDel=id; break;
+    case 'cdelcancel': costDel=null; break;
+    case 'lu': { // 상차 완료 · 하차 완료 (다시 누르면 취소)
+      const load=el.dataset.k==='load', k=load?'loadedAt':'unloadedAt', l=load?'상차':'하차', before={loadedAt:t.loadedAt,unloadedAt:t.unloadedAt};
+      const d=new Date(), now=`${iso(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if(!load&&!t.loadedAt){toast('상차 완료를 먼저 눌러 주세요');break}
+      if(t[k]){t[k]='';if(load)t.unloadedAt=''} // 상차를 취소하면 하차도 같이 취소
+      else t[k]=now;
+      saveTrip(t); toast(before[k]?(load&&before.unloadedAt?'상차 · 하차 완료를 취소했어요':`${l} 완료를 취소했어요`):`${l} 완료로 표시했어요`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+    case 'cdelcfm': removeTrip(t); costDel=costOpen=null; toast('지출을 삭제했어요',()=>restoreTrip(t)); break;
     case 'filter': if(el.dataset.which==='led')ledFilter=el.dataset.f; else calFilter=el.dataset.f; openId=payingId=deletingId=null; break;
   }
   render();
@@ -1331,6 +1379,25 @@ function fmtPhone(v){const d=v.replace(/\D/g,'').slice(0,11);
 document.addEventListener('input',e=>{if(e.target.matches&&e.target.matches('.payamt')){const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}});
 document.querySelectorAll('.phone').forEach(i=>i.addEventListener('input',e=>{e.target.value=fmtPhone(e.target.value)}));
 // 어떤 콜: formSrc는 고른 아이콘(원콜 · 전국24시콜 · 기타). 기타면 직접 쓴 이름이 저장됨 (안 쓰면 '기타')
+// 자주 가는 상하차지: 같은 시·군으로 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에 채움 (상차·하차 기록 모두에서)
+let placeOpts={from:[],to:[]};
+function placesFor(city){
+  const c=sNorm(city); if(!c)return [];
+  const m=new Map();
+  trips.forEach(t=>[['from','fromAddr','fromName','fromPhone'],['to','toAddr','toName','toPhone']].forEach(([a,b,n,p])=>{
+    if(sNorm(t[a])!==c||!(t[b]||t[n]||t[p]))return;
+    const key=[t[b],t[n],t[p]].join('|'), o=m.get(key)||{addr:t[b],name:t[n],phone:t[p],cnt:0,last:''};
+    o.cnt++; if(t.date>o.last)o.last=t.date; m.set(key,o);
+  }));
+  return [...m.values()].sort((x,y)=>y.last.localeCompare(x.last)||y.cnt-x.cnt).slice(0,4);
+}
+function renderPlaces(side){
+  const box=$('pl-'+side); if(!box)return;
+  const l=placesFor($('f-'+side).value), cur=[$('f-'+side+'addr').value,$('f-'+side+'name').value,$('f-'+side+'phone').value].join('|');
+  placeOpts[side]=l;
+  box.innerHTML=l.map((o,i)=>`<button type="button" data-place="${side}" data-i="${i}" aria-pressed="${[o.addr,o.name,o.phone].join('|')===cur}">${esc([o.addr,o.name,o.phone].filter(Boolean).join(' · '))}</button>`).join('');
+}
+['from','to'].forEach(s=>['input','change'].forEach(ev=>$('f-'+s).addEventListener(ev,()=>renderPlaces(s))));
 let formPt='인수증', formSrc='';
 const SRC_MAIN=['원콜','전국24시콜'];
 const srcValue=()=>formSrc==='기타'?($('f-srctext').value.trim()||'기타'):formSrc;
@@ -1408,6 +1475,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
+  {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
   {v:'1.10.0',d:'10/12',items:['하차일 따로 적기','달력 [운임 보기 · 상차 일정 · 하차 일정] · 날짜 목록을 상차 / 하차로 나눠 보기','건마다 ① 상차 → ② 하차 순서로 완료 표시 (운송 중 · 하차 완료)']},
   {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
@@ -1437,7 +1505,7 @@ function setTextSize(z){
 }
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');paintTod()}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');paintTod();renderPlaces('from');renderPlaces('to')}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
   document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
@@ -1457,7 +1525,7 @@ function saveDraft(){
   const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to')}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
@@ -1518,6 +1586,7 @@ function fillTrip(t){
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
+  renderPlaces('from'); renderPlaces('to');
 }
 $('f-cancel').onclick=()=>{
   if(costEditId!==null){const id=costEditId;resetCost();view=backView;costOpen=id;popOverlay('cedit');render();window.scrollTo(0,0);return}
