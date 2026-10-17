@@ -252,7 +252,25 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .day .s.cnt .mk{width:8px;height:8px}
 .chip.go{background:#fff2d6;color:#8a5a00}
 .chip.done{background:var(--paid-soft);color:var(--paid)}
-.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+/* 일부만 받기 · 문자 보낸 날 색 · 받을 돈 달력 · 순서 */
+.amt .of{display:block;font-size:12px;font-weight:600;color:var(--muted);text-align:right}
+.chip.part{background:var(--paid-soft);color:var(--paid)}
+.chip.sms.s0{background:#e3effd;color:#1f5aa8}
+.chip.sms.s1{background:#e2f2e4;color:#2f7a3c}
+.chip.sms.s2{background:#fdeedd;color:#a85a12}
+.chip.sms.s3{background:var(--late-soft);color:var(--late)}
+.paybox label small{font-weight:600;color:var(--muted);margin-left:6px}
+.ucal{gap:6px;padding:12px}
+.ucal-h{display:flex;align-items:center;justify-content:space-between}
+.ucal-h b{font-size:17px}
+.ucal .cal{border:0;padding:0;box-shadow:none;background:transparent}
+.ucal .day.pick{outline:2px solid var(--late);outline-offset:-2px}
+.ucal .hint{text-align:center}
+.sortrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sortrow .section-title{margin:0 2px}
+.sortsw{display:flex;gap:4px;background:var(--track);border-radius:999px;padding:3px}
+.sortsw button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--muted)}
+.sortsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -647,10 +665,16 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <!-- 받을 돈 달력: 날짜마다 아직 받을 금액 (누르면 그날 건만) -->
+    <div class="card ucal">
+      <div class="ucal-h"><button type="button" class="ib sm" id="uc-prev" aria-label="이전 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="uc-title"></b><button type="button" class="ib sm" id="uc-next" aria-label="다음 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+      <div class="cal"><div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
+      <div class="grid" id="uc-grid"></div></div>
+      <p class="hint small" id="uc-hint">날짜를 누르면 그날 받을 돈만 보여요</p>
+    </div>    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="u-shint" hidden></p>
     <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
-    <div class="section-title">오래된 순서</div>
+    <div class="sortrow"><span class="section-title">순서</span><div class="sortsw" id="u-sort" role="group" aria-label="순서"><button type="button" data-usort="old" aria-pressed="true">오래된 것 위로</button><button type="button" data-usort="new" aria-pressed="false">최근 것 위로</button></div></div>
     <div class="list" id="u-list"></div>
   </section>
 
