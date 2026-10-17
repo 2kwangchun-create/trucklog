@@ -258,14 +258,14 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   const open=openId===t.id;
   const client=`<span class="client${t.client?'':' none'}">${t.client?esc(t.client):'화주 미입력'}</span>`;
   const part=!t.paid&&t.got>0;
-  const amt=part?`<b class="amt num c-due">${comma(left(t))}<small class="of">/ ${comma(t.amount)}</small></b>`:`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
+  const amt=part?`<b class="amt num c-due">${comma(left(t))}<small class="of">남은 돈 · 전체 ${short(t.amount)}원</small></b>`:`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
     ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
-      <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="chip pt">${esc(t.payType||'인수증')}</span>${ageChip(t)}${docChips(t,!(role||open))}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span></div></div>`;
+      <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="ptx">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span>${(d=>d?`<span class="docs">${d}</span>`:'')(docChips(t,!(role||open)))}</div></div>`;
   let detail='';
   if(open){
     detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
@@ -284,7 +284,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       +`<p class="hint small">덜 받았으면 받은 만큼만 적으세요. 남은 돈은 계속 받을 돈으로 남아요.</p>`
       +`<div class="r1">${B('','paycfm','입금 확인',P.check)}<button type="button" class="btn ghost" data-do="paycancel">취소</button></div></div></div>`;
   } else {
-    const main=t.paid?`<div class="r1 one">${B('ghost','unpay','미수로 되돌리기')}</div>`:t.got>0?`<div class="r1">${B('','pay','남은 돈 받기',P.check)}${B('ghost','sms','정산 문자')}</div><div class="r1 one">${B('ghost','unpay','마지막 입금 취소')}</div>`
+    const main=t.paid?`<div class="r1 one">${B('ghost','unpay','미수로 되돌리기')}</div>`:t.got>0?`<div class="r1">${B('','pay','남은 돈 받기',P.check)}${B('ghost','sms','정산 문자')}</div><div class="undo1">${B('linkish','unpay','↺ 마지막에 받은 돈 취소')}</div>`
       :`<div class="r1">${B('','pay','입금 완료',P.check)}${B('ghost','sms','정산 문자')}</div>`;
     const sub=deletingId===t.id?`<div class="r2">${B('danger','delcfm','정말 삭제')}<button type="button" class="btn ghost" data-do="delcancel">취소</button></div>`
       :`<div class="r2">${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
@@ -386,7 +386,7 @@ function renderUnpaidCal(){
   const pfx=`${ucY}-${pad(ucM+1)}`, mine=due.filter(t=>t.date.startsWith(pfx)), i=months.indexOf(pfx);
   if(uDay&&!uDay.startsWith(pfx))uDay=null;
   $('uc-prev').disabled=i<=0; $('uc-next').disabled=i<0||i>=months.length-1;
-  $('uc-title').textContent=`${ucY}년 ${ucM+1}월`+(mine.length?` · 미수 ${short(mine.reduce((s,t)=>s+left(t),0))}원`:'');
+  $('uc-title').textContent=`${ucY}년 ${ucM+1}월`;
   const first=new Date(ucY,ucM,1).getDay(), days=new Date(ucY,ucM+1,0).getDate();
   let h=''; for(let k=0;k<first;k++)h+='<div class="day blank"></div>';
   for(let d=1;d<=days;d++){
@@ -398,7 +398,7 @@ function renderUnpaidCal(){
   $('uc-grid').innerHTML=h;
   // 아래 목록: 고른 날이 있으면 그날, 없으면 이 달 전체
   const list=(uDay?mine.filter(t=>t.date===uDay):mine).sort(byOld), total=list.reduce((s,t)=>s+left(t),0);
-  $('uc-hint').textContent=uDay?`${dayK(uDay)} · ${list.length}건 · 다시 누르면 이 달 전체`:mine.length?'빨간 날을 누르면 그날 받을 돈만 보여요 · 진할수록 오래된 것':'이 달은 받을 돈이 없어요';
+  $('uc-hint').textContent=uDay?`${dayK(uDay)} · ${list.length}건 · 다시 누르면 이 달 전체`:mine.length?'빨간 날을 누르면 그날 받을 돈만 보여요':'이 달은 받을 돈이 없어요';
   $('u-label').textContent=`아직 못 받은 돈 (${uDay?dayK(uDay):`${ucY}년 ${ucM+1}월`})`;
   $('u-total').textContent=won(total);
   $('u-sub').textContent=`${list.length}건 · 전체 미수 ${won(due.reduce((s,t)=>s+left(t),0))}`;

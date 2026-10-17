@@ -351,6 +351,19 @@ textarea{width:100%;padding:12px 14px;border:1px solid var(--line2);border-radiu
 .chip.a5{background:var(--a5);color:var(--a5-fg);font-weight:700}
 .chip.paid{background:var(--paid-soft);color:var(--paid)}
 .chip.pt{background:transparent;box-shadow:inset 0 0 0 1px var(--line2);color:var(--fg);font-weight:500}
+/* 목록 한 건: 날짜 · 운임 방식은 글자로, 미수 칩 하나만 크게 · 나머지 상태(운송·일부 받음·계산서·문자)는 아래 줄에 작게 */
+.head .ptx{font-size:14px;color:var(--muted)}
+.head .ptx::before{content:"·";margin-right:6px}
+.head .docs{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.head .docs .chip{font-size:12px;padding:2px 8px}
+.amt .of{white-space:nowrap}
+.act .undo1{display:flex;justify-content:flex-end;margin-top:-4px}
+.btn.linkish{min-height:40px;padding:4px 6px;background:transparent;color:var(--muted);font-size:14px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+/* 받을 돈 달력: 진하기 안내 (최근 → 오래됨) */
+.ulegend{display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.ulegend i{width:18px;height:12px;border-radius:3px;display:block}
+.ulegend span:first-child{margin-right:2px}.ulegend span:last-child{margin-left:2px}
+.ulegend .a1{background:var(--a1)}.ulegend .a2{background:var(--a2)}.ulegend .a3{background:var(--a3)}.ulegend .a4{background:var(--a4)}.ulegend .a5{background:var(--a5)}
 /* 미수 기간 고르기: 옆으로 밀어서 */
 .agelegend{display:flex;gap:6px;overflow-x:auto;margin:0 -16px;padding:2px 16px 4px;scrollbar-width:none}
 .agelegend::-webkit-scrollbar{display:none}
@@ -409,9 +422,9 @@ input[type=date],input[type=text],input[type=search],input[inputmode]{width:100%
 .seg.kind{grid-template-columns:repeat(2,1fr)}
 /* 장부: 전체·받은 돈·못 받은 돈 + 찾기 */
 .frow{display:flex;gap:8px;align-items:flex-start}
-.fchips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.fchips{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
 .fchips::-webkit-scrollbar{display:none}
-.fchips button{flex:none;border:1px solid var(--line2);background:var(--surface);min-height:40px;padding:0 10px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap}
+.fchips button{flex:none;border:1px solid var(--line2);background:var(--surface);min-height:40px;padding:0 9px;border-radius:999px;font-size:13.5px;letter-spacing:-.2px;font-weight:600;color:var(--muted);white-space:nowrap}
 .fchips button span{font-weight:500}
 .fchips button[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
 
@@ -671,6 +684,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="ucal-h"><button type="button" class="ib sm" id="uc-prev" aria-label="이전 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="uc-title"></b><button type="button" class="ib sm" id="uc-next" aria-label="다음 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
       <div class="cal"><div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
       <div class="grid" id="uc-grid"></div></div>
+      <div class="ulegend" aria-hidden="true"><span>최근</span><i class="a1"></i><i class="a2"></i><i class="a3"></i><i class="a4"></i><i class="a5"></i><span>오래됨</span></div>
       <p class="hint small" id="uc-hint"></p>
     </div>    <label class="search" id="u-searchbox"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="u-shint" hidden></p>
