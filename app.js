@@ -347,6 +347,11 @@ function initScope(id,inputId,key,onChange){
 let uRange=null, uPanel=false; // 받을 돈 기간 (null=전체) · uPanel은 예전 기간 패널용(지금은 늘 false)
 const rangeTxt=r=>r.start===r.end?md(r.start):`${md(r.start)} ~ ${md(r.end)}`;
 function renderUnpaid(){
+  document.querySelectorAll('#u-view [data-uview]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.uview===uView));
+  const calMode=uView==='cal';
+  // 달력으로 볼 땐 달력이 고르는 도구라 찾기 · 기간 · 미수 기간 · 순서는 숨김
+  ['u-searchbox','u-age','u-sortrow','u-rangebtn'].forEach(id=>$(id).hidden=calMode); $('u-calbox').hidden=!calMode;
+  if(calMode){$('u-shint').hidden=true;renderUnpaidCal();return}
   const q=$('u-search').value.trim();
   const allDue=trips.filter(t=>!t.paid);
   const base=runSearch(allDue.filter(t=>!uRange||(t.date>=uRange.start&&t.date<=uRange.end)),q,scopeOf('u-scope'),$('u-shint'));
@@ -369,6 +374,39 @@ function renderUnpaid(){
 }
 // 받을 돈: 순서(오래된 것 위로 · 최근 것 위로)
 let uSort=ls.get('uSort')==='new'?'new':'old';
+// 받을 돈 [목록 | 달력]: 달력은 안 받은 날만 금액이 뜨고 누를 수 있음 · 화살표는 미수 있는 달로만
+let uView=ls.get('uView')==='cal'?'cal':'list', ucY=null, ucM=null, uDay=null;
+function renderUnpaidCal(){
+  const due=trips.filter(t=>left(t)>0);
+  const months=[...new Set(due.map(t=>t.date.slice(0,7)))].sort();
+  if(ucY===null||!months.includes(`${ucY}-${pad(ucM+1)}`)){ // 처음엔 이번 달, 이번 달에 없으면 가장 최근 미수 달
+    const cur=todayIso.slice(0,7), pick=months.includes(cur)?cur:months[months.length-1]||cur;
+    ucY=+pick.slice(0,4); ucM=+pick.slice(5,7)-1;
+  }
+  const pfx=`${ucY}-${pad(ucM+1)}`, mine=due.filter(t=>t.date.startsWith(pfx)), i=months.indexOf(pfx);
+  if(uDay&&!uDay.startsWith(pfx))uDay=null;
+  $('uc-prev').disabled=i<=0; $('uc-next').disabled=i<0||i>=months.length-1;
+  $('uc-title').textContent=`${ucY}년 ${ucM+1}월`+(mine.length?` · 미수 ${short(mine.reduce((s,t)=>s+left(t),0))}원`:'');
+  const first=new Date(ucY,ucM,1).getDay(), days=new Date(ucY,ucM+1,0).getDate();
+  let h=''; for(let k=0;k<first;k++)h+='<div class="day blank"></div>';
+  for(let d=1;d<=days;d++){
+    const ds=`${pfx}-${pad(d)}`, ts=mine.filter(t=>t.date===ds), wd=(first+d-1)%7, dc=`d num${wd===0?' sun':wd===6?' sat':''}`;
+    if(!ts.length){h+=`<div class="day uoff${ds===todayIso?' today':''}"><span class="${dc}">${d}</span></div>`;continue}
+    const s=ts.reduce((a,t)=>a+left(t),0);
+    h+=`<button type="button" class="day uhas ${ageLevel(ts[0])}${ds===uDay?' upick':''}" data-ucd="${ds}" aria-label="${ucM+1}월 ${d}일 ${ts.length}건 받을 돈 ${comma(s)}원"><span class="${dc}">${d}</span><span class="s num">${short(s)}</span></button>`;
+  }
+  $('uc-grid').innerHTML=h;
+  // 아래 목록: 고른 날이 있으면 그날, 없으면 이 달 전체
+  const list=(uDay?mine.filter(t=>t.date===uDay):mine).sort(byOld), total=list.reduce((s,t)=>s+left(t),0);
+  $('uc-hint').textContent=uDay?`${dayK(uDay)} · ${list.length}건 · 다시 누르면 이 달 전체`:mine.length?'빨간 날을 누르면 그날 받을 돈만 보여요 · 진할수록 오래된 것':'이 달은 받을 돈이 없어요';
+  $('u-label').textContent=`아직 못 받은 돈 (${uDay?dayK(uDay):`${ucY}년 ${ucM+1}월`})`;
+  $('u-total').textContent=won(total);
+  $('u-sub').textContent=`${list.length}건 · 전체 미수 ${won(due.reduce((s,t)=>s+left(t),0))}`;
+  $('u-list').innerHTML=list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):'<div class="empty">받을 돈이 없어요.</div>';
+}
+$('uc-prev').onclick=()=>ucJump(-1);
+$('uc-next').onclick=()=>ucJump(1);
+function ucJump(n){const months=[...new Set(trips.filter(t=>left(t)>0).map(t=>t.date.slice(0,7)))].sort(),i=months.indexOf(`${ucY}-${pad(ucM+1)}`),m=months[i+n];if(!m)return;ucY=+m.slice(0,4);ucM=+m.slice(5,7)-1;uDay=null;openId=payingId=null;renderUnpaid()}
 // ---------- 달력 ----------
 function monthTrips(y,m){const p=`${y}-${pad(m+1)}`;return trips.filter(t=>t.date.startsWith(p))}
 function renderBackupBanner(){
@@ -1195,6 +1233,10 @@ document.addEventListener('click',e=>{
   if(ct){setCat(ct.dataset.cat);return}
   const ca=e.target.closest('[data-cadd]');
   if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
+  const uv=e.target.closest('[data-uview]');
+  if(uv){uView=uv.dataset.uview;ls.set('uView',uView);uDay=null;openId=payingId=null;renderUnpaid();window.scrollTo(0,0);return}
+  const ucd=e.target.closest('[data-ucd]');
+  if(ucd){uDay=uDay===ucd.dataset.ucd?null:ucd.dataset.ucd;openId=payingId=null;renderUnpaid();return}
   const us=e.target.closest('[data-usort]');
   if(us){uSort=us.dataset.usort;ls.set('uSort',uSort);renderUnpaid();return}
   const lub=e.target.closest('[data-lu]');
@@ -1366,7 +1408,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.11.0',d:'10/17',items:['화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
+  {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
   {v:'1.10.0',d:'10/12',items:['하차일 따로 적기','달력 [운임 보기 · 상차 일정 · 하차 일정] · 날짜 목록을 상차 / 하차로 나눠 보기','건마다 ① 상차 → ② 하차 순서로 완료 표시 (운송 중 · 하차 완료)']},
   {v:'1.9.0',d:'10/12',items:['정산 문자를 보내면 그 건에 "문자 ○일 전" 표시','계산서 발행 표시 · 장부에서 계산서 미발행 건만 모아 보기','장부 순수익을 [전체 / 들어온 돈] 기준으로 바꿔 보기','장부 · 설정 화면 깔끔하게 정리','상차지 · 하차지 주소를 누르면 지도 · 내비 앱으로 길 안내','앱을 켜 둔 채 날짜가 바뀌면 등록 날짜도 오늘로','설정에서 업데이트 내용 보기']},
   {v:'1.8.0',d:'10/11',items:['등록할 때 어떤 콜(원콜 · 전국24시콜 · 기타)인지 고르기','목록에 콜 마크와 화주 담당자 · 연락처 항상 표시','검색에서 찾을 곳 고르기 (자동 · 화주 · 콜 · 지역 · 주소 · 메모)','링크로 열면 바로 앱 설치 화면']},

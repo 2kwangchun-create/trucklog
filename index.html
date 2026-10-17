@@ -270,7 +270,17 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .sortrow .section-title{margin:0 2px}
 .sortsw{display:flex;gap:4px;background:var(--track);border-radius:999px;padding:3px}
 .sortsw button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--muted)}
-.sortsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.sortsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}/* 받을 돈 [목록 | 달력]: 안 받은 날만 눌러짐 · 오래될수록 진하게 */
+.ucal .day.uhas{cursor:pointer;border-radius:10px}
+.ucal .day.uhas .s{font-weight:800}
+.ucal .day.uhas.a1{background:var(--a1)} .ucal .day.uhas.a1 .s{color:var(--a1-fg)}
+.ucal .day.uhas.a2{background:var(--a2)} .ucal .day.uhas.a2 .s{color:var(--a2-fg)}
+.ucal .day.uhas.a3{background:var(--a3)} .ucal .day.uhas.a3 .s,.ucal .day.uhas.a3 .d{color:var(--a3-fg)}
+.ucal .day.uhas.a4{background:var(--a4)} .ucal .day.uhas.a4 .s,.ucal .day.uhas.a4 .d{color:var(--a4-fg)}
+.ucal .day.uhas.a5{background:var(--a5)} .ucal .day.uhas.a5 .s,.ucal .day.uhas.a5 .d{color:var(--a5-fg)}
+.ucal .day.uoff{opacity:.35}
+.ucal .day.upick{outline:3px solid var(--fg);outline-offset:-3px}
+.ucal-h .ib:disabled{opacity:.3}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .flabel small{font-weight:500;color:var(--muted);font-size:13px;margin-left:4px}
 /* 목록: 화주 이름 앞 작은 콜 표시 (연한 바탕 + 진한 글씨) */
 .srcb{display:inline-flex;align-items:center;height:22px;font-size:12px;font-weight:700;padding:0 7px;border-radius:6px;flex:none;line-height:1}
@@ -655,10 +665,17 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <label class="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
+    <div class="seg kind" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true">목록</button><button type="button" data-uview="cal" aria-pressed="false">달력</button></div>
+    <!-- 받을 돈 달력: 안 받은 날만 금액이 뜨고 누를 수 있음 (오래될수록 진한 빨강) -->
+    <div class="card ucal" id="u-calbox" hidden>
+      <div class="ucal-h"><button type="button" class="ib sm" id="uc-prev" aria-label="이전 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="uc-title"></b><button type="button" class="ib sm" id="uc-next" aria-label="다음 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+      <div class="cal"><div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
+      <div class="grid" id="uc-grid"></div></div>
+      <p class="hint small" id="uc-hint"></p>
+    </div>    <label class="search" id="u-searchbox"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="u-search" placeholder="화주, 지역, 주소, 메모로 찾기" aria-label="찾기"><select class="sscope" id="u-scope" autocomplete="off" aria-label="어디서 찾을지"><option value="auto">자동</option><option value="all">전체</option><option value="client">화주</option><option value="src">콜</option><option value="region">지역</option><option value="addr">주소</option><option value="memo">메모</option></select></label>
     <p class="shint" id="u-shint" hidden></p>
     <div class="agelegend" id="u-age" role="group" aria-label="미수 기간으로 골라 보기"></div>
-    <div class="sortrow"><span class="section-title">순서</span><div class="sortsw" id="u-sort" role="group" aria-label="순서"><button type="button" data-usort="old" aria-pressed="true">오래된 것 위로</button><button type="button" data-usort="new" aria-pressed="false">최근 것 위로</button></div></div>
+    <div class="sortrow" id="u-sortrow"><span class="section-title">순서</span><div class="sortsw" id="u-sort" role="group" aria-label="순서"><button type="button" data-usort="old" aria-pressed="true">오래된 것 위로</button><button type="button" data-usort="new" aria-pressed="false">최근 것 위로</button></div></div>
     <div class="list" id="u-list"></div>
   </section>
 
