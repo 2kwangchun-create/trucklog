@@ -215,7 +215,7 @@ const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 const P={arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
-  nav:'M3 11l18-8-8 18-2-8z',
+  nav:'M3 11l18-8-8 18-2-8z',plus:'M12 5v14M5 12h14',
   phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'};
 const WD='일월화수목금토', wdOf=s=>WD[parseD(s).getDay()];
 const mdK=s=>`${Number(s.slice(5,7))}월 ${Number(s.slice(8,10))}일`;
@@ -289,7 +289,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
     const main=t.paid?`<div class="r1 one">${B('ghost','unpay','미수로 되돌리기')}</div>`:t.got>0?`<div class="r1">${B('','pay','남은 돈 받기',P.check)}${B('ghost','sms','정산 문자')}</div><div class="undo1">${B('linkish','unpay','↺ 마지막에 받은 돈 취소')}</div>`
       :`<div class="r1">${B('','pay','입금 완료',P.check)}${B('ghost','sms','정산 문자')}</div>`;
     const sub=deletingId===t.id?`<div class="r2">${B('danger','delcfm','정말 삭제')}<button type="button" class="btn ghost" data-do="delcancel">취소</button></div>`
-      :`<div class="r2">${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
+      :`<div class="r2 three">${B('ghost','again','또 등록',P.plus)}${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
     if(mode==='unpaid')act=`<div class="act">${main}${open?sub:''}</div>`;
     else if(open)act=`<div class="act">${main}${sub}</div>`;
   }
@@ -360,21 +360,24 @@ function renderUnpaid(){
   const base=found.filter(t=>!isPlan(t)), plans=found.filter(isPlan).sort(byOld); // 예정은 아래에 따로
   const cnt={};base.forEach(t=>{const a=ageLevel(t);cnt[a]=(cnt[a]||0)+1});
   if(uAge&&!cnt[uAge])uAge=null;
-  $('u-age').classList.toggle('picking',!!uAge);
-  $('u-age').innerHTML=`<button type="button" class="chip all" data-age="" aria-pressed="${!uAge}">전체 ${base.length}</button>`+
+  if(uLate)uAge=null;
+  const nLate=uLate?base.filter(t=>daysSince(t.date)>=uLate).length:0;
+  $('u-age').classList.toggle('picking',!!(uAge||uLate));
+  $('u-age').innerHTML=(uLate?`<button type="button" class="chip a4" data-ulate aria-pressed="true">${uLate}일 넘음 ${nLate} ✕</button>`:'')
+    +`<button type="button" class="chip all" data-age="" aria-pressed="${!uAge&&!uLate}">전체 ${base.length}</button>`+
     AGES.map(([k,l])=>`<button type="button" class="chip ${k}" data-age="${k}" aria-pressed="${uAge===k}" ${cnt[k]?'':'disabled'}>${l} ${cnt[k]||0}</button>`).join('');
-  const list=base.filter(t=>!uAge||ageLevel(t)===uAge).sort(uSort==='new'?byNew:byOld);
+  const list=base.filter(t=>(!uAge||ageLevel(t)===uAge)&&(!uLate||daysSince(t.date)>=uLate)).sort(uSort==='new'?byNew:byOld);
   document.querySelectorAll('#u-sort [data-usort]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.usort===uSort));
-  const total=list.reduce((s,t)=>s+left(t),0), filtered=!!(q||uRange||uAge);
+  const total=list.reduce((s,t)=>s+left(t),0), filtered=!!(q||uRange||uAge||uLate);
   $('u-total').textContent=won(total);
-  const ageTxt=uAge?` · ${AGES.find(a=>a[0]===uAge)[1]}`:'';
+  const ageTxt=uLate?` · ${uLate}일 넘은 것`:uAge?` · ${AGES.find(a=>a[0]===uAge)[1]}`:'';
   $('u-label').textContent=`아직 못 받은 돈 (${uRange?rLabel(uRange):'전체 기간'}${ageTxt}${q?` · "${$('u-search').value.trim()}"`:''})`;
   const late=list.filter(t=>daysSince(t.date)>=30).length;
   const planSum=plans.reduce((s,t)=>s+left(t),0);
-  $('u-sub').textContent=`${list.length}건`+(late?` · 30일 넘은 건 ${late}건`:'')+(filtered?` · 전체 미수 ${won(allDue.reduce((s,t)=>s+left(t),0))}`:'')+(plans.length&&!uAge?` · 예정 ${plans.length}건 ${short(planSum)}원`:'');
+  $('u-sub').textContent=`${list.length}건`+(late?` · 30일 넘은 건 ${late}건`:'')+(filtered?` · 전체 미수 ${won(allDue.reduce((s,t)=>s+left(t),0))}`:'')+(plans.length&&!uAge&&!uLate?` · 예정 ${plans.length}건 ${short(planSum)}원`:'');
   $('u-rangetxt').textContent=uRange?rLabel(uRange):'전체 기간';
   $('u-rangebtn').classList.toggle('on',!!uRange);
-  const planHtml=plans.length&&!uAge?`<div class="lsec plan"><i class="mk from"></i><b>예정</b><span class="num">${plans.length}건 · ${short(planSum)}원</span><small>아직 운행 전</small></div>`+plans.map(t=>rowHtml(t,'unpaid')).join(''):'';
+  const planHtml=plans.length&&!uAge&&!uLate?`<div class="lsec plan"><i class="mk from"></i><b>예정</b><span class="num">${plans.length}건 · ${short(planSum)}원</span><small>아직 운행 전</small></div>`+plans.map(t=>rowHtml(t,'unpaid')).join(''):'';
   $('u-list').innerHTML=(list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`)+planHtml;
 }
 // 받을 돈: 순서(오래된 것 위로 · 최근 것 위로)
@@ -421,8 +424,22 @@ function renderBackupBanner(){
   $('c-backup').hidden=!need;
   if(need)$('c-backup-txt').textContent=last?`마지막 백업이 ${daysSince(last)}일 전이에요.`:'아직 백업한 적이 없어요.';
 }
+// 오래 못 받은 돈 알림: 설정에서 끄기 · 14 · 30(기본) · 60 · 90일 넘으면 달력 맨 위에
+// ✕를 누르면 그날 하루는 안 띄움 · [보기]는 받을 돈 목록에서 그 건들만
+let lateDays=(v=>v==='off'?0:[14,30,60,90].includes(+v)?+v:30)(ls.get('lateAlert'));
+let uLate=null; // 받을 돈: 알림에서 들어오면 'N일 넘은 것'만
+const lateList=()=>lateDays?trips.filter(t=>left(t)>0&&!isPlan(t)&&daysSince(t.date)>=lateDays):[];
+function renderLateBanner(){
+  const L=lateList(), show=L.length>0&&ls.get('lateHide')!==todayIso;
+  $('c-late').hidden=!show; if(!show)return;
+  const sum=L.reduce((s,t)=>s+left(t),0), old=Math.max(...L.map(t=>daysSince(t.date)));
+  $('c-late-txt').innerHTML=`<span><b>${lateDays}일 넘게 못 받은 돈</b></span><b class="num">${L.length}건 · ${won(sum)}</b><small>가장 오래된 것 ${old}일째</small>`;
+}
+function setLate(v){lateDays=v;ls.set('lateAlert',v?String(v):'off');document.querySelectorAll('#s-late [data-late-set]').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.lateSet===v)))}
+$('c-late-go').onclick=()=>{uView='list';uRange=null;uAge=null;$('u-search').value='';navTab('unpaid');uLate=lateDays;renderUnpaid();window.scrollTo(0,0)};
+$('c-late-x').onclick=()=>{ls.set('lateHide',todayIso);renderLateBanner();toast('오늘은 알림을 안 띄울게요. 설정에서 끌 수도 있어요.')};
 function renderCal(){
-  renderBackupBanner();
+  renderBackupBanner(); renderLateBanner();
   $('c-first').hidden=trips.length>0;
   $('c-titletxt').textContent=`${calY}년 ${calM+1}월`;
   const mt=monthTrips(calY,calM);
@@ -833,11 +850,12 @@ function ledgerXlsx(list,costList,label){
   const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17],filterRows:L.length+1});
   const cost=XL.sheet([['날짜','항목','금액','메모'],...C.map(c=>[day(c.date),c.cat,money(c.amount),c.memo]),...(C.length?[[S('합계',5),S(C.length+'건',5),S(cs,6),S('',5)]]:[])],{widths:[12,12,13,34],filterRows:C.length+1});
   // 요약: 큰 숫자 · 화주별 · 지출 항목별
+  const taxSum=L.filter(t=>t.tax).reduce((s,t)=>s+t.amount,0);
   const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
   const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
   const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
   const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
-    [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],['지출',money(cs)],
+    [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],['지출',money(cs)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
     [S('순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-cs,6)],[S('들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-cs,6)],[],
     [S('화주',1),S('건수',1),S('운임',1),S('받은 돈',1),S('남은 돈',1)],
     ...Object.entries(byC).sort((a,b)=>b[1].a-a[1].a).map(([k,o])=>[k,S(o.n,0),money(o.a),money(o.g),money(o.d)])];
@@ -1139,6 +1157,48 @@ $('clsheet').addEventListener('click',e=>{
   }
 });
 
+// ---------- 세금 신고용 정리 (설정) ----------
+// 부가세: 1~6월 · 7~12월 (반기) · 종합소득세: 1년 — 운임은 부가세 뺀 금액(공급가액)으로 적는다고 봄 (정산 문자도 계산서면 +10%)
+let txY=TODAY.getFullYear(), txP=TODAY.getMonth()<6?'h1':'h2';
+const TXP={h1:['01-01','06-30','1~6월','부가세 상반기'],h2:['07-01','12-31','7~12월','부가세 하반기'],y:['01-01','12-31','1년','종합소득세']};
+const txRange=()=>({start:`${txY}-${TXP[txP][0]}`,end:`${txY}-${TXP[txP][1]}`});
+const txLabel=()=>`${txY}년 ${TXP[txP][2]} (${TXP[txP][3]})`;
+function renderTax(){
+  $('tx-y').textContent=txY+'년';
+  document.querySelectorAll('#tx-per [data-txp]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.txp===txP));
+  const r=txRange(), L=trips.filter(t=>inRange(t,r)), C=costs.filter(c=>inRange(c,r));
+  const sum=L.reduce((s,t)=>s+t.amount,0), T=L.filter(t=>t.tax), tSum=T.reduce((s,t)=>s+t.amount,0), N=L.filter(t=>!t.tax), nSum=sum-tSum;
+  const fees=L.reduce((s,t)=>s+(t.fee||0),0), cs=C.reduce((s,c)=>s+c.amount,0);
+  const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
+  const due=txP==='h1'?`${txY}년 7월 25일까지`:txP==='h2'?`${txY+1}년 1월 25일까지`:`${txY+1}년 5월 31일까지`;
+  const row=(l,v,cls='')=>`<div class="txrow ${cls}"><span>${l}</span><b class="num">${v}</b></div>`;
+  $('tx-body').innerHTML=`<p class="txdue"><b>${TXP[txP][3]} 신고</b> · ${due}<small>개인 일반과세자 기준이에요. 정확한 신고는 세무사와 확인하세요.</small></p>`
+    +`<div class="txcard"><h3>매출 (운임)</h3>`+row(`운행 <small>${L.length}건</small>`,won(sum),'sum')
+    +row(`계산서 발행 <small>${T.length}건</small>`,won(tSum))+row('부가세 (10%)',won(Math.round(tSum*0.1)),'sub')+row('발행 합계 (부가세 포함)',won(tSum+Math.round(tSum*0.1)),'sub')
+    +row(`계산서 미발행 <small>${N.length}건</small>`,won(nSum))+`</div>`
+    +`<div class="txcard"><h3>경비</h3>`+row('수수료',won(fees))+Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>row(esc(k),won(v),'sub')).join('')
+    +row(`지출 합계 <small>${C.length}건</small>`,won(cs))+row('경비 합계 (수수료 + 지출)',won(fees+cs),'sum')+`</div>`
+    +`<div class="txnet"><span>남는 돈 (운임 − 경비)</span><b class="num">${won(sum-fees-cs)}</b></div>`
+    +`<div class="txbtns"><button type="button" class="btn" id="tx-xlsx">세무사에게 보낼 엑셀</button>`
+    +(N.length?`<button type="button" class="btn ghost" id="tx-notax">계산서 안 낸 ${N.length}건 보기</button>`:'')+`</div>`
+    +`<p class="hint small">상차일 기준으로 모았어요. 지출은 영수증 · 카드 내역과 맞춰 보세요.</p>`;
+  $('tx-prev').disabled=false; $('tx-next').disabled=txY>=TODAY.getFullYear();
+}
+function openTax(){renderTax();$('taxsheet').hidden=false;pushOverlay({tsheet:true})}
+function closeTax(){$('taxsheet').hidden=true;popOverlay('tsheet')}
+$('s-tax').onclick=openTax;
+$('taxsheet').addEventListener('click',e=>{
+  if(e.target===$('taxsheet')||e.target.closest('#tx-close')){closeTax();return}
+  if(e.target.closest('#tx-prev')){txY--;renderTax();return}
+  if(e.target.closest('#tx-next')){if(txY<TODAY.getFullYear())txY++;renderTax();return}
+  const p=e.target.closest('[data-txp]'); if(p){txP=p.dataset.txp;renderTax();return}
+  if(e.target.closest('#tx-xlsx')){const r=txRange();doCsv(trips.filter(t=>inRange(t,r)),`아빠장부_세금_${txY}_${TXP[txP][2].replace('~','-')}.xlsx`,costs.filter(c=>inRange(c,r)),txLabel());return}
+  if(e.target.closest('#tx-notax')){ // 장부에서 그 기간 · 미발행만
+    const r=txRange(); closeTax();
+    setTimeout(()=>{ledKind='trip';ledFilter='notax';ledRange=r;$('l-search').value='';navTab('ledger');window.scrollTo(0,0)},60);
+  }
+});
+
 // ---------- 정산 문자 ----------
 // 운행 한 건마다 화주에게: "운임 금액 {금액}원 입금확인바랍니다." · 계산서 발행이면 운임에 10%(부가세)를 더해서
 // 화주마다 마지막에 고른 발행/미발행을 기억해 다음에도 그대로 고름
@@ -1295,7 +1355,7 @@ function closeOverlays(){if(editingId!==null)leaveEdit();if(costEditId!==null)re
 function navTab(v){
   if(selMode)exitSelect();
   const lvl=curLvl();
-  closeOverlays(); if(v==='add'){resetForm();loadDraftNew()}
+  closeOverlays(); if(v==='add'){resetForm();loadDraftNew()} if(v==='unpaid')uLate=null;
   if(v==='cal'){ if(lvl>1){pendingTab='cal';history.go(-(lvl-1))} go('cal'); return }
   if(lvl<=1){ if(lvl===0)history.pushState({lvl:1,v:'cal'},''); history.pushState({lvl:2,v},''); go(v); return }
   if(lvl===2){ history.replaceState({lvl:2,v},''); go(v); return }
@@ -1322,6 +1382,7 @@ window.addEventListener('popstate',e=>{
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
+  if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
@@ -1372,12 +1433,18 @@ document.addEventListener('click',e=>{
   if(tx){setTextSize(tx.dataset.tsize);return}
   const ed=e.target.closest('[data-do="edit"]');
   if(ed){startEdit(store.get(ed.dataset.id));return}
+  const agn=e.target.closest('[data-do="again"]');
+  if(agn){againTrip(store.get(agn.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
   if(fill){$(fill.dataset.fill).value=fill.dataset.v; if(fill.dataset.fill==='f-from')renderPlaces('from'); if(fill.dataset.fill==='f-to')renderPlaces('to');
     if(fill.dataset.fill==='f-client'&&!$('f-clientphone').value&&!$('f-clientname').value){const p=[...trips].sort(byNew).find(t=>t.client===fill.dataset.v&&(t.clientPhone||t.clientName));if(p){$('f-clientphone').value=p.clientPhone||'';$('f-clientname').value=p.clientName||'';syncMore()}}
     return}
+  const ul=e.target.closest('[data-ulate]');
+  if(ul){uLate=null;openId=payingId=null;renderUnpaid();return}
+  const lset=e.target.closest('[data-late-set]');
+  if(lset){const v=+lset.dataset.lateSet;setLate(v);toast(v?`${v}일 넘게 못 받은 돈을 달력 위에 알려 줄게요`:'오래 못 받은 돈 알림을 껐어요');return}
   const ag=e.target.closest('[data-age]');
-  if(ag){const v=ag.dataset.age||null;uAge=(v&&uAge===v)?null:v;openId=payingId=null;renderUnpaid();return}
+  if(ag){uLate=null;const v=ag.dataset.age||null;uAge=(v&&uAge===v)?null:v;openId=payingId=null;renderUnpaid();return}
   const sr=e.target.closest('[data-src]');
   if(sr){const k=sr.dataset.src; // 한 번 더 누르면 해제
     if(k===formSrc)setSrc('');else if(k==='기타'){formSrc='기타';paintSrc();$('f-srctext').focus()}else setSrc(k);return}
@@ -1564,7 +1631,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.13.0',d:'10/20',items:['엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
+  {v:'1.13.0',d:'10/20',items:['운행 상세에 [또 등록]: 같은 운행을 날짜만 오늘로 바꿔 바로 등록','오래 못 받은 돈 알림: 달력 맨 위에 며칠 넘은 미수 건수 · 금액 (설정에서 끄기 · 14~90일)','설정 › 세금 신고용 정리: 부가세(반기) · 종합소득세(1년) 매출 · 계산서 · 경비 합계와 세무사용 엑셀','엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
   {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
   {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
@@ -1596,6 +1663,7 @@ function setTextSize(z){
 }
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
+setLate(lateDays);
 function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');paintTod();renderPlaces('from');renderPlaces('to')}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
@@ -1678,6 +1746,20 @@ function fillTrip(t){
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
   renderPlaces('from'); renderPlaces('to');
+}
+// 또 등록: 이 운행 그대로(화주·담당자·상차지·하차지·운임·메모) 새 등록 화면에 채움
+// 상차일은 오늘, 하차일은 원래처럼 며칠 뒤 · 입금 · 계산서 · 상차/하차 완료는 비워 둠
+function againTrip(t){
+  if(!t)return;
+  const d=readDraft('draftNew');
+  if(d&&d.v&&!confirm('등록 화면에 적던 내용이 있어요. 지우고 이 운행으로 채울까요?'))return;
+  navTab('add');
+  formKind='trip'; resetForm(); fillTrip(t);
+  const n=t.toDate?Math.round((parseD(t.toDate)-parseD(t.date))/86400000):0;
+  $('f-date').value=todayIso; $('f-todate').value=n>0?iso(new Date(TODAY.getTime()+n*86400000)):''; paintTod();
+  syncMore(); saveDraft();
+  showDraftNote(`${md(t.date)} ${t.from} → ${t.to} 운행을 그대로 채웠어요. 날짜 · 운임만 확인하고 저장하세요.`,true);
+  window.scrollTo(0,0);
 }
 $('f-cancel').onclick=()=>{
   if(costEditId!==null){const id=costEditId;resetCost();view=backView;costOpen=id;popOverlay('cedit');render();window.scrollTo(0,0);return}

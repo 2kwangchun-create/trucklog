@@ -300,10 +300,30 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .clstats span{font-size:13px;color:var(--muted);font-weight:600}
 .clstats b{font-size:18px}
 .clct{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
+.act .r2.three{grid-template-columns:repeat(3,1fr)}
+.act .r2.three .btn{padding-left:4px;padding-right:4px}
 .btn.cldue{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px}
 .btn.cldue span{font-size:15px}
 .btn.cldue b{font-size:22px;letter-spacing:-.3px}
 .btn.cldue small{font-size:13px;font-weight:600;opacity:.9}
+.txyear{display:flex;align-items:center;justify-content:center;gap:14px}
+.txyear b{font-size:20px;min-width:80px;text-align:center}
+.txyear .ib{border:0;background:var(--bg)}
+.txyear .ib:disabled{opacity:.3}
+#tx-per button span{font-size:12px;color:inherit;opacity:.75}
+.txdue{margin:0;padding:10px 12px;border-radius:12px;background:var(--accent-soft);font-size:15px}
+.txdue small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.txcard{border:1px solid var(--line);border-radius:12px;padding:4px 12px}
+.txcard h3{margin:8px 0 4px;font-size:15px;color:var(--muted)}
+.txrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:16px}
+.txcard h3+.txrow{border-top:0}
+.txrow.sub{padding-left:12px;font-size:15px;color:var(--muted)}
+.txrow.sum{font-weight:700}
+.txrow b{white-space:nowrap}
+.txrow small{color:var(--muted);font-size:13px;font-weight:500}
+.txnet{display:flex;justify-content:space-between;align-items:baseline;padding:12px;border-radius:12px;background:var(--paid-soft);font-weight:700}
+.txnet b{font-size:22px;color:var(--paid)}
+.txbtns{display:grid;gap:8px}
 .clrecent{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .clrecent div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;align-items:center}
 .clrecent div:first-child{border-top:0}
@@ -660,6 +680,13 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 .ver{text-align:center;color:var(--muted);font-size:13px;margin:4px 0 0}
 .banner{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--a1);color:var(--fg);border-radius:12px;padding:12px 14px;font-size:15px}
 .banner>span{flex:1 1 200px;min-width:0}
+.banner.late{background:var(--late-soft);flex-wrap:nowrap}
+.banner.late #c-late-txt{display:flex;flex-direction:column;gap:1px}
+.banner.late #c-late-txt b.num{font-size:18px;color:var(--late)}
+.banner.late #c-late-txt small{font-size:13px;color:var(--muted)}
+.banner.late .lbtns{flex:none;display:flex;align-items:center;gap:2px}
+.banner.late .ib{border:0;background:transparent}
+.seg.late5{grid-template-columns:repeat(5,1fr)}
 .first{display:flex;flex-direction:column;gap:4px;background:var(--accent-soft);border-radius:12px;padding:14px;font-size:15px}
 .first>b{font-size:17px}
 .me{flex-direction:row;align-items:center;gap:14px}
@@ -731,6 +758,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <button type="button" class="todaybtn" id="c-today">오늘</button>
     </header>
     <div class="banner" id="c-backup" hidden><span><b>백업해 두세요.</b> <span id="c-backup-txt"></span> 휴대폰을 잃어버리면 기록도 사라질 수 있어요.</span><button type="button" class="btn small" data-goto="set">백업하기</button></div>
+    <div class="banner late" id="c-late" hidden><span id="c-late-txt"></span><span class="lbtns"><button type="button" class="btn small" id="c-late-go">보기</button><button type="button" class="ib" id="c-late-x" aria-label="오늘은 그만 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></div>
     <div class="first" id="c-first" hidden><b>아빠장부를 시작해 볼까요?</b><span>아래 가운데 <b>[등록]</b>을 눌러 첫 운행을 적으면, 달력에 받은 돈은 초록, 못 받은 돈은 빨강으로 표시돼요.</span></div>
     <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">운임 보기</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차 일정</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차 일정</button></div>
     <div class="cal">
@@ -871,6 +899,13 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="gt">화주 옆 콜 표시</div>
     <div class="seg kind smark" id="s-smark" role="group" aria-label="화주 옆 콜 표시"><button type="button" data-smark="both" aria-pressed="false"><span class="pv"><span class="srcb s1"><i class="bl"><img src="icons/call-one.webp" alt=""></i>원콜</span><b>대한물류</b></span><small>마크 + 이름</small></button><button type="button" data-smark="mark" aria-pressed="true"><span class="pv"><span class="srcb s1 only"><i class="bl"><img src="icons/call-one.webp" alt=""></i></span><b>대한물류</b></span><small>마크만</small></button></div>
     <p class="hint small smark-note">기타로 직접 적은 콜 이름은 어느 쪽이든 그대로 보여요.</p>
+    <div class="gt">오래 못 받은 돈 알림</div>
+    <div class="seg late5" id="s-late" role="group" aria-label="오래 못 받은 돈 알림"><button type="button" data-late-set="0" aria-pressed="false">끄기</button><button type="button" data-late-set="14" aria-pressed="false">14일</button><button type="button" data-late-set="30" aria-pressed="true">30일</button><button type="button" data-late-set="60" aria-pressed="false">60일</button><button type="button" data-late-set="90" aria-pressed="false">90일</button></div>
+    <p class="hint small smark-note">고른 날짜보다 오래 못 받은 돈이 있으면 달력 맨 위에 알려 줘요. 알림의 ✕를 누르면 그날 하루는 안 보여요.</p>
+    <div class="gt">세금</div>
+    <div class="card items">
+      <button type="button" class="item" id="s-tax"><span class="ii" style="background:var(--paid-soft);color:var(--paid)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="tx"><b>세금 신고용 정리</b><small>부가세 · 종합소득세 · 세무사에게 보낼 엑셀</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
     <div class="gt">백업 · 내보내기</div>
     <p class="lastbk" id="s-lastbk"></p>
     <div class="card items">
@@ -933,6 +968,15 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="rgrid" id="lp-grid"></div></div>
       <button type="button" class="btn big" id="lp-apply"></button>
     </div>
+  </div>
+</div>
+<!-- 세금 신고용 정리: 설정에서 -->
+<div class="sheet" id="taxsheet" role="dialog" aria-modal="true" aria-labelledby="tx-h" hidden>
+  <div class="sheet-in">
+    <div class="sheethead"><h2 id="tx-h">세금 신고용 정리</h2><button type="button" class="ib" id="tx-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="txyear"><button type="button" class="ib" id="tx-prev" aria-label="이전 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b id="tx-y" class="num"></b><button type="button" class="ib" id="tx-next" aria-label="다음 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+    <div class="seg" id="tx-per" role="group" aria-label="기간"><button type="button" data-txp="h1" aria-pressed="false">1~6월<br><span>부가세</span></button><button type="button" data-txp="h2" aria-pressed="false">7~12월<br><span>부가세</span></button><button type="button" data-txp="y" aria-pressed="false">1년<br><span>종합소득세</span></button></div>
+    <div id="tx-body"></div>
   </div>
 </div>
 <!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
