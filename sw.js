@@ -2,7 +2,7 @@
    - 앱 파일은 저장해 두고 바로 띄운 뒤, 인터넷이 되면 뒤에서 새 파일로 바꿔 둡니다.
      (앱을 고쳐서 올리면, 앱을 열 때 새 버전을 받아 바로 바꿔요 — app.js의 Updater)
    - 기록 데이터는 여기서 다루지 않습니다 (휴대폰 저장소 + 클라우드). */
-const VERSION = '1.12.1';
+const VERSION = '1.13.0';
 const SHELL = 'trucklog-shell-' + VERSION;
 const RUNTIME = 'trucklog-runtime';
 const FILES = ['./', './index.html', './app.js', './firebase-config.js', './manifest.webmanifest',
