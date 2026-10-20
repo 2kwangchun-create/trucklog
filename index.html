@@ -324,6 +324,23 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .txnet{display:flex;justify-content:space-between;align-items:baseline;padding:12px;border-radius:12px;background:var(--paid-soft);font-weight:700}
 .txnet b{font-size:22px;color:var(--paid)}
 .txbtns{display:grid;gap:8px}
+.cpast{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.cpast .cph{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px}
+.cpast .cph .linkbtn{border:0;background:none;color:var(--accent);font:inherit;font-weight:700;padding:2px 0;cursor:pointer;white-space:nowrap}
+.cpast .cps{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cpast .cps div{border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+.cpast .cps .ok{background:var(--paid-soft)}.cpast .cps .ok b{color:var(--paid)}
+.cpast .cps .no{background:var(--late-soft)}.cpast .cps .no b{color:var(--late)}
+.cpast .cps span{font-size:13px;color:var(--muted);font-weight:600}
+.cpast .cps b{font-size:17px}
+.cpast .cps small{font-size:12px;color:var(--muted)}
+.cpast .cpl{display:flex;flex-direction:column}
+.cpast .cpl div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.cpast .cpl div:first-child{border-top:0}
+.cpast .cpl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpast .cpl small{color:var(--muted)}
+.cpast .cpl b{white-space:nowrap}
+.cpast .cpl b em{font-style:normal;font-size:12px;font-weight:700;margin-left:4px}
 .clrecent{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .clrecent div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;align-items:center}
 .clrecent div:first-child{border-top:0}
@@ -822,7 +839,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         </div>
         <div class="srcetc" id="f-srcetc" hidden><input type="text" id="f-srctext" placeholder="어떤 콜인지 적어 주세요 (예: 화물맨)" aria-label="기타 콜 이름"><div class="recent" id="r-src"></div></div></div>
       <div class="card field"><label for="f-date">상차일 <em>*</em></label><input type="date" id="f-date"></div>
-      <div class="card field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="recent" id="r-client"></div>
+      <div class="card field"><label for="f-client">화주 / 거래처</label><input type="text" id="f-client" placeholder="예: 대한물류"><div class="cpast" id="f-cpast" hidden></div><div class="recent" id="r-client"></div>
         <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></div>
       <div class="card field"><label for="f-from"><i class="mk from"></i>상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div><div class="places" id="pl-from"></div>
         <input type="text" id="f-fromaddr" class="addrin" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
