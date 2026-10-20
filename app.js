@@ -1039,7 +1039,7 @@ function openClient(name){
     +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b>${plan.length?`<small>예정 ${plan.length}건</small>`:''}</div></div>`
     +(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
     +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:'')
-    +`<div class="section-title">최근 운행</div><div class="clrecent">`+ts.slice(0,6).map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.amount)}<small> ${t.paid?'받음':isPlan(t)?'예정':'미수'}</small></b></div>`).join('')+'</div>';
+    +`<div class="section-title">최근 운행</div><div class="clrecent">`+ts.slice(0,6).map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.paid?t.amount:left(t))}<small> ${t.paid?'받음':isPlan(t)?'예정':t.got>0?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`).join('')+'</div>';
   $('clsheet').hidden=false; pushOverlay({csheet:true});
 }
 function closeClient(){$('clsheet').hidden=true;popOverlay('csheet')}
@@ -1475,7 +1475,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 금액 · 건수 · 가장 오래된 날 표시']},
+  {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
   {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
   {v:'1.10.0',d:'10/12',items:['하차일 따로 적기','달력 [운임 보기 · 상차 일정 · 하차 일정] · 날짜 목록을 상차 / 하차로 나눠 보기','건마다 ① 상차 → ② 하차 순서로 완료 표시 (운송 중 · 하차 완료)']},
