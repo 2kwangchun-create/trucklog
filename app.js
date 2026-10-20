@@ -720,9 +720,9 @@ function renderSettings(){
 
 // 파일 내보내기: 가능하면 공유(카톡·드라이브), 아니면 다운로드
 async function giveFile(text,name,type,share){
-  const blob=new Blob([text],{type});
+  const blob=text instanceof Blob?text:new Blob([text],{type});
   if(share&&navigator.canShare){
-    for(const t of [type,'text/plain']){
+    for(const t of [type,type.startsWith('text/')?'text/plain':'application/octet-stream']){
       try{const f=new File([blob],name,{type:t});
         if(navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return 'shared'}}
       catch(e){if(e&&e.name==='AbortError')return 'cancel'}
@@ -743,22 +743,111 @@ async function doBackup(share){
   toast(r==='shared'?'백업 파일을 보냈어요':'백업 파일을 휴대폰 "다운로드" 폴더에 저장했어요');
   render();
 }
-function csvText(list,costList){
-  const head=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','상차 담당자','상차 연락처','하차지','하차 상세주소','하차 담당자','하차 연락처','운임 방식','운임','수수료','입금 상태','입금일','받은 금액','남은 금액','미수 일수','계산서 발행일','문자 보낸 날','상차 완료','하차 완료','메모'];
-  const q=v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=list.sort(byOld).map(t=>[t.date,t.toDate||t.date,t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.fromName,t.fromPhone,t.to,t.toAddr,t.toName,t.toPhone,t.payType,t.amount,t.fee||0,t.paid?'받음':t.got?'일부 받음':'못 받음',t.paid||'',recv(t),left(t),t.paid?'':Math.max(0,daysSince(t.date)),t.tax||'',t.smsAt||'',t.loadedAt||'',t.unloadedAt||'',t.memo]);
-  const out=[head,...rows];
-  // 아래에 지출 표와 합계(순수익)를 이어 붙임
-  if(costList){
-    const cl=[...costList].sort(byOld), sum=list.reduce((s,t)=>s+t.amount,0), fees=list.reduce((s,t)=>s+(t.fee||0),0), cs=cl.reduce((s,c)=>s+c.amount,0);
-    if(cl.length)out.push([],['지출일','항목','금액','메모'],...cl.map(c=>[c.date,c.cat,c.amount,c.memo]));
-    out.push([],['합계'],['총 운임',sum],['수수료',fees],['지출',cs],['순수익',sum-fees-cs]);
-  }
-  return '﻿'+out.map(r=>r.map(q).join(',')).join('\r\n');
+// ---------- 엑셀 파일(.xlsx) 만들기 ----------
+// 다른 프로그램 없이 앱 안에서 진짜 엑셀 파일을 만듦 (인터넷 없어도 됨)
+// 시트: 요약 · 운행 · 지출 / 칸 너비 · 제목 줄 고정과 색 · 금액 쉼표 · 입금 상태 색 · 합계 줄
+const XL={
+  // 꾸밈 번호: 0 기본 · 1 제목 줄 · 2 금액 · 3 빨강(못 받음) · 4 초록(받음) · 5 합계 글씨 · 6 합계 금액 · 7 가운데(날짜) · 8 큰 제목 · 9 주황(일부 받음)
+  styles:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    +'<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>'
+    +'<fonts count="6"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="맑은 고딕"/></font>'
+    +'<font><b/><sz val="11"/><color rgb="FFB3261E"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><color rgb="FF2F7A3C"/><name val="맑은 고딕"/></font>'
+    +'<font><b/><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="15"/><color rgb="FF1F5E4A"/><name val="맑은 고딕"/></font></fonts>'
+    +'<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+    +'<fill><patternFill patternType="solid"><fgColor rgb="FF1F5E4A"/><bgColor indexed="64"/></patternFill></fill>'
+    +'<fill><patternFill patternType="solid"><fgColor rgb="FFE1ECE6"/><bgColor indexed="64"/></patternFill></fill></fills>'
+    +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'
+    +'<border><left style="thin"><color rgb="FFD5DAD3"/></left><right style="thin"><color rgb="FFD5DAD3"/></right><top style="thin"><color rgb="FFD5DAD3"/></top><bottom style="thin"><color rgb="FFD5DAD3"/></bottom><diagonal/></border></borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="10">'
+    +'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+    +'<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="164" fontId="4" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    +'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+  esc:s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,''),
+  col:n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s},
+  // rows: 칸 = 값 또는 {v:값, s:꾸밈 번호}. 숫자는 숫자 칸, 나머지는 글자 칸
+  sheet(rows,o){
+    const W=o.widths||[], hdr=o.header!==false;
+    const cols=W.length?'<cols>'+W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')+'</cols>':'';
+    const view=hdr?'<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>':'<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';
+    const body=rows.map((r,ri)=>`<row r="${ri+1}"${hdr&&ri===0?' ht="30" customHeight="1"':''}>`+r.map((c,ci)=>{
+      const cell=c&&typeof c==='object'?c:{v:c}, v=cell.v, s=cell.s!=null?cell.s:(hdr&&ri===0?1:typeof v==='number'?2:0), ref=XL.col(ci)+(ri+1);
+      if(v===''||v==null)return `<c r="${ref}" s="${s}"/>`;
+      return typeof v==='number'?`<c r="${ref}" s="${s}"><v>${v}</v></c>`:`<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${XL.esc(v)}</t></is></c>`;
+    }).join('')+'</row>').join('');
+    const filt=hdr&&o.filterRows?`<autoFilter ref="A1:${XL.col(rows[0].length-1)}${o.filterRows}"/>`:'';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +view+'<sheetFormatPr defaultRowHeight="20"/>'+cols+'<sheetData>'+body+'</sheetData>'+filt+'</worksheet>';
+  },
+  book(sheets){ // sheets: [{name, xml}] → xlsx 파일 조각들
+    const N='http://schemas.openxmlformats.org', H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const f={
+      '[Content_Types].xml':H+`<Types xmlns="${N}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`
+        +sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>',
+      '_rels/.rels':H+`<Relationships xmlns="${N}/package/2006/relationships"><Relationship Id="rId1" Type="${N}/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+      'xl/workbook.xml':H+`<workbook xmlns="${N}/spreadsheetml/2006/main" xmlns:r="${N}/officeDocument/2006/relationships"><sheets>`+sheets.map((s,i)=>`<sheet name="${XL.esc(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+'</sheets></workbook>',
+      'xl/_rels/workbook.xml.rels':H+`<Relationships xmlns="${N}/package/2006/relationships">`+sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="${N}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')
+        +`<Relationship Id="rId${sheets.length+1}" Type="${N}/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+      'xl/styles.xml':XL.styles,
+    };
+    sheets.forEach((s,i)=>f[`xl/worksheets/sheet${i+1}.xml`]=s.xml);
+    return XL.zip(f);
+  },
+  // 압축 없이 묶는 zip (엑셀이 그대로 열 수 있음)
+  crcT:null,
+  crc(b){if(!XL.crcT){XL.crcT=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;XL.crcT[n]=c>>>0}}
+    let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=XL.crcT[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0},
+  zip(files){
+    const te=new TextEncoder(), parts=[], cen=[]; let off=0;
+    const u16=n=>[n&255,(n>>>8)&255], u32=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+    for(const [name,text] of Object.entries(files)){
+      const nb=te.encode(name), data=te.encode(text), crc=XL.crc(data);
+      const head=[...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0)];
+      parts.push(new Uint8Array(head),nb,data);
+      cen.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nb);
+      off+=head.length+nb.length+data.length;
+    }
+    const cenSize=cen.reduce((s,a)=>s+a.length,0), n=Object.keys(files).length;
+    const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(n),...u16(n),...u32(cenSize),...u32(off),...u16(0)]);
+    return new Blob([...parts,...cen,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  },
+};
+// 장부 → 엑셀: 요약 · 운행 · 지출 시트
+function ledgerXlsx(list,costList,label){
+  const L=[...list].sort(byOld), C=[...(costList||[])].sort(byOld);
+  const S=(v,s)=>({v,s}), money=v=>S(v,2), day=v=>S(v||'',7);
+  const st=t=>t.paid?S('받음',4):t.got?S('일부 받음',9):isPlan(t)?S('예정',7):S('못 받음',3);
+  // 운행: 자주 보는 칸을 앞에, 담당자·완료 시각 같은 건 뒤에
+  const tripHead=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','하차지','하차 상세주소','운임','수수료','입금 상태','입금일','받은 금액','남은 금액','미수 일수','계산서 발행일','문자 보낸 날','메모','운임 방식','상차 담당자','상차 연락처','하차 담당자','하차 연락처','상차 완료','하차 완료'];
+  const tripRows=L.map(t=>[day(t.date),day(t.toDate||t.date),t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.to,t.toAddr,money(t.amount),money(t.fee||0),st(t),day(t.paid),money(recv(t)),money(left(t)),
+    t.paid||isPlan(t)?S('',7):S(Math.max(0,daysSince(t.date)),7),day(t.tax),day(t.smsAt),t.memo,t.payType,t.fromName,t.fromPhone,t.toName,t.toPhone,day(t.loadedAt),day(t.unloadedAt)]);
+  const sum=L.reduce((s,t)=>s+t.amount,0), fees=L.reduce((s,t)=>s+(t.fee||0),0), got=L.reduce((s,t)=>s+recv(t),0), due=L.reduce((s,t)=>s+left(t),0), cs=C.reduce((s,c)=>s+c.amount,0);
+  const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
+  const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17],filterRows:L.length+1});
+  const cost=XL.sheet([['날짜','항목','금액','메모'],...C.map(c=>[day(c.date),c.cat,money(c.amount),c.memo]),...(C.length?[[S('합계',5),S(C.length+'건',5),S(cs,6),S('',5)]]:[])],{widths:[12,12,13,34],filterRows:C.length+1});
+  // 요약: 큰 숫자 · 화주별 · 지출 항목별
+  const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
+  const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
+  const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
+  const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
+    [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],['지출',money(cs)],
+    [S('순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-cs,6)],[S('들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-cs,6)],[],
+    [S('화주',1),S('건수',1),S('운임',1),S('받은 돈',1),S('남은 돈',1)],
+    ...Object.entries(byC).sort((a,b)=>b[1].a-a[1].a).map(([k,o])=>[k,S(o.n,0),money(o.a),money(o.g),money(o.d)])];
+  if(C.length)sumRows.push([],[S('지출 항목',1),S('금액',1)],...Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,money(v)]));
+  const summary=XL.sheet(sumRows,{header:false,widths:[46,14,14,14,14]});
+  return XL.book([{name:'요약',xml:summary},{name:'운행',xml:trip},{name:'지출',xml:cost}]);
 }
-async function doCsv(list,name,costList){
+async function doCsv(list,name,costList,label){
   if(!list.length&&!(costList&&costList.length)){toast('내보낼 기록이 없어요.');return}
-  const r=await giveFile(csvText([...list],costList),name,'text/csv',true);
+  const r=await giveFile(ledgerXlsx(list,costList,label||''),name,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',true);
   if(r!=='cancel')toast(r==='shared'?'엑셀 파일을 보냈어요':'엑셀 파일을 "다운로드" 폴더에 저장했어요');
 }
 let pendingImport=null;
@@ -1360,13 +1449,13 @@ $('c-today').onclick=()=>{calGo(todayIso);render()};
 $('l-search').oninput=renderLedger;
 initScope('l-scope','l-search','scope:l',renderLedger);
 initScope('u-scope','u-search','scope:u',()=>{openId=payingId=null;renderUnpaid()});
-$('l-csv').onclick=()=>doCsv(ledTrips(),ledRange?`아빠장부_${ledRange.start}_${ledRange.end}.csv`:`아빠장부_${ledY}-${pad(ledM+1)}.csv`,ledCosts());
+$('l-csv').onclick=()=>doCsv(ledTrips(),ledRange?`아빠장부_${ledRange.start}_${ledRange.end}.xlsx`:`아빠장부_${ledY}-${pad(ledM+1)}.xlsx`,ledCosts(),ledLabel());
 $('l-addcost').onclick=()=>{navTab('add');setKind('cost');$('cf-amt').focus()};
 $('u-search').oninput=()=>{openId=payingId=null;renderUnpaid()};
 $('u-rangebtn').onclick=()=>openLedPick('u');
 $('s-share').onclick=()=>doBackup(true);
 $('s-download').onclick=()=>doBackup(false);
-$('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.csv`,costs);
+$('s-csv').onclick=()=>doCsv(trips,`아빠장부_전체_${todayIso}.xlsx`,costs,'전체 기간');
 $('s-import').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readImport(f)};
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.head,.chead')){e.preventDefault();e.target.click()}});
 
@@ -1475,6 +1564,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
+  {v:'1.13.0',d:'10/20',items:['엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
   {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
   {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
