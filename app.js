@@ -1763,8 +1763,8 @@ $('f-client').addEventListener('input',renderCPast);
 // 상차일은 오늘, 하차일은 원래처럼 며칠 뒤 · 입금 · 계산서 · 상차/하차 완료는 비워 둠
 function againTrip(t){
   if(!t)return;
-  const d=readDraft('draftNew');
-  if(d&&d.v&&!confirm('등록 화면에 적던 내용이 있어요. 지우고 이 운행으로 채울까요?'))return;
+  // 묻지 않고 바로 등록 화면으로 (적던 내용이 있었으면 알림의 [되돌리기]로 다시 불러옴)
+  const prev=readDraft('draftNew');
   navTab('add');
   formKind='trip'; resetForm(); fillTrip(t);
   const n=t.toDate?Math.round((parseD(t.toDate)-parseD(t.date))/86400000):0;
@@ -1772,6 +1772,7 @@ function againTrip(t){
   syncMore(); saveDraft();
   showDraftNote(`${md(t.date)} ${t.from} → ${t.to} 운행을 그대로 채웠어요. 날짜 · 운임만 확인하고 저장하세요.`,true);
   window.scrollTo(0,0);
+  if(prev&&prev.v)toast('적던 내용 대신 이 운행으로 채웠어요',()=>{if(view!=='add')navTab('add');resetForm();fillSnap(prev);saveDraft();showDraftNote('적던 내용을 다시 불러왔어요.',true)});
 }
 $('f-cancel').onclick=()=>{
   if(costEditId!==null){const id=costEditId;resetCost();view=backView;costOpen=id;popOverlay('cedit');render();window.scrollTo(0,0);return}
