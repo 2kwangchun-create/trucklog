@@ -1632,7 +1632,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.13.0',d:'10/20',items:['등록할 때 전에 적은 화주면 화주 칸 아래에 돈 준 건 · 안 준 건 (못 받은 돈 · 가장 오래된 날)','운행 상세에 [또 등록]: 같은 운행을 날짜만 오늘로 바꿔 바로 등록','오래 못 받은 돈 알림: 달력 맨 위에 며칠 넘은 미수 건수 · 금액 (설정에서 끄기 · 14~90일)','설정 › 세금 신고용 정리: 부가세(반기) · 종합소득세(1년) 매출 · 계산서 · 경비 합계와 세무사용 엑셀','엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
+  {v:'1.13.0',d:'10/20',items:['등록할 때 전에 적은 화주면 화주 칸 아래에 한 줄로: 받음 · 못 받음(남은 돈)','운행 상세에 [또 등록]: 같은 운행을 날짜만 오늘로 바꿔 바로 등록','오래 못 받은 돈 알림: 달력 맨 위에 며칠 넘은 미수 건수 · 금액 (설정에서 끄기 · 14~90일)','설정 › 세금 신고용 정리: 부가세(반기) · 종합소득세(1년) 매출 · 계산서 · 경비 합계와 세무사용 엑셀','엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
   {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
   {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
   {v:'1.11.0',d:'10/17',items:['받을 돈 [목록 | 달력]: 달력에선 안 받은 날만 금액 · 누르면 그날 건, 오래될수록 진한 빨강','화면 역할 정리: 달력=일정과 금액 · 받을 돈=수금 · 장부=정산','받을 돈 · 장부의 기간 고르기 창과 찾기 칸을 같은 모양으로','받을 돈 순서: 오래된 것 위로 · 최근 것 위로','문자 보낸 날 색 구분 (오늘 · 1~3일 · 4~7일 · 8일 넘음)','돈을 일부만 받으면 받은 금액을 적고 남은 돈 표시']},
@@ -1748,19 +1748,15 @@ function fillTrip(t){
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
   renderPlaces('from'); renderPlaces('to'); renderCPast();
 }
-// 등록할 때 전에 적었던 화주면: 돈 준 건 · 안 준 건 (못 받은 것 오래된 순 먼저, 그다음 최근 것 · 6건까지)
+// 등록할 때 전에 적었던 화주면 한 줄로: 받음 몇 건 · 못 받음 몇 건(남은 돈) · [자세히]
 function renderCPast(){
   const name=$('f-client').value.trim(), box=$('f-cpast');
   const ts=name?trips.filter(t=>t.id!==editingId&&(t.client||'').trim().toLowerCase()===name.toLowerCase()):[];
   box.hidden=!ts.length; if(!ts.length){box.innerHTML='';return}
-  const paid=ts.filter(t=>t.paid), due=ts.filter(t=>!t.paid&&!isPlan(t)), plan=ts.filter(isPlan);
-  const dueSum=due.reduce((s,t)=>s+left(t),0), old=due.length?Math.max(...due.map(t=>daysSince(t.date))):0;
-  const st=t=>t.paid?'<em class="c-paid">받음</em>':isPlan(t)?'<em>예정</em>':t.got>0?'<em class="c-due">일부</em>':'<em class="c-due">못 받음</em>';
-  const list=[...due.sort(byOld),...[...paid,...plan].sort(byNew)].slice(0,6);
-  box.innerHTML=`<div class="cph"><b>${esc(ts[0].client)} · 전에 ${ts.length}건</b><button type="button" class="linkbtn" data-do="client" data-c="${esc(ts[0].client)}">자세히</button></div>`
-    +`<div class="cps"><div class="ok"><span>돈 준 건</span><b class="num">${paid.length}건</b><small class="num">${won(paid.reduce((s,t)=>s+t.amount,0))}</small></div>`
-    +`<div class="no"><span>안 준 건</span><b class="num">${due.length}건${due.length?' · '+short(dueSum)+'원':''}</b><small class="num">${due.length?'가장 오래된 것 '+old+'일째':'밀린 돈 없음'}${plan.length?' · 예정 '+plan.length+'건':''}</small></div></div>`
-    +'<div class="cpl">'+list.map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${comma(t.paid?t.amount:left(t))}${st(t)}</b></div>`).join('')+'</div>';
+  const paid=ts.filter(t=>t.paid).length, due=ts.filter(t=>!t.paid&&!isPlan(t)), dueSum=due.reduce((s,t)=>s+left(t),0);
+  box.innerHTML=`<span class="cpo">받음 ${paid}</span>`
+    +(due.length?`<span class="cpn">못 받음 ${due.length} · ${short(dueSum)}원</span>`:'<span class="cpo">밀린 돈 없음</span>')
+    +`<button type="button" class="linkbtn" data-do="client" data-c="${esc(ts[0].client)}">자세히</button>`;
 }
 $('f-client').addEventListener('input',renderCPast);
 // 또 등록: 이 운행 그대로(화주·담당자·상차지·하차지·운임·메모) 새 등록 화면에 채움
