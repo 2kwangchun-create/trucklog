@@ -145,7 +145,7 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),got:Math.max(0,Math.round(Number(r.got)||0)),paid:r.paid?String(r.paid):null};
@@ -210,7 +210,11 @@ function ageChip(t){
   const d=daysSince(t.date);
   return `<span class="chip ${ageLevel(t)}">${d<0?'예정':'미수 '+d+'일째'}</span>`;
 }
-const routeHtml=t=>`${esc(t.from)} → ${esc(t.to)}`;
+// 상차지 · 하차지 여러 곳: 첫 곳은 from · to 칸 그대로, 더 있는 곳은 stops(글자로 바꾼 목록) [{k:'from'|'to',c:시·군,a:상세주소,n:담당자,p:연락처}]
+const stopsOf=t=>{try{const v=JSON.parse(t.stops||'[]');return Array.isArray(v)?v.filter(x=>x&&x.c&&(x.k==='from'||x.k==='to')):[]}catch(_){return []}};
+const xStops=(t,k)=>stopsOf(t).filter(x=>x.k===k);
+const cities=(t,k)=>[t[k],...xStops(t,k).map(x=>x.c)].filter(Boolean).join('·');
+const routeHtml=t=>`${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -266,12 +270,15 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
     ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
-      <div class="route"><span class="rt">${esc(t.from)}${ic(P.arrow)}${esc(t.to)}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
+      <div class="route"><span class="rt">${esc(cities(t,'from'))}${ic(P.arrow)}${esc(cities(t,'to'))}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="ptx">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span>${(d=>d?`<span class="docs">${d}</span>`:'')(docChips(t,!(role||open)))}</div></div>`;
   let detail='';
   if(open){
     detail=`<div class="detail"><div class="blk"><span class="bl">화주</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`
-      +addrBlk('상차 · '+dayK(t.date),'from',t.from,t.fromAddr,t.fromPhone,t.fromName)+addrBlk('하차 · '+dayK(t.toDate||t.date),'to',t.to,t.toAddr,t.toPhone,t.toName)
+      +addrBlk('상차'+(xStops(t,'from').length?' 1':'')+' · '+dayK(t.date),'from',t.from,t.fromAddr,t.fromPhone,t.fromName)
+      +xStops(t,'from').map((x,i)=>addrBlk(`상차 ${i+2}`,'from',x.c,x.a,x.p,x.n)).join('')
+      +addrBlk('하차'+(xStops(t,'to').length?' 1':'')+' · '+dayK(t.toDate||t.date),'to',t.to,t.toAddr,t.toPhone,t.toName)
+      +xStops(t,'to').map((x,i)=>addrBlk(`하차 ${i+2}`,'to',x.c,x.a,x.p,x.n)).join('')
       +(t.gotLog?`<div class="blk"><span class="bl">받은 기록</span><div class="num">${t.gotLog.split(',').filter(Boolean).map(x=>{const[d,a]=x.split(':');return md(d)+' '+won(Number(a))}).join(' · ')}${t.paid?'':`<br><b class="c-due">남은 돈 ${won(left(t))}</b>`}</div></div>`:'')
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
       +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
@@ -301,7 +308,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
 }
 
 // ---------- 받을 돈 ----------
-const hay=t=>[t.src,t.from,t.fromAddr,t.to,t.toAddr,t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
+const hay=t=>[t.src,t.from,t.fromAddr,t.to,t.toAddr,...stopsOf(t).flatMap(x=>[x.c,x.a,x.n,x.p]),t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
 
 // ---------- 찾기: 어디서 찾을지 (자동 · 전체 · 화주 · 지역 · 주소 · 메모) ----------
 const SF={client:['client','clientName','clientPhone'],src:['src'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
@@ -843,7 +850,7 @@ function ledgerXlsx(list,costList,label){
   const st=t=>t.paid?S('받음',4):t.got?S('일부 받음',9):isPlan(t)?S('예정',7):S('못 받음',3);
   // 운행: 자주 보는 칸을 앞에, 담당자·완료 시각 같은 건 뒤에
   const tripHead=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','하차지','하차 상세주소','운임','수수료','입금 상태','입금일','받은 금액','남은 금액','미수 일수','계산서 발행일','문자 보낸 날','메모','운임 방식','상차 담당자','상차 연락처','하차 담당자','하차 연락처','상차 완료','하차 완료'];
-  const tripRows=L.map(t=>[day(t.date),day(t.toDate||t.date),t.src,t.client,t.clientName,t.clientPhone,t.from,t.fromAddr,t.to,t.toAddr,money(t.amount),money(t.fee||0),st(t),day(t.paid),money(recv(t)),money(left(t)),
+  const tripRows=L.map(t=>[day(t.date),day(t.toDate||t.date),t.src,t.client,t.clientName,t.clientPhone,cities(t,'from'),[t.fromAddr,...xStops(t,'from').map(x=>x.c+' '+(x.a||''))].filter(x=>x&&x.trim()).join(' / '),cities(t,'to'),[t.toAddr,...xStops(t,'to').map(x=>x.c+' '+(x.a||''))].filter(x=>x&&x.trim()).join(' / '),money(t.amount),money(t.fee||0),st(t),day(t.paid),money(recv(t)),money(left(t)),
     t.paid||isPlan(t)?S('',7):S(Math.max(0,daysSince(t.date)),7),day(t.tax),day(t.smsAt),t.memo,t.payType,t.fromName,t.fromPhone,t.toName,t.toPhone,day(t.loadedAt),day(t.unloadedAt)]);
   const sum=L.reduce((s,t)=>s+t.amount,0), fees=L.reduce((s,t)=>s+(t.fee||0),0), got=L.reduce((s,t)=>s+recv(t),0), due=L.reduce((s,t)=>s+left(t),0), cs=C.reduce((s,c)=>s+c.amount,0);
   const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
@@ -1080,7 +1087,7 @@ function copyText(list,kind,o){
     const L=[];
     const parts=[];
     if(o.client)parts.push(t.client||'화주 미입력');
-    if(o.city)parts.push(`${t.from} → ${t.to}`);
+    if(o.city)parts.push(`${cities(t,'from')} → ${cities(t,'to')}`);
     let head=parts.join(' · ');
     if(o.date)head=`[${md(t.date)}]`+(head?' '+head:'');
     if(head)L.push(head);
@@ -1089,12 +1096,16 @@ function copyText(list,kind,o){
     const who=(n,p)=>`${n||'이름 '+NA} ${p||'연락처 '+NA}`;
     if(kind==='all'&&o.client)L.push(`화주 담당: ${who(t.clientName,t.clientPhone)}`);
     if(kind!=='to'){
-      L.push(`상차지: ${[o.city?t.from:'',t.fromAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
-      L.push(`상차 담당: ${who(t.fromName,t.fromPhone)}`);
+      const xf=xStops(t,'from'), nf=xf.length?' 1':'';
+      L.push(`상차지${nf}: ${[o.city?t.from:'',t.fromAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
+      L.push(`상차 담당${nf}: ${who(t.fromName,t.fromPhone)}`);
+      xf.forEach((x,j)=>{L.push(`상차지 ${j+2}: ${[o.city?x.c:'',x.a||'상세주소 '+NA].filter(Boolean).join(' ')}`);L.push(`상차 담당 ${j+2}: ${who(x.n,x.p)}`)});
     }
     if(kind!=='from'){
-      L.push(`하차지: ${[o.city?t.to:'',t.toAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
-      L.push(`하차 담당: ${who(t.toName,t.toPhone)}`);
+      const xt=xStops(t,'to'), nt=xt.length?' 1':'';
+      L.push(`하차지${nt}: ${[o.city?t.to:'',t.toAddr||'상세주소 '+NA].filter(Boolean).join(' ')}`);
+      L.push(`하차 담당${nt}: ${who(t.toName,t.toPhone)}`);
+      xt.forEach((x,j)=>{L.push(`하차지 ${j+2}: ${[o.city?x.c:'',x.a||'상세주소 '+NA].filter(Boolean).join(' ')}`);L.push(`하차 담당 ${j+2}: ${who(x.n,x.p)}`)});
     }
     if(t.memo)L.push(`메모: ${t.memo}`);
     // 번호는 첫 줄 앞에 바로 붙임 (넣을 항목이 없으면 내용 첫 줄 옆에)
@@ -1433,6 +1444,10 @@ document.addEventListener('click',e=>{
   if(tx){setTextSize(tx.dataset.tsize);return}
   const ed=e.target.closest('[data-do="edit"]');
   if(ed){startEdit(store.get(ed.dataset.id));return}
+  const ast=e.target.closest('[data-addstop]');
+  if(ast){const k=ast.dataset.addstop,l=readStops(true);l.push({k});renderStops(l);const b=$('f-x'+k).lastElementChild;b&&b.querySelector('.xc').focus();saveDraft();return}
+  const dst=e.target.closest('[data-delstop]');
+  if(dst){const el=dst.closest('.xstop'),all=[...document.querySelectorAll('#f .xstop')],i=all.indexOf(el),l=readStops(true);l.splice(i,1);renderStops(l);saveDraft();return}
   const agn=e.target.closest('[data-do="again"]');
   if(agn){againTrip(store.get(agn.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
@@ -1568,12 +1583,20 @@ function paintSrc(){
 }
 // 저장된 값으로 화면 맞추기 (원콜 · 전국24시콜 · 기타 · 직접 쓴 이름)
 function setSrc(v){formSrc=!v?'':SRC_MAIN.includes(v)?v:'기타';$('f-srctext').value=formSrc==='기타'&&v!=='기타'?v:'';paintSrc()}
+// 등록 양식의 추가 상차지 · 하차지 (+ 상차지 추가 · + 하차지 추가)
+function stopBlk(k,x,i){return `<div class="xstop" data-k="${k}"><div class="xh"><b><i class="mk ${k}"></i>${k==='from'?'상차지':'하차지'} ${i+2}</b><button type="button" class="xdel" data-delstop>빼기</button></div>`
+  +`<input type="text" class="xc" placeholder="시·군 (예: ${k==='from'?'안산':'청주'})" value="${esc(x.c||'')}" aria-label="${k==='from'?'상차지':'하차지'} ${i+2} 시·군">`
+  +`<input type="text" class="xa addrin" placeholder="상세주소" value="${esc(x.a||'')}" aria-label="${k==='from'?'상차지':'하차지'} ${i+2} 상세주소">`
+  +`<div class="contact"><input type="text" class="xn" placeholder="담당자" value="${esc(x.n||'')}" aria-label="담당자 이름"><input type="tel" class="xp phone" inputmode="tel" placeholder="연락처" value="${esc(x.p||'')}" aria-label="연락처"></div></div>`}
+function readStops(all){return [...document.querySelectorAll('#f .xstop')].map(el=>({k:el.dataset.k,c:el.querySelector('.xc').value.trim(),a:el.querySelector('.xa').value.trim(),n:el.querySelector('.xn').value.trim(),p:el.querySelector('.xp').value.trim()})).filter(x=>all||x.c||x.a||x.n||x.p)}
+function renderStops(list){['from','to'].forEach(k=>{$('f-x'+k).innerHTML=(list||[]).filter(x=>x.k===k).map((x,i)=>stopBlk(k,x,i)).join('')})}
+$('f').addEventListener('input',e=>{if(e.target.classList.contains('xp'))e.target.value=fmtPhone(e.target.value)});
 const readForm=()=>({src:srcValue(),date:$('f-date').value,toDate:$('f-todate').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
   clientPhone:$('f-clientphone').value.trim(),fromPhone:$('f-fromphone').value.trim(),toPhone:$('f-tophone').value.trim(),
   clientName:$('f-clientname').value.trim(),fromName:$('f-fromname').value.trim(),toName:$('f-toname').value.trim(),
-  amount:Number($('f-amt').value.replace(/\D/g,'')),fee:Number($('f-fee').value.replace(/\D/g,''))||0,memo:$('f-memo').value.trim()});
-function formMissing(f){return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
+  amount:Number($('f-amt').value.replace(/\D/g,'')),fee:Number($('f-fee').value.replace(/\D/g,''))||0,memo:$('f-memo').value.trim(),stops:(l=>l.length?JSON.stringify(l):'')(readStops().filter(x=>x.c))});
+function formMissing(f){if(readStops().some(x=>!x.c))return ['추가한 곳의 시·군'];return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
 ['f-amt','f-fee'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
 function setPt(v){formPt=v;document.querySelectorAll('#f-pt [data-pt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pt===v))}
 // 등록 화면 위쪽: [운행 기록 | 지출 기록] 고르기, 제목·취소 버튼은 지금 하는 일에 맞춤
@@ -1665,7 +1688,7 @@ function setTextSize(z){
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
 setLate(lateDays);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
   document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
@@ -1678,18 +1701,18 @@ function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 // draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
 const F_IDS=['f-date','f-todate','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
-function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
+function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,stops:readStops(true),src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
 function saveDraft(){
   if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
-  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
+  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&!readStops().length&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});renderStops(s.stops||[]);setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
-const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,!!s.tax,s.src||'']);
+const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,!!s.tax,s.src||'',(s.stops||[]).filter(x=>x.c||x.a||x.n||x.p)]);
 let editOrig='';
 // 수정하다가 [수정 저장]·[수정 취소] 없이 나가면(탭 이동·뒤로 버튼) 고친 내용을 보관하고 돌아갈지 물어봄
 function leaveEdit(){
@@ -1746,7 +1769,7 @@ function fillTrip(t){
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
-  renderPlaces('from'); renderPlaces('to'); renderCPast();
+  renderStops(stopsOf(t)); renderPlaces('from'); renderPlaces('to'); renderCPast();
 }
 // 등록할 때 전에 적었던 화주면 한 줄로: 받음 몇 건 · 못 받음 몇 건(남은 돈) · [자세히]
 function renderCPast(){
@@ -1800,7 +1823,7 @@ $('f').addEventListener('submit',e=>{
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
   resetForm(); ls.set('draftNew',''); goCal();
-  toast(`${f.from}→${f.to} 저장했어요`,()=>removeTrip(t));
+  toast(`${cities(f,'from')}→${cities(f,'to')} 저장했어요`,()=>removeTrip(t));
 });
 
 // ---------- 시작 ----------

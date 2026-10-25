@@ -563,6 +563,15 @@ input[type=tel]{width:100%;min-height:50px;padding:12px 14px;border:1px solid va
 
 /* 여러 건 선택 */
 .row{position:relative;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* 상차지 · 하차지 여러 곳 */
+.xstops{display:flex;flex-direction:column;gap:8px}
+.xstops:empty{display:none}
+.xstop{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px dashed var(--line)}
+.xstop .xh{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px}
+.xstop .xh b{display:inline-flex;align-items:center;gap:6px}
+.xstop .xdel{border:0;background:none;color:var(--late);font:inherit;font-size:14px;font-weight:700;padding:6px 2px;cursor:pointer}
+.addstop{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:1px dashed var(--line2);border-radius:10px;background:transparent;color:var(--accent);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.addstop .ic{width:18px;height:18px}
 .ck{display:none}
 body.selecting .row{padding-left:54px}
 body.selecting .ck{display:block;position:absolute;left:14px;top:16px;width:28px;height:28px;border-radius:50%;border:2px solid var(--muted);background:var(--surface)}
@@ -831,7 +840,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         <div class="contact"><input type="text" id="f-clientname" placeholder="담당자 이름" aria-label="화주 담당자 이름"><input type="tel" id="f-clientphone" class="phone" inputmode="tel" placeholder="연락처 (010-1234-5678)" aria-label="화주 연락처"></div></div>
       <div class="card field"><label for="f-from"><i class="mk from"></i>상차지 <em>*</em></label><input type="text" id="f-from" placeholder="시·군 (예: 평택)"><div class="recent" id="r-from"></div><div class="places" id="pl-from"></div>
         <input type="text" id="f-fromaddr" class="addrin" placeholder="상세주소 (예: 포승읍 평택항로 156, 2창고)" aria-label="상차지 상세주소">
-        <div class="contact"><input type="text" id="f-fromname" placeholder="상차 담당자" aria-label="상차지 담당자 이름"><input type="tel" id="f-fromphone" class="phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div></div>
+        <div class="contact"><input type="text" id="f-fromname" placeholder="상차 담당자" aria-label="상차지 담당자 이름"><input type="tel" id="f-fromphone" class="phone" inputmode="tel" placeholder="상차지 연락처" aria-label="상차지 연락처"></div>
+        <div class="xstops" id="f-xfrom"></div><button type="button" class="addstop" data-addstop="from"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>상차지 추가</button></div>
       <div class="flow" aria-hidden="true"><span><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></span></div>
       <div class="card field"><label for="f-to"><i class="mk to"></i>하차지 <em>*</em></label><input type="text" id="f-to" placeholder="시·군 (예: 대전)"><div class="recent" id="r-to"></div><div class="places" id="pl-to"></div>
         <input type="text" id="f-toaddr" class="addrin" placeholder="상세주소 (예: 대덕구 대화로 100)" aria-label="하차지 상세주소">
@@ -839,6 +849,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         <div class="todate"><label for="f-todate">하차일</label><input type="date" id="f-todate">
           <div class="quick"><button type="button" data-tod="0">같은 날</button><button type="button" data-tod="1">다음 날</button><button type="button" data-tod="2">모레</button></div>
           <small class="hint small">비워 두면 상차일과 같은 날로 봐요</small></div></div>
+        <div class="xstops" id="f-xto"></div><button type="button" class="addstop" data-addstop="to"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>하차지 추가</button>
       <div class="card field"><label for="f-amt">운임 <em>*</em></label>
         <div class="amtbox"><input type="text" id="f-amt" class="num" inputmode="numeric" placeholder="예: 450,000"><span>원</span></div>
         <div class="quick"><button type="button" data-add="10000">+1만</button><button type="button" data-add="50000">+5만</button><button type="button" data-add="100000">+10만</button><button type="button" data-add="0">지우기</button></div>
