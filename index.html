@@ -283,8 +283,9 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .ucal-h .ib:disabled{opacity:.3}/* 자주 가는 상하차지: 같은 시·군으로 전에 적은 주소·담당자 */
 .places{display:flex;flex-direction:column;gap:4px}
 .places:empty{display:none}
-.places button{display:flex;align-items:center;gap:6px;text-align:left;border:1px dashed var(--line2);background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;color:var(--fg)}
-.places button::before{content:"📍";font-size:13px}
+.places::before{content:"전에 갔던 곳 · 누르면 주소와 담당자가 채워져요";font-size:12px;font-weight:600;color:var(--muted);padding-left:2px}
+.places button{display:flex;align-items:center;gap:8px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;min-height:44px;padding:8px 10px;font-size:15px;color:var(--fg)}
+.places button::before{content:"";width:16px;height:16px;flex:none;background:var(--accent);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E") center/contain no-repeat}
 .places button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
 /* 예정(아직 운행 전): 회색 */
 .lsec.plan{color:var(--muted)}
@@ -295,10 +296,12 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 /* 화주 한눈에 보기 */
 .head .client.tap{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px;cursor:pointer}
 .clbody{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
-.clstats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.clbody>*{flex-shrink:0}
+.clok{margin:0;padding:12px;border-radius:12px;background:var(--paid-soft);color:var(--paid);font-weight:700;text-align:center}
+.clstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .clstats div{background:var(--bg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
 .clstats span{font-size:13px;color:var(--muted);font-weight:600}
-.clstats b{font-size:18px}
+.clstats b{font-size:16px}
 .clct{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
 .act .r2.three{grid-template-columns:repeat(3,1fr)}
 .act .r2.three .btn{padding-left:4px;padding-right:4px}
@@ -538,12 +541,12 @@ details.more>summary::-webkit-details-marker{display:none}
 details.more>summary .ic{width:18px;height:18px}
 details.more[open]>summary .ic{transform:rotate(45deg)}
 details.more>.field,details.more>.contact{margin-top:8px}
-.err{color:var(--late);font-size:15px;font-weight:600}
-.err:empty{display:none}
-/* 저장 버튼: 탭 바로 위에 늘 붙어 있음 */
 details.todmore{margin-top:2px}
 details.todmore>summary #f-todsum{color:var(--fg);font-weight:700;margin-left:6px}
 details.todmore>.todate{margin-top:8px}
+.err{color:var(--late);font-size:15px;font-weight:600}
+.err:empty{display:none}
+/* 저장 버튼: 탭 바로 위에 늘 붙어 있음 */
 .savebar{position:sticky;bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;flex-direction:column;gap:6px;padding:12px 0 4px;background:linear-gradient(rgba(0,0,0,0),var(--bg) 30%)}
 .savebar .btn{box-shadow:0 4px 14px rgba(31,94,74,.3)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;font-size:16px;max-width:calc(100% - 32px);z-index:30}
@@ -563,9 +566,6 @@ body.asking .app{padding-bottom:calc(210px + env(safe-area-inset-bottom,0px))}
 .contact input{min-width:0}
 input[type=tel]{width:100%;min-height:50px;padding:12px 14px;border:1px solid var(--line2);border-radius:12px;background:var(--surface);font-size:17px}
 .addrin{background:var(--bg)!important}
-
-/* 여러 건 선택 */
-.row{position:relative;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* 상차지 · 하차지 여러 곳 */
 .xstops{display:flex;flex-direction:column;gap:8px}
 .xstops:empty{display:none}
@@ -575,6 +575,9 @@ input[type=tel]{width:100%;min-height:50px;padding:12px 14px;border:1px solid va
 .xstop .xdel{border:0;background:none;color:var(--late);font:inherit;font-size:14px;font-weight:700;padding:6px 2px;cursor:pointer}
 .addstop{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:1px dashed var(--line2);border-radius:10px;background:transparent;color:var(--accent);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .addstop .ic{width:18px;height:18px}
+
+/* 여러 건 선택 */
+.row{position:relative;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .ck{display:none}
 body.selecting .row{padding-left:54px}
 body.selecting .ck{display:block;position:absolute;left:14px;top:16px;width:28px;height:28px;border-radius:50%;border:2px solid var(--muted);background:var(--surface)}
@@ -724,6 +727,21 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 .item .tx b{font-size:16px;font-weight:600}
 .item .tx small{font-size:14px;color:var(--muted)}
 .item>.ic:last-child{color:var(--muted)}
+/* 고소장 만들기 (goso.js) */
+.gosoin{gap:14px}
+.gosoin form{display:flex;flex-direction:column;gap:10px}
+.gosec{border:1px solid var(--line);border-radius:14px;padding:0 12px}
+.gosec>summary{list-style:none;cursor:pointer;font-weight:700;font-size:17px;min-height:50px;display:flex;align-items:center;justify-content:space-between}
+.gosec>summary::-webkit-details-marker{display:none}
+.gosec>summary::after{content:"+";font-size:22px;color:var(--muted)}
+.gosec[open]>summary::after{content:"−"}
+.gosec>.field,.gosec>.btn{margin-bottom:14px;width:100%}
+.gosoin textarea{flex:none;min-height:120px;background:var(--surface)}
+.gsev{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
+.gsrow{display:grid;grid-template-columns:3fr 2fr;gap:6px}
+.gsbar{position:sticky;bottom:-20px;display:flex;gap:8px;background:var(--surface);padding:8px 0 4px}
+.gsbar .btn{flex:1}
+.gsbar .btn.ghost{flex:none;padding:10px 18px}
 </style>
 </head>
 <body>
@@ -925,6 +943,10 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card items">
       <button type="button" class="item" id="s-tax"><span class="ii" style="background:var(--paid-soft);color:var(--paid)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="tx"><b>세금 신고용 정리</b><small>부가세 · 종합소득세 · 세무사에게 보낼 엑셀</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
+    <div class="gt">서류</div>
+    <div class="card items">
+      <button type="button" class="item" id="s-goso"><span class="ii" style="background:var(--client-soft);color:var(--client)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg></span><span class="tx"><b>고소장 만들기</b><small>경찰서 고소장 양식을 엑셀로</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
     <div class="gt">백업 · 내보내기</div>
     <p class="lastbk" id="s-lastbk"></p>
     <div class="card items">
@@ -939,7 +961,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card"><p id="s-stats" class="hint"></p></div>
     <div class="gt">업데이트 내용</div>
     <div class="card chgs" id="s-changes"></div>
-    <p class="ver">아빠장부 1.13.0</p>
+    <p class="ver">아빠장부 1.14.0</p>
   </section>
 </div>
 
@@ -1061,5 +1083,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
 <script src="firebase-config.js"></script>
 <script>/* 이 컴퓨터에서만: ?demo=1 이면 demo.js(깃에 안 올라감)를 불러 확인용으로 */if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&/[?&]demo/.test(location.search))document.write('<script src="demo.js"><\/script>')</script>
 <script src="app.js"></script>
+<script src="goso.js"></script>
 </body>
 </html>

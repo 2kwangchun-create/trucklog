@@ -2,12 +2,12 @@
    - 앱 파일은 저장해 두고 바로 띄운 뒤, 인터넷이 되면 뒤에서 새 파일로 바꿔 둡니다.
      (앱을 고쳐서 올리면, 앱을 열 때 새 버전을 받아 바로 바꿔요 — app.js의 Updater)
    - 기록 데이터는 여기서 다루지 않습니다 (휴대폰 저장소 + 클라우드). */
-const VERSION = '1.13.0';
+const VERSION = '1.14.0';
 const SHELL = 'trucklog-shell-' + VERSION;
 const RUNTIME = 'trucklog-runtime';
 const FILES = ['./', './index.html', './app.js', './firebase-config.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
-  './icons/call-one.webp', './icons/call-24.png'];
+  './icons/call-one.webp', './icons/call-24.png', './goso.js', './goso-template.xlsx'];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];
 
 self.addEventListener('install', e => {

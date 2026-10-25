@@ -219,7 +219,7 @@ const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 const P={arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
-  nav:'M3 11l18-8-8 18-2-8z',plus:'M12 5v14M5 12h14',
+  nav:'M3 11l18-8-8 18-2-8z',plus:'M12 5v14M5 12h14',doc:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',
   phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'};
 const WD='일월화수목금토', wdOf=s=>WD[parseD(s).getDay()];
 const mdK=s=>`${Number(s.slice(5,7))}월 ${Number(s.slice(8,10))}일`;
@@ -296,7 +296,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
     const main=t.paid?`<div class="r1 one">${B('ghost','unpay','미수로 되돌리기')}</div>`:t.got>0?`<div class="r1">${B('','pay','남은 돈 받기',P.check)}${B('ghost','sms','정산 문자')}</div><div class="undo1">${B('linkish','unpay','↺ 마지막에 받은 돈 취소')}</div>`
       :`<div class="r1">${B('','pay','입금 완료',P.check)}${B('ghost','sms','정산 문자')}</div>`;
     const sub=deletingId===t.id?`<div class="r2">${B('danger','delcfm','정말 삭제')}<button type="button" class="btn ghost" data-do="delcancel">취소</button></div>`
-      :`<div class="r2 three">${B('ghost','again','또 등록',P.plus)}${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
+      :`<div class="r2 three">${B('ghost','goso','고소장',P.doc)}${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
     if(mode==='unpaid')act=`<div class="act">${main}${open?sub:''}</div>`;
     else if(open)act=`<div class="act">${main}${sub}</div>`;
   }
@@ -1151,12 +1151,12 @@ function openClient(name){
   const paidT=ts.filter(t=>t.paid), avg=paidT.length?Math.round(paidT.reduce((s,t)=>s+Math.max(0,(parseD(t.paid)-parseD(t.date))/86400000),0)/paidT.length):null;
   const oldest=due.length?due.reduce((a,t)=>t.date<a.date?t:a):null, ct=ts.find(t=>t.clientPhone||t.clientName);
   $('cl-h').textContent=name;
-  $('cl-body').innerHTML=`<div class="clstats">`
-    +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${won(sum)}</b></div>`
-    +`<div><span>받은 돈</span><b class="num c-paid">${won(got)}</b></div><div><span>못 받은 돈</span><b class="num c-due">${won(dueSum)}</b><small class="num">${due.length}건${oldest?' · 가장 오래된 것 '+daysSince(oldest.date)+'일째':''}</small></div>`
-    +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b>${plan.length?`<small>예정 ${plan.length}건</small>`:''}</div></div>`
-    +(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
-    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:'')
+  // 순서: 연락처(바로 전화) → 못 받은 돈 보기(가장 많이 누를 것) → 숫자 요약 → 최근 운행
+  $('cl-body').innerHTML=(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
+    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:'<p class="clok">이 화주는 못 받은 돈이 없어요.</p>')
+    +`<div class="clstats">`
+    +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b></div>`
+    +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b></div><div><span>예정</span><b class="num">${plan.length}건</b></div></div>`
     +`<div class="section-title">최근 운행</div><div class="clrecent">`+ts.slice(0,6).map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.paid?t.amount:left(t))}<small> ${t.paid?'받음':isPlan(t)?'예정':t.got>0?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`).join('')+'</div>';
   $('clsheet').hidden=false; pushOverlay({csheet:true});
 }
@@ -1448,8 +1448,8 @@ document.addEventListener('click',e=>{
   if(ast){const k=ast.dataset.addstop,l=readStops(true);l.push({k});renderStops(l);const b=$('f-x'+k).lastElementChild;b&&b.querySelector('.xc').focus();saveDraft();return}
   const dst=e.target.closest('[data-delstop]');
   if(dst){const el=dst.closest('.xstop'),all=[...document.querySelectorAll('#f .xstop')],i=all.indexOf(el),l=readStops(true);l.splice(i,1);renderStops(l);saveDraft();return}
-  const agn=e.target.closest('[data-do="again"]');
-  if(agn){againTrip(store.get(agn.dataset.id));return}
+  const gso=e.target.closest('[data-do="goso"]'); // 이 운행(화주 · 날짜 · 못 받은 운임)으로 고소장 칸을 채워서 열기 (goso.js)
+  if(gso){Goso.open(store.get(gso.dataset.id));return}
   const fill=e.target.closest('[data-fill]');
   if(fill){$(fill.dataset.fill).value=fill.dataset.v; if(fill.dataset.fill==='f-from')renderPlaces('from'); if(fill.dataset.fill==='f-to')renderPlaces('to');
     if(fill.dataset.fill==='f-client')renderCPast();
@@ -1655,6 +1655,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
+  {v:'1.14.0',d:'10/26',items:['설정 › 서류 › 고소장 만들기: 칸을 채우면 경찰서 고소장 엑셀 양식에 그대로 넣어서 저장 (육하원칙으로 범죄사실 문장 만들기)','운행 상세의 [또 등록] 자리에 [고소장]: 그 운행의 화주 · 날짜 · 못 받은 운임으로 고소장 칸을 채워서 열기','등록: 상차지 · 하차지 여러 곳 (+ 상차지 추가 · + 하차지 추가)','등록: 하차일은 [하차일 더보기]를 눌러야 펼쳐짐','화주 한눈에 보기: 연락처 → 못 받은 돈 → 숫자 요약 순서로','전에 갔던 곳 버튼을 크고 누르기 쉽게']},
   {v:'1.13.0',d:'10/20',items:['등록할 때 전에 적은 화주면 화주 칸 아래에 한 줄로: 받음 · 못 받음(남은 돈)','운행 상세에 [또 등록]: 같은 운행을 날짜만 오늘로 바꿔 바로 등록','오래 못 받은 돈 알림: 달력 맨 위에 며칠 넘은 미수 건수 · 금액 (설정에서 끄기 · 14~90일)','설정 › 세금 신고용 정리: 부가세(반기) · 종합소득세(1년) 매출 · 계산서 · 경비 합계와 세무사용 엑셀','엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
   {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
   {v:'1.12.0',d:'10/17',items:['고침: 상차 완료 · 하차 완료 버튼과 지출 목록 누르기가 안 되던 문제','자주 가는 상하차지: 시·군을 고르면 전에 적은 상세주소 · 담당자 · 연락처를 눌러서 한 번에','앞으로 할 운행은 받을 돈에서 회색 「예정」으로 따로 (미수 합계에서 빠짐)','화주 이름을 누르면 한눈에 보기 (운행 수 · 못 받은 돈 · 평균 입금 일수 · 최근 운행)']},
@@ -1690,9 +1691,10 @@ setSrcMark(srcMark);
 setLate(lateDays);
 function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
+// 하차일은 [+ 하차일]을 눌러야 펼쳐짐 · 날짜가 있으면(수정 · 또 등록 · 적던 것) 펼쳐서 보여줌
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
-  document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
   $('f-todlbl').textContent=v?'하차일':'하차일 더보기'; $('f-todsum').textContent=v?`${md(v)}${n===1?' (다음 날)':n===2?' (모레)':n===0?' (같은 날)':''}`:''; if(v)$('f-todmore').open=true;
+  document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
 ['input','change'].forEach(ev=>{$('f-date').addEventListener(ev,paintTod);$('f-todate').addEventListener(ev,paintTod)});
 // 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
 function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
