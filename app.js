@@ -145,7 +145,7 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','stopAt'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),got:Math.max(0,Math.round(Number(r.got)||0)),paid:r.paid?String(r.paid):null};
@@ -215,6 +215,12 @@ const stopsOf=t=>{try{const v=JSON.parse(t.stops||'[]');return Array.isArray(v)?
 const xStops=(t,k)=>stopsOf(t).filter(x=>x.k===k);
 const cities=(t,k)=>[t[k],...xStops(t,k).map(x=>x.c)].filter(Boolean).join('·');
 // 목록에서 추가한 곳이 눈에 띄게: 서울 [+안산] → 부산 [+청주]
+// 들르는 곳 순서: 상차 1(from) · 추가 상차지 … → 하차 1(to) · 추가 하차지 …
+const legsOf=t=>[{k:'from',c:t.from,a:t.fromAddr},...xStops(t,'from'),{k:'to',c:t.to,a:t.toAddr},...xStops(t,'to')];
+// 곳마다 완료 시각 (stopAt). 예전 기록처럼 없으면 전체 상차·하차 완료 시각으로 채워서 보여줌
+function legTimes(t,legs){let v=[];try{v=JSON.parse(t.stopAt||'[]')}catch(_){}
+  if(!Array.isArray(v)||v.length!==legs.length)v=legs.map(x=>x.k==='from'?(t.loadedAt||''):(t.unloadedAt||''));
+  return v.map(x=>typeof x==='string'?x:'')}
 const placeHtml=(t,k)=>esc(t[k])+xStops(t,k).map(x=>`<i class="xs">+${esc(x.c)}</i>`).join('');
 const routeHtml=t=>`${placeHtml(t,'from')} → ${placeHtml(t,'to')}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
@@ -305,6 +311,18 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
   const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 끝나고':'눌러서 완료'}</small>`}</button>`;
+  // 여러 곳을 들르는 건: 곳마다 완료 버튼이 있는 세로 순서표 (상차 1 · 상차 2 · … → 하차 1 · 하차 2 · …)
+  const legs=stopsOf(t).length?legsOf(t):null, tm=legs?legTimes(t,legs):null;
+  const loadsDone=legs?legs.every((x,i)=>x.k!=='from'||tm[i]):false;
+  const LB=(x,i)=>{const v=tm[i],wait=!v&&x.k==='to'&&!loadsDone,n=legs.slice(0,i+1).filter(y=>y.k===x.k).length;
+    return `<button type="button" class="leg ${x.k}${v?' done':''}${wait?' wait':''}" data-do="leg" data-i="${i}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${x.k==='from'?'상차':'하차'} ${n} ${esc(x.c)} ${v?'완료 취소':'완료'}">`
+      +`<span class="no">${v?ic(P.check):n}</span><span class="lt"><small>${x.k==='from'?'상차':'하차'} ${n}</small><b>${esc(x.c)}</b>${x.a?`<i>${esc(x.a)}</i>`:''}</span>`
+      +`<span class="ls num">${v?stampTxt(v):wait?'상차 다 끝나고':'눌러서 완료'}</span></button>`};
+  if(legs&&(role||open)){
+    const done=tm.filter(Boolean).length;
+    return `<div class="row${isPlan(t)?' plan':''}${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}`
+      +`<div class="legs"><div class="legh"><b>들르는 곳 ${legs.length}곳</b><span class="num">${done}/${legs.length} 완료</span></div>${legs.map(LB).join('')}</div>${act}</div>`;
+  }
   const prog=role||open?`<div class="prog">${PB('load',1,`${esc(cities(t,'from'))} 상차`,t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,`${esc(cities(t,'to'))} 하차`,t.unloadedAt,!t.loadedAt)}</div>`:'';
   return `<div class="row${isPlan(t)?' plan':''}${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
@@ -1514,6 +1532,18 @@ document.addEventListener('click',e=>{
     case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
     case 'cdel': costDel=id; break;
     case 'cdelcancel': costDel=null; break;
+    case 'leg': { // 여러 곳: 한 곳씩 완료 (다시 누르면 취소). 상차는 순서 상관없이, 하차는 상차가 다 끝난 뒤
+      const legs=legsOf(t), tm=legTimes(t,legs), i=Number(el.dataset.i), x=legs[i], before={loadedAt:t.loadedAt,unloadedAt:t.unloadedAt,stopAt:t.stopAt};
+      if(!x)break;
+      const d=new Date(), now=`${iso(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if(tm[i]){tm[i]='';if(x.k==='from')legs.forEach((y,j)=>{if(y.k==='to')tm[j]=''})} // 상차 한 곳을 취소하면 하차도 같이 취소
+      else{if(x.k==='to'&&!legs.every((y,j)=>y.k!=='from'||tm[j])){toast('상차를 다 끝낸 뒤에 눌러 주세요');break}tm[i]=now}
+      // 전체 상태: 상차가 다 끝나면 상차 완료(운송 중), 하차까지 다 끝나면 하차 완료
+      const last=k=>legs.map((y,j)=>y.k===k?tm[j]:null).filter(v=>v!==null);
+      const lf=last('from'), lt=last('to');
+      t.loadedAt=lf.every(Boolean)?lf.sort().pop():''; t.unloadedAt=t.loadedAt&&lt.every(Boolean)?lt.sort().pop():'';
+      t.stopAt=JSON.stringify(tm);
+      saveTrip(t); toast(before.stopAt===t.stopAt?'':tm[i]?`${x.c} ${x.k==='from'?'상차':'하차'} 완료`:`${x.c} ${x.k==='from'?'상차':'하차'} 완료를 취소했어요`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
     case 'lu': { // 상차 완료 · 하차 완료 (다시 누르면 취소)
       const load=el.dataset.k==='load', k=load?'loadedAt':'unloadedAt', l=load?'상차':'하차', before={loadedAt:t.loadedAt,unloadedAt:t.unloadedAt};
       const d=new Date(), now=`${iso(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -1674,6 +1704,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
+  {v:'1.14.1',d:'10/26',items:['여러 곳 들르는 운행: 들르는 곳 순서표에서 곳마다 상차 · 하차 완료 (하차는 상차를 다 끝낸 뒤)','목록에서 추가한 곳이 보이게: 서울 [+안산] → 부산 [+청주]','추가한 상차지 · 하차지에도 자주 간 곳 버튼과 전에 갔던 곳(주소 · 담당자)']},
   {v:'1.14.0',d:'10/26',items:['설정 › 서류 › 고소장 만들기: 칸을 채우면 경찰서 고소장 엑셀 양식에 그대로 넣어서 저장 (육하원칙으로 범죄사실 문장 만들기)','운행 상세의 [또 등록] 자리에 [고소장]: 그 운행의 화주 · 날짜 · 못 받은 운임으로 고소장 칸을 채워서 열기','등록: 상차지 · 하차지 여러 곳 (+ 상차지 추가 · + 하차지 추가)','등록: 하차일은 [하차일 더보기]를 눌러야 펼쳐짐','화주 한눈에 보기: 연락처 → 못 받은 돈 → 숫자 요약 순서로','전에 갔던 곳 버튼을 크고 누르기 쉽게']},
   {v:'1.13.0',d:'10/20',items:['등록할 때 전에 적은 화주면 화주 칸 아래에 한 줄로: 받음 · 못 받음(남은 돈)','운행 상세에 [또 등록]: 같은 운행을 날짜만 오늘로 바꿔 바로 등록','오래 못 받은 돈 알림: 달력 맨 위에 며칠 넘은 미수 건수 · 금액 (설정에서 끄기 · 14~90일)','설정 › 세금 신고용 정리: 부가세(반기) · 종합소득세(1년) 매출 · 계산서 · 경비 합계와 세무사용 엑셀','엑셀로 보내기를 진짜 엑셀 파일로: 요약 · 운행 · 지출 시트, 칸 너비 · 제목 줄 · 금액 쉼표 · 입금 상태 색 · 합계']},
   {v:'1.12.1',d:'10/20',items:['화주 한눈에 보기: [못 받은 돈 보기] 버튼에 남은 돈 합계 · 건수 · 가장 오래된 날 표시','화주 한눈에 보기의 최근 운행도 일부 받은 건은 남은 돈으로 표시']},
