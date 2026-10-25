@@ -656,10 +656,12 @@ function costRowHtml(c){
 }
 
 // ---------- 등록 ----------
+// 최근에 많이 쓴 순: 오래된 기록일수록 점수가 줄어듦 (약 2주마다 절반) · 상차지 · 하차지는 추가한 곳도 함께
+function topVals(key){const c={};trips.forEach(t=>{const age=Math.max(0,daysSince(t.date)),w=Math.pow(0.5,age/14);
+    [t[key],...(key==='from'||key==='to'?xStops(t,key).map(x=>x.c):[])].forEach(v=>{if(v)c[v]=(c[v]||0)+w})});
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,6)}
 function renderRecent(){
-  // 최근에 많이 쓴 순: 오래된 기록일수록 점수가 줄어듦 (약 2주마다 절반)
-  const top=(key)=>{const c={};trips.forEach(t=>{if(!t[key])return;const age=Math.max(0,daysSince(t.date));c[t[key]]=(c[t[key]]||0)+Math.pow(0.5,age/14)});
-    return Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,6)};
+  const top=topVals;
   [['from','r-from','f-from'],['to','r-to','f-to'],['client','r-client','f-client']].forEach(([k,box,inp])=>{
     $(box).innerHTML=top(k).map(v=>`<button type="button" data-fill="${inp}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
   });
@@ -1446,6 +1448,10 @@ document.addEventListener('click',e=>{
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const ast=e.target.closest('[data-addstop]');
   if(ast){const k=ast.dataset.addstop,l=readStops(true);l.push({k});renderStops(l);const b=$('f-x'+k).lastElementChild;b&&b.querySelector('.xc').focus();saveDraft();return}
+  const xf=e.target.closest('[data-xfill]');
+  if(xf){const el=xf.closest('.xstop');el.querySelector('.xc').value=xf.dataset.xfill;renderXPlaces(el);saveDraft();return}
+  const xp=e.target.closest('[data-xplace]');
+  if(xp){const el=xp.closest('.xstop'),o=(el._pl||[])[+xp.dataset.xplace];if(o){el.querySelector('.xa').value=o.addr||'';el.querySelector('.xn').value=o.name||'';el.querySelector('.xp').value=o.phone||'';renderXPlaces(el);saveDraft()}return}
   const dst=e.target.closest('[data-delstop]');
   if(dst){const el=dst.closest('.xstop'),all=[...document.querySelectorAll('#f .xstop')],i=all.indexOf(el),l=readStops(true);l.splice(i,1);renderStops(l);saveDraft();return}
   const gso=e.target.closest('[data-do="goso"]'); // 이 운행(화주 · 날짜 · 못 받은 운임)으로 고소장 칸을 채워서 열기 (goso.js)
@@ -1561,6 +1567,11 @@ function placesFor(city){
     const key=[t[b],t[n],t[p]].join('|'), o=m.get(key)||{addr:t[b],name:t[n],phone:t[p],cnt:0,last:''};
     o.cnt++; if(t.date>o.last)o.last=t.date; m.set(key,o);
   }));
+  trips.forEach(t=>stopsOf(t).forEach(x=>{
+    if(sNorm(x.c)!==c||!(x.a||x.n||x.p))return;
+    const key=[x.a||'',x.n||'',x.p||''].join('|'), o=m.get(key)||{addr:x.a||'',name:x.n||'',phone:x.p||'',cnt:0,last:''};
+    o.cnt++; if(t.date>o.last)o.last=t.date; m.set(key,o);
+  }));
   return [...m.values()].sort((x,y)=>y.last.localeCompare(x.last)||y.cnt-x.cnt).slice(0,4);
 }
 function renderPlaces(side){
@@ -1586,10 +1597,16 @@ function setSrc(v){formSrc=!v?'':SRC_MAIN.includes(v)?v:'기타';$('f-srctext').
 // 등록 양식의 추가 상차지 · 하차지 (+ 상차지 추가 · + 하차지 추가)
 function stopBlk(k,x,i){return `<div class="xstop" data-k="${k}"><div class="xh"><b><i class="mk ${k}"></i>${k==='from'?'상차지':'하차지'} ${i+2}</b><button type="button" class="xdel" data-delstop>빼기</button></div>`
   +`<input type="text" class="xc" placeholder="시·군 (예: ${k==='from'?'안산':'청주'})" value="${esc(x.c||'')}" aria-label="${k==='from'?'상차지':'하차지'} ${i+2} 시·군">`
+  +`<div class="recent">${topVals(k).map(v=>`<button type="button" data-xfill="${esc(v)}">${esc(v)}</button>`).join('')}</div><div class="places xpl"></div>`
   +`<input type="text" class="xa addrin" placeholder="상세주소" value="${esc(x.a||'')}" aria-label="${k==='from'?'상차지':'하차지'} ${i+2} 상세주소">`
   +`<div class="contact"><input type="text" class="xn" placeholder="담당자" value="${esc(x.n||'')}" aria-label="담당자 이름"><input type="tel" class="xp phone" inputmode="tel" placeholder="연락처" value="${esc(x.p||'')}" aria-label="연락처"></div></div>`}
 function readStops(all){return [...document.querySelectorAll('#f .xstop')].map(el=>({k:el.dataset.k,c:el.querySelector('.xc').value.trim(),a:el.querySelector('.xa').value.trim(),n:el.querySelector('.xn').value.trim(),p:el.querySelector('.xp').value.trim()})).filter(x=>all||x.c||x.a||x.n||x.p)}
-function renderStops(list){['from','to'].forEach(k=>{$('f-x'+k).innerHTML=(list||[]).filter(x=>x.k===k).map((x,i)=>stopBlk(k,x,i)).join('')})}
+function renderStops(list){['from','to'].forEach(k=>{$('f-x'+k).innerHTML=(list||[]).filter(x=>x.k===k).map((x,i)=>stopBlk(k,x,i)).join('')});document.querySelectorAll('#f .xstop').forEach(renderXPlaces)}
+// 추가한 곳의 시·군을 적거나 고르면: 그 시·군으로 전에 적은 주소 · 담당자 · 연락처
+function renderXPlaces(el){const q=sel=>el.querySelector(sel), l=placesFor(q('.xc').value), cur=[q('.xa').value,q('.xn').value,q('.xp').value].join('|');el._pl=l;
+  q('.xpl').innerHTML=l.map((o,i)=>`<button type="button" data-xplace="${i}" aria-pressed="${[o.addr,o.name,o.phone].join('|')===cur}">${esc([o.addr,o.name,o.phone].filter(Boolean).join(' · '))}</button>`).join('');
+  el.querySelectorAll('[data-xfill]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.xfill===q('.xc').value.trim()))}
+$('f').addEventListener('input',e=>{if(e.target.classList.contains('xc'))renderXPlaces(e.target.closest('.xstop'))});
 $('f').addEventListener('input',e=>{if(e.target.classList.contains('xp'))e.target.value=fmtPhone(e.target.value)});
 const readForm=()=>({src:srcValue(),date:$('f-date').value,toDate:$('f-todate').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
