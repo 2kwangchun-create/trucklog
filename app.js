@@ -1688,10 +1688,11 @@ function setTextSize(z){
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
 setLate(lateDays);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
   document.querySelectorAll('#f [data-tod]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.tod)===n&&(!v||n>0||!!d)))}
+  $('f-todlbl').textContent=v?'하차일':'하차일 더보기'; $('f-todsum').textContent=v?`${md(v)}${n===1?' (다음 날)':n===2?' (모레)':n===0?' (같은 날)':''}`:''; if(v)$('f-todmore').open=true;
 ['input','change'].forEach(ev=>{$('f-date').addEventListener(ev,paintTod);$('f-todate').addEventListener(ev,paintTod)});
 // 담당자·연락처가 적혀 있으면 그 칸을 펼쳐서 보여줌
 function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
@@ -1769,7 +1770,7 @@ function fillTrip(t){
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
-  renderStops(stopsOf(t)); renderPlaces('from'); renderPlaces('to'); renderCPast();
+  renderStops(stopsOf(t)); paintTod(); renderPlaces('from'); renderPlaces('to'); renderCPast();
 }
 // 등록할 때 전에 적었던 화주면 한 줄로: 받음 몇 건 · 못 받음 몇 건(남은 돈) · [자세히]
 function renderCPast(){
