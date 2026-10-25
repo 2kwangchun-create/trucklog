@@ -214,7 +214,9 @@ function ageChip(t){
 const stopsOf=t=>{try{const v=JSON.parse(t.stops||'[]');return Array.isArray(v)?v.filter(x=>x&&x.c&&(x.k==='from'||x.k==='to')):[]}catch(_){return []}};
 const xStops=(t,k)=>stopsOf(t).filter(x=>x.k===k);
 const cities=(t,k)=>[t[k],...xStops(t,k).map(x=>x.c)].filter(Boolean).join('·');
-const routeHtml=t=>`${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}`;
+// 목록에서 추가한 곳이 눈에 띄게: 서울 [+안산] → 부산 [+청주]
+const placeHtml=(t,k)=>esc(t[k])+xStops(t,k).map(x=>`<i class="xs">+${esc(x.c)}</i>`).join('');
+const routeHtml=t=>`${placeHtml(t,'from')} → ${placeHtml(t,'to')}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -270,7 +272,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
     ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
     :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
-      <div class="route"><span class="rt">${esc(cities(t,'from'))}${ic(P.arrow)}${esc(cities(t,'to'))}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
+      <div class="route"><span class="rt">${placeHtml(t,'from')}${ic(P.arrow)}${placeHtml(t,'to')}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="ptx">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span>${(d=>d?`<span class="docs">${d}</span>`:'')(docChips(t,!(role||open)))}</div></div>`;
   let detail='';
   if(open){
@@ -303,7 +305,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
   const PB=(k,n,l,v,wait)=>`<button type="button" class="pbtn${v?' done':''}${wait?' wait':''}" data-do="lu" data-k="${k}" data-id="${t.id}"${wait?' aria-disabled="true"':''} aria-label="${l} ${v?'완료 취소':'완료'}"><span class="no">${v?ic(P.check):n}</span><b>${l}</b>${v?`<small class="num">${stampTxt(v)}</small>`:`<small>${wait?'상차 끝나고':'눌러서 완료'}</small>`}</button>`;
-  const prog=role||open?`<div class="prog">${PB('load',1,`${esc(t.from)} 상차`,t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,`${esc(t.to)} 하차`,t.unloadedAt,!t.loadedAt)}</div>`:'';
+  const prog=role||open?`<div class="prog">${PB('load',1,`${esc(cities(t,'from'))} 상차`,t.loadedAt)}<i class="pline${t.loadedAt?' on':''}"></i>${PB('unload',2,`${esc(cities(t,'to'))} 하차`,t.unloadedAt,!t.loadedAt)}</div>`:'';
   return `<div class="row${isPlan(t)?' plan':''}${open?' open':''}${sel.has(t.id)?' checked':''}" data-id="${t.id}"><span class="ck" aria-hidden="true"></span>${head}${detail}${prog}${act}</div>`;
 }
 
