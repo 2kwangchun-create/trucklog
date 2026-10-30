@@ -142,6 +142,18 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .drvbox{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub)}
 .drvbox>label{font-size:15px;font-weight:700;margin-top:4px;display:flex;align-items:center;gap:6px}
 .drvlink{display:flex;flex-direction:column;gap:6px}
+.udrv{border:1px solid var(--sub);background:var(--sub-soft);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.udrv .udh{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.udrv .udh b{font-size:16px;color:var(--sub)}
+.udrv .udh .num{font-size:20px;font-weight:800;color:var(--sub)}
+.udrv .udi{display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;align-items:center;padding:8px 0;border-top:1px solid rgba(107,79,187,.25);font-size:14px}
+.udrv .udi .w{min-width:0}
+.udrv .udi .w b{display:block;font-size:15px}
+.udrv .udi .w span{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.udrv .udi>.num{font-weight:800;font-size:16px;color:var(--sub);white-space:nowrap}
+.udrv .udi .btn{min-height:36px;padding:4px 12px;font-size:14px;background:var(--sub);border-color:var(--sub);color:#fff}
+.drvb{display:inline-flex;align-items:center;gap:3px;font-size:13px;font-weight:700;color:var(--sub);background:var(--sub-soft);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.drvb .ic{width:14px;height:14px}
 .drvlink:empty{display:none}
 .drvlink>small{font-size:13px;color:var(--muted);font-weight:600;margin-top:4px}
 .drvlink button{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;color:var(--fg);cursor:pointer}
@@ -834,6 +846,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
+    <div class="card udrv" id="u-drv" hidden></div>
     <div class="seg kind" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true">목록</button><button type="button" data-uview="cal" aria-pressed="false">달력</button></div>
     <!-- 받을 돈 달력: 안 받은 날만 금액이 뜨고 누를 수 있음 (오래될수록 진한 빨강) -->
     <div class="card ucal" id="u-calbox" hidden>
@@ -969,10 +982,14 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
           <button type="button" data-cat="기타" aria-pressed="false">기타</button>
         </div></div>
       <div class="card field drvbox" id="cf-drv" hidden>
+        <label for="cf-sub">기사</label><div class="contact"><input type="text" id="cf-sub" placeholder="기사 이름" aria-label="기사 이름"><input type="tel" id="cf-subphone" class="phone" inputmode="tel" placeholder="기사 전화번호" aria-label="기사 전화번호"></div><div class="recent" id="cr-sub"></div>
         <label for="cf-client">화주</label><input type="text" id="cf-client" placeholder="예: 대한물류"><div class="recent" id="cr-client"></div>
         <label for="cf-from"><i class="mk from"></i>상차지</label><input type="text" id="cf-from" placeholder="시·군 (예: 부산)"><div class="recent" id="cr-from"></div>
         <label for="cf-to"><i class="mk to"></i>하차지</label><input type="text" id="cf-to" placeholder="시·군 (예: 대구)"><div class="recent" id="cr-to"></div>
         <div class="drvlink" id="cf-link"></div>
+        <label>기사에게 줬나요?</label>
+        <div class="seg kind" id="cf-paid" role="group" aria-label="기사에게 줬는지"><button type="button" data-cfpaid="no" aria-pressed="true">아직 안 줌</button><button type="button" data-cfpaid="yes" aria-pressed="false">줬어요</button></div>
+        <small class="hint small">아직 안 줬으면 [받을 돈] 화면에 "기사에게 줄 돈"으로 떠요.</small>
       </div>
       <div class="card field"><label for="cf-amt">금액 <em>*</em></label>
         <div class="amtbox"><input type="text" id="cf-amt" class="num" inputmode="numeric" placeholder="예: 80,000"><span>원</span></div>
