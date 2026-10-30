@@ -1287,26 +1287,32 @@ $('c-subdue-go').onclick=()=>openSub(null);
 
 // ---------- 화주 한눈에 보기 ----------
 // 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
-let clName='';
+let clName='', clTs=[], clShow=5;
+// 운행 기록: 처음엔 5건, [더보기]를 누를 때마다 10건씩 더
+function clListHtml(){
+  return clTs.slice(0,clShow).map(t=>`<div><small class="num">${md(t.date)}</small><span>${routeHtml(t)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.paid?t.amount:left(t))}<small> ${t.paid?'받음':isPlan(t)?'예정':t.got>0?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`).join('')
+    +(clTs.length>clShow?`<button type="button" class="clmore" id="cl-more">더보기 <span class="num">(남은 ${clTs.length-clShow}건)</span></button>`:'');
+}
 function openClient(name){
-  clName=name; const ts=trips.filter(t=>(t.client||'')===name).sort(byNew);
+  clName=name; const ts=trips.filter(t=>(t.client||'')===name).sort(byNew); clTs=ts; clShow=5;
   const sum=ts.reduce((s,t)=>s+t.amount,0), got=ts.reduce((s,t)=>s+recv(t),0);
   const due=ts.filter(t=>!t.paid&&!isPlan(t)), dueSum=due.reduce((s,t)=>s+left(t),0), plan=ts.filter(isPlan);
   const paidT=ts.filter(t=>t.paid), avg=paidT.length?Math.round(paidT.reduce((s,t)=>s+Math.max(0,(parseD(t.paid)-parseD(t.date))/86400000),0)/paidT.length):null;
   const oldest=due.length?due.reduce((a,t)=>t.date<a.date?t:a):null, ct=ts.find(t=>t.clientPhone||t.clientName);
   $('cl-h').textContent=name;
-  // 순서: 연락처(바로 전화) → 못 받은 돈 보기(가장 많이 누를 것) → 숫자 요약 → 최근 운행
+  // 순서: 연락처(바로 전화) → 못 받은 돈 보기(가장 많이 누를 것) → 숫자 요약 → 운행 기록
   $('cl-body').innerHTML=(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
     +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:'<p class="clok">이 화주는 못 받은 돈이 없어요.</p>')
     +`<div class="clstats">`
     +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b></div>`
     +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b></div><div><span>예정</span><b class="num">${plan.length}건</b></div></div>`
-    +`<div class="section-title">최근 운행</div><div class="clrecent">`+ts.slice(0,6).map(t=>`<div><small class="num">${md(t.date)}</small><span>${esc(t.from)} → ${esc(t.to)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.paid?t.amount:left(t))}<small> ${t.paid?'받음':isPlan(t)?'예정':t.got>0?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`).join('')+'</div>';
+    +`<div class="section-title">운행 기록 <span class="num">${ts.length}건</span></div><div class="clrecent" id="cl-list">`+clListHtml()+'</div>';
   $('clsheet').hidden=false; pushOverlay({csheet:true});
 }
 function closeClient(){$('clsheet').hidden=true;popOverlay('csheet')}
 $('clsheet').addEventListener('click',e=>{
   if(e.target===$('clsheet')||e.target.closest('#cl-close')){closeClient();return}
+  if(e.target.closest('#cl-more')){clShow+=10;$('cl-list').innerHTML=clListHtml();return}
   if(e.target.closest('#cl-due')){ // 받을 돈 목록에서 이 화주만
     closeClient(); setTimeout(()=>{uView='list';uRange=null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
   }
