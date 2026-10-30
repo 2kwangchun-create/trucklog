@@ -696,11 +696,11 @@ const subCostRowHtml=t=>`<div class="row crow subc"><div class="chead" data-do="
 const catName=c=>c.cat==='기사'?'기사 운임':(c.cat||'기타');
 function costRowHtml(c){
   const open=costOpen===c.id;
-  const act=!open?'':`<div class="act"><button type="button" class="btn ghost small" data-do="cedit" data-id="${c.id}">수정</button>`
+  const act=!open?'':`<div class="act">${c.cat==='기사'&&!c.subPaid?`<button type="button" class="btn small dpbtn" data-dpopen="${c.id}">기사에게 줬어요</button>`:''}<button type="button" class="btn ghost small" data-do="cedit" data-id="${c.id}">수정</button>`
     +(costDel===c.id?`<button type="button" class="btn danger small" data-do="cdelcfm" data-id="${c.id}">정말 삭제</button><button type="button" class="btn ghost small" data-do="cdelcancel">취소</button>`
       :`<button type="button" class="btn ghost small" data-do="cdel" data-id="${c.id}">삭제</button>`)+`</div>`;
   return `<div class="row crow${open?' open':''}"><div class="chead" data-do="copen" data-id="${c.id}" role="button" tabindex="0" aria-expanded="${open}">`
-    +`<span class="cat">${c.cat==='기사'?'기사 운임':esc(c.cat||'기타')}</span><span class="cmemo">${esc(c.cat==='기사'?[c.sub,[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · '),c.memo].filter(Boolean).join(' · '):c.memo)}</span><b class="num camt">${comma(c.amount)}</b><span class="cdate num">${md(c.date)}${c.cat==='기사'?(c.subPaid?` · ${md(c.subPaid)} 줌`:' · <b class="c-due">아직 안 줌</b>'):''}</span></div>${act}</div>`;
+    +`<span class="cat">${c.cat==='기사'?'기사 운임':esc(c.cat||'기타')}</span><span class="cmemo">${esc(c.cat==='기사'?[c.sub,[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · '),c.memo].filter(Boolean).join(' · '):c.memo)}</span><b class="num camt">${comma(c.amount)}</b><span class="cdate num">${md(c.date)}${c.cat==='기사'?(c.subPaid?` · ${md(c.subPaid)} 줌`:c.got?` · ${short(c.got)} 줌 · <b class="c-due">남음 ${short(c.amount-c.got)}</b>`:' · <b class="c-due">아직 안 줌</b>'):''}</span></div>${act}</div>`;
 }
 
 // ---------- 등록 ----------
@@ -1245,17 +1245,41 @@ Snap.init();
 
 // ---------- 기사 한눈에 보기 ----------
 // 기사 이름을 누르면: 연락처 · 아직 줄 돈 · 숫자 요약 · 맡긴 일 기록(5건씩 더보기) — 지출의 기사 운임 + 예전 방식으로 맡긴 운행
+// ---------- 기사에게 준 돈 적기 ----------
+// 언제 · 얼마 (남은 줄 돈이 미리 채워짐) · 덜 주면 그만큼만 기록(got · gotLog)하고 남은 돈은 계속 줄 돈 · 다 주면 준 날(subPaid)
+// 예전 방식으로 맡긴 운행은 한 번에: 적은 금액이 기사에게 준 돈이 됨
+let dpId=null;
+const dpRest=r=>r.kind==='cost'?Math.max(0,r.amount-(r.got||0)):r.subPay;
+function openDp(id){const r=store.get(id);if(!r)return;dpId=id;
+  $('dp-h').textContent=`${r.sub||'기사'}에게 준 돈`;
+  $('dp-sub').textContent=r.kind==='cost'?[md(r.date),r.client,[r.from,r.to].filter(Boolean).join('→'),`기사 운임 ${comma(r.amount)}원`+(r.got?` (${comma(r.got)}원 줌)`:'')].filter(Boolean).join(' · ')
+    :`${md(r.date)} · ${cities(r,'from')}→${cities(r,'to')}`;
+  $('dp-date').value=todayIso; $('dp-amt').value=comma(dpRest(r)); $('dp-hint').textContent=`남은 줄 돈 ${won(dpRest(r))}`;
+  $('dpsheet').hidden=false; pushOverlay({dpsheet:true})}
+function closeDp(){$('dpsheet').hidden=true;popOverlay('dpsheet')}
+$('dp-amt').addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''});
+$('dp-no').onclick=closeDp;
+$('dpsheet').addEventListener('click',e=>{if(e.target===$('dpsheet'))closeDp()});
+$('dp-ok').onclick=()=>{const r=store.get(dpId);if(!r){closeDp();return}
+  const d=$('dp-date').value||todayIso, rest=dpRest(r), a=Math.min(rest,Number($('dp-amt').value.replace(/\D/g,''))||rest)||rest;
+  const before={subPaid:r.subPaid,subPay:r.subPay,got:r.got,gotLog:r.gotLog};
+  if(r.kind==='cost'){r.got=(r.got||0)+a;r.gotLog=(r.gotLog?r.gotLog+',':'')+d+':'+a;if(r.got>=r.amount)r.subPaid=d}
+  else{r.subPay=a;r.subPaid=d}
+  closeDp(); saveTrip(r); render(); if(!$('drsheet').hidden)renderDriver();
+  const left2=r.kind==='cost'?r.amount-r.got:0;
+  toast(`${r.sub||'기사'}에게 ${comma(a)}원 줌 (${md(d)})${left2>0?` · 남은 줄 돈 ${won(left2)}`:''}`,()=>{Object.assign(r,before);saveTrip(r);render();if(!$('drsheet').hidden)renderDriver()})};
+
 let drName='', drRecs=[], drShow=5;
 const drRecsOf=name=>[...costs.filter(c=>c.cat==='기사'&&c.sub===name).map(c=>{const lt=c.link?store.get(c.link):null;
-    return {id:c.id,date:c.date,amt:c.amount,paid:c.subPaid,phone:c.subPhone,trip:lt&&!lt.deleted?lt:null,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')}}),
+    return {id:c.id,date:c.date,amt:c.amount,got:c.subPaid?0:(c.got||0),paid:c.subPaid,phone:c.subPhone,trip:lt&&!lt.deleted?lt:null,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')}}),
   ...trips.filter(t=>t.sub===name).map(t=>({id:t.id,date:t.date,amt:t.subPay,paid:t.subPaid,phone:t.subPhone,trip:t,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((a,b)=>b.date.localeCompare(a.date));
 function drListHtml(){
-  return drRecs.slice(0,drShow).map(x=>`<div class="drr"><small class="num">${md(x.date)}</small><span>${esc(x.route||'경로 없음')}</span><b class="num" style="color:${x.paid?'var(--paid)':'var(--sub)'}">${short(x.amt)}<small> ${x.paid?'줌':'안 줌'}</small></b>`
+  return drRecs.slice(0,drShow).map(x=>`<div class="drr"><small class="num">${md(x.date)}</small><span>${esc(x.route||'경로 없음')}</span><b class="num" style="color:${x.paid?'var(--paid)':'var(--sub)'}">${short(x.paid?x.amt:x.amt-(x.got||0))}<small> ${x.paid?'줌':x.got?`남음 (${short(x.amt)} 중)`:'안 줌'}</small></b>`
     +(x.paid?`<small class="st num">${md(x.paid)}에 줌</small>`:`<button type="button" class="btn small" data-drpay="${x.id}">줬어요</button>`)+'</div>').join('')
     +(drRecs.length>drShow?`<button type="button" class="clmore" id="dr-more">더보기 <span class="num">(남은 ${drRecs.length-drShow}건)</span></button>`:'');
 }
 function renderDriver(){
-  const all=drRecsOf(drName), L=drRecs=all.filter(x=>inPer(x.date)), pl=perLbl(), due=L.filter(x=>!x.paid), dueSum=due.reduce((a,x)=>a+x.amt,0), paid=L.filter(x=>x.paid);
+  const all=drRecsOf(drName), L=drRecs=all.filter(x=>inPer(x.date)), pl=perLbl(), due=L.filter(x=>!x.paid), dueSum=due.reduce((a,x)=>a+x.amt-(x.got||0),0), paid=L.filter(x=>x.paid);
   const oldest=due.length?due.reduce((a,x)=>x.date<a.date?x:a):null, ph=(all.find(x=>x.phone)||{}).phone;
   const linked=L.filter(x=>x.trip), mine=linked.reduce((a,x)=>a+(x.trip.amount-x.amt),0);
   $('dr-h').textContent=drName;
@@ -1271,8 +1295,7 @@ $('drsheet').addEventListener('click',e=>{
   if(e.target===$('drsheet')||e.target.closest('#dr-close')){closeDriver();return}
   if(e.target.closest('#dr-more')){drShow+=10;$('dr-list').innerHTML=drListHtml();return}
   const sp=e.target.closest('[data-sp]'); if(sp){setSheetPer(sp.dataset.sp);drShow=5;renderDriver();return}
-  const b=e.target.closest('[data-drpay]'); if(b){const r=store.get(b.dataset.drpay);if(!r)return;const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);const keep=drShow;renderDriver();drShow=keep;$('dr-list').innerHTML=drListHtml();render();
-    toast(`${drName}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);if(!$('drsheet').hidden)renderDriver()})}
+  const b=e.target.closest('[data-drpay]'); if(b){openDp(b.dataset.drpay);return}
 });
 
 // ---------- 화주 한눈에 보기 ----------
@@ -1545,6 +1568,7 @@ window.addEventListener('popstate',e=>{
   if(!$('drsheet').hidden&&!s.dsheet)$('drsheet').hidden=true;
   if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
+  if(!$('dpsheet').hidden&&!s.dpsheet)$('dpsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)leaveEdit();
@@ -1562,6 +1586,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="tel:"]'))return; // 전화 앱 키패드로 번호만 넘김
   const cp=e.target.closest('[data-copy]');
   if(cp){const v=cp.dataset.copy;
+  const dpo=e.target.closest('[data-dpopen]'); if(dpo){openDp(dpo.dataset.dpopen);return}
     try{navigator.clipboard.writeText(v).then(()=>toast(`${v} 복사했어요`),()=>toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요'))}
     catch(_){toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요')}
     return}
@@ -1802,11 +1827,11 @@ function setCfPaid(v){cfPaid=!!v;document.querySelectorAll('#cf-paid [data-cfpai
 // 기사 이름: 지출의 기사 운임 + 예전 맡긴 기록에서 자주 쓴 순
 function topSubs(){const c={};[...costs.filter(x=>x.cat==='기사'),...trips].forEach(x=>{if(!x.sub)return;const w=Math.pow(0.5,Math.max(0,daysSince(x.date))/14);c[x.sub]=(c[x.sub]||0)+w});return Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,6)}
 // 기사에게 줄 돈: 기사 운임 지출 중 아직 안 준 것 + 예전 방식으로 맡긴 운행 중 안 준 것
-const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c.id,date:c.date,sub:c.sub,phone:c.subPhone,memo:c.memo,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
+const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c.id,date:c.date,sub:c.sub,phone:c.subPhone,memo:c.memo,amt:Math.max(0,c.amount-(c.got||0)),total:c.amount,got:c.got||0,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
   ...trips.filter(t=>t.sub&&!t.subPaid).map(t=>({id:t.id,date:t.date,sub:t.sub,phone:t.subPhone,memo:t.memo,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort(byOld);
-// 받을 돈 화면 [받을 돈 | 기사에게 줄 돈] (이 휴대폰에 기억)
+// 남은 돈 화면 [받을 돈 | 기사에게 줄 돈] (이 휴대폰에 기억)
 let uMode=ls.get('uMode')==='give'?'give':'recv';
-const drvItem=(x,done)=>`<div class="udi"><div class="w"><b${x.sub?` class="tapname" data-drvname="${esc(x.sub)}" role="button"`:''}>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span>`
+const drvItem=(x,done)=>`<div class="udi"><div class="w"><b${x.sub?` class="tapname" data-drvname="${esc(x.sub)}" role="button"`:''}>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}${x.got?` · ${short(x.got)} 줌, 남음`:''}</span></div><span class="num">${comma(x.amt)}</span>`
   +(done?`<span class="done">${md(x.paid)} 줌</span>`:`<button type="button" class="btn small" data-drvpay="${x.id}">줬어요</button>`)+'</div>';
 function renderGive(all){
   // 받을 돈과 같은 도구: [목록 | 달력] · 찾기 · 기간 · 미수 기간 · 순서 (값도 받을 돈과 같이 씀)
@@ -1861,8 +1886,7 @@ function renderGiveCal(all){
 $('v-unpaid').addEventListener('click',e=>{
   const m=e.target.closest('[data-umode]'); if(m){uMode=m.dataset.umode;ls.set('uMode',uMode);openId=payingId=null;renderUnpaid();window.scrollTo(0,0);return}
   const dn=e.target.closest('[data-drvname]'); if(dn){openDriver(dn.dataset.drvname);return}
-  const b=e.target.closest('[data-drvpay]');if(!b)return;const r=store.get(b.dataset.drvpay);if(!r)return;
-  const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);renderUnpaid();toast(`${r.sub||'기사'}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);renderUnpaid()})});
+  const b=e.target.closest('[data-drvpay]');if(b)openDp(b.dataset.drvpay)});
 // 기사 운임: 화주 · 상차지 · 하차지만 적음 · 최근 운행에 셋이 같은 건이 있으면 그 운행과 연결 (운임에서 기사 운임을 빼면 내 몫)
 // 연결은 link 칸(운행 id)에 저장 · 운행 상세에 "기사 운임" 줄이 생김
 let cfLink='', cfLinkOff=false;
