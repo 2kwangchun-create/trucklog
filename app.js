@@ -555,10 +555,10 @@ function renderLedger(){
   const mc=ledCosts(), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-subOut-csum;
   $('l-earn').hidden=!subL.length;
   if(subL.length)$('l-earn').innerHTML=`실제 번 돈 <b class="num">${won(sum-subOut)}</b> · 맡긴 ${subL.length}건은 내 몫만 (기사에게 줄 돈 ${short(subOut)}원 뺌)`;
-  $('l-ntrip').textContent=all.length+'건'; $('l-ncost').textContent=mc.length+'건';
+  $('l-ntrip').textContent=all.length+'건'; $('l-ncost').textContent=(mc.length+subL.length)+'건';
   $('l-netlabel').textContent=span+' 순수익';
   $('l-costlabel').textContent=fees?'수수료·지출':'지출';
-  $('l-cost').textContent=short(fees+csum);
+  $('l-cost').textContent=short(fees+csum+subOut); // 지출에 기사 운임 포함
   $('l-net').textContent=(net<0?'-':'')+won(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
   // 실제로 들어온 돈 기준: 받은 돈 − 받은 건의 수수료 − 지출 (못 받은 돈이 많으면 마이너스일 수 있음)
   const cash=paid-all.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0)-subL.filter(t=>t.subPaid).reduce((s,t)=>s+t.subPay,0)-csum;
@@ -566,15 +566,17 @@ function renderLedger(){
   // 스위치: 전체(못 받은 돈 포함) ↔ 지금까지 들어온 돈 기준
   const byCash=netMode==='cash';
   $('l-net').hidden=byCash; $('l-cash').hidden=!byCash;
-  $('l-netcap').textContent=byCash?`받은 돈 − 받은 건 수수료${subL.length?' − 기사에게 보낸 돈':''} − 지출 · 지금까지 실제로 들어온 돈`:`운임 − 수수료${subL.length?' − 기사에게 줄 돈':''} − 지출 · 못 받은 돈까지 포함`;
+  $('l-netcap').textContent=byCash?`받은 돈 − 받은 건 수수료 − 지출${subL.length?'(기사에게 보낸 돈)':''} · 지금까지 실제로 들어온 돈`:`운임 − 수수료 − 지출${subL.length?'(기사 운임 포함)':''} · 못 받은 돈까지 포함`;
   document.querySelectorAll('#l-netsw [data-netmode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.netmode===netMode));
   $('l-costh').textContent=span+' 지출';
-  $('l-costsum').textContent=won(csum);
+  $('l-costsum').textContent=won(csum+subOut);
   $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
   const byCat={};mc.forEach(c=>byCat[c.cat||'기타']=(byCat[c.cat||'기타']||0)+c.amount);
+  if(subOut)byCat['기사 운임']=subOut;
   $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
-  const cshown=[...mc].sort(byNew);
-  $('l-costs').innerHTML=cshown.length?cshown.map(costRowHtml).join(''):`<div class="empty">${span}은 적은 지출이 없어요.</div>`;
+  // 지출 목록: 적은 지출 + 기사 운임(맡긴 건), 날짜 최근 순
+  const cshown=[...mc.map(c=>({d:c.date,k:c.createdAt||0,h:costRowHtml(c)})),...subL.map(t=>({d:t.date,k:t.createdAt||0,h:subCostRowHtml(t)}))].sort((a,b)=>b.d.localeCompare(a.d)||b.k-a.k);
+  $('l-costs').innerHTML=cshown.length?cshown.map(x=>x.h).join(''):`<div class="empty">${span}은 적은 지출이 없어요.</div>`;
 }
 function monthCosts(y,m){const p=`${y}-${pad(m+1)}`;return costs.filter(c=>c.date.startsWith(p))}
 
@@ -684,6 +686,10 @@ $('ledsheet').addEventListener('click',e=>{
   if(e.target.closest('#lp-apply')){const r=lpDraft;if(!r.start)return;pickApply({start:r.start,end:lpMode==='day'?r.start:(r.end||r.start)})}
 });
 let costOpen=null, costDel=null;
+// 기사 운임 (맡긴 건): 누르면 운행 목록에서 그 건을 펼쳐 보여줌 · 고치기는 운행에서
+const subCostRowHtml=t=>`<div class="row crow subc"><div class="chead" data-do="subcost" data-id="${t.id}" role="button" tabindex="0">`
+  +`<span class="cat">기사 운임</span><span class="cmemo">🤝 ${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
+  +`<span class="cdate num">${md(t.date)} 운행 · ${t.subPaid?md(t.subPaid)+' 보냄':'아직 안 보냄'}</span></div></div>`;
 function costRowHtml(c){
   const open=costOpen===c.id;
   const act=!open?'':`<div class="act"><button type="button" class="btn ghost small" data-do="cedit" data-id="${c.id}">수정</button>`
@@ -895,20 +901,24 @@ function ledgerXlsx(list,costList,label){
   const sum=L.reduce((s,t)=>s+t.amount,0), fees=L.reduce((s,t)=>s+(t.fee||0),0), got=L.reduce((s,t)=>s+recv(t),0), due=L.reduce((s,t)=>s+left(t),0), cs=C.reduce((s,c)=>s+c.amount,0);
   const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
   const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17,11,15,11,13,12,12],filterRows:L.length+1});
-  const cost=XL.sheet([['날짜','항목','금액','메모'],...C.map(c=>[day(c.date),c.cat,money(c.amount),c.memo]),...(C.length?[[S('합계',5),S(C.length+'건',5),S(cs,6),S('',5)]]:[])],{widths:[12,12,13,34],filterRows:C.length+1});
+  // 지출 시트: 적은 지출 + 기사 운임(맡긴 건)
+  const SC=L.filter(t=>t.sub), CR=[...C.map(c=>({d:c.date,r:[day(c.date),c.cat,money(c.amount),c.memo]})),...SC.map(t=>({d:t.date,r:[day(t.date),'기사 운임',money(t.subPay),`${t.sub} · ${cities(t,'from')}→${cities(t,'to')} · ${t.subPaid?md(t.subPaid)+' 보냄':'아직 안 보냄'}`]}))].sort((a,b)=>a.d.localeCompare(b.d));
+  const csAll=cs+SC.reduce((s,t)=>s+t.subPay,0);
+  const cost=XL.sheet([['날짜','항목','금액','메모'],...CR.map(x=>x.r),...(CR.length?[[S('합계',5),S(CR.length+'건',5),S(csAll,6),S('',5)]]:[])],{widths:[12,12,13,40],filterRows:CR.length+1});
   // 요약: 큰 숫자 · 화주별 · 지출 항목별
   const taxSum=L.filter(t=>t.tax).reduce((s,t)=>s+t.amount,0);
   const subOut=L.filter(t=>t.sub).reduce((s,t)=>s+t.subPay,0), subSent=L.filter(t=>t.sub&&t.subPaid).reduce((s,t)=>s+t.subPay,0);
   const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
   const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
   const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
+  if(subOut)byK['기사 운임']=subOut; // 맡긴 건의 기사 운임도 지출
   const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
-    [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],['지출',money(cs)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
-    ...(subOut?[['맡긴 건 기사에게 줄 돈',money(subOut)],['실제 번 돈 (맡긴 건은 내 몫만)',money(sum-subOut)]]:[]),
-    [S(subOut?'순수익 (운임 − 수수료 − 기사에게 줄 돈 − 지출)':'순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-subOut-cs,6)],[S(subOut?'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 기사에게 보낸 돈 − 지출)':'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-subSent-cs,6)],[],
+    [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],[subOut?'지출 (기사 운임 포함)':'지출',money(cs+subOut)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
+    ...(subOut?[['실제 번 돈 (맡긴 건은 내 몫만)',money(sum-subOut)]]:[]),
+    [S('순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-subOut-cs,6)],[S(subOut?'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출 · 기사 운임은 보낸 것만)':'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-subSent-cs,6)],[],
     [S('화주',1),S('건수',1),S('운임',1),S('받은 돈',1),S('남은 돈',1)],
     ...Object.entries(byC).sort((a,b)=>b[1].a-a[1].a).map(([k,o])=>[k,S(o.n,0),money(o.a),money(o.g),money(o.d)])];
-  if(C.length)sumRows.push([],[S('지출 항목',1),S('금액',1)],...Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,money(v)]));
+  if(C.length||subOut)sumRows.push([],[S('지출 항목',1),S('금액',1)],...Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,money(v)]));
   const summary=XL.sheet(sumRows,{header:false,widths:[46,14,14,14,14]});
   return XL.book([{name:'요약',xml:summary},{name:'운행',xml:trip},{name:'지출',xml:cost}]);
 }
@@ -1669,6 +1679,7 @@ document.addEventListener('click',e=>{
     case 'subtax': { const before={subTax:t.subTax}; t.subTax=t.subTax?'':todayIso; saveTrip(t); toast(t.subTax?'기사 계산서 받음으로 표시했어요':'기사 계산서 받음을 지웠어요',()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
     case 'subcopy': copyPlain(subText(t),'기사 정산 내용을 복사했어요. 문자 · 카톡에 붙여넣기 하세요'); break;
     case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
+    case 'subcost': ledKind='trip'; ledFilter='all'; openId=id; payingId=deletingId=null; render(); {const r=document.querySelector(`#l-list .row[data-id="${id}"]`);if(r)window.scrollTo(0,r.getBoundingClientRect().top+scrollY-80)} return;
     case 'cdel': costDel=id; break;
     case 'cdelcancel': costDel=null; break;
     case 'leg': { // 여러 곳: 한 곳씩 완료 (다시 누르면 취소). 상차는 순서 상관없이, 하차는 상차가 다 끝난 뒤
