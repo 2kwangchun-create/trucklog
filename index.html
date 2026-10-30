@@ -134,6 +134,21 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .catgrid button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:12px 2px;font-size:15px;font-weight:600;color:var(--fg)}
 .catgrid button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+/* 지출 › 기사 운임: 화주 · 상차지 · 하차지 + 같은 운행 연결 */
+.catgrid .drvcat{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--sub);color:var(--sub);background:var(--sub-soft)}
+.catgrid .drvcat small{font-size:12px;font-weight:500;opacity:.85}
+.catgrid .drvcat .ic{width:18px;height:18px}
+.catgrid .drvcat[aria-pressed="true"]{background:var(--sub);border-color:var(--sub);color:#fff}
+.drvbox{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub)}
+.drvbox>label{font-size:15px;font-weight:700;margin-top:4px;display:flex;align-items:center;gap:6px}
+.drvlink{display:flex;flex-direction:column;gap:6px}
+.drvlink:empty{display:none}
+.drvlink>small{font-size:13px;color:var(--muted);font-weight:600;margin-top:4px}
+.drvlink button{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;color:var(--fg);cursor:pointer}
+.drvlink button[aria-pressed="true"]{border:2px solid var(--sub);background:var(--sub-soft)}
+.drvlink button b{white-space:nowrap}
+.drvlink button i{font-style:normal;grid-column:1/-1;font-size:13px;color:var(--sub);font-weight:700}
+.drvlink button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cf-recent{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted);padding:4px 4px 0}
 .cf-recent:empty{display:none}
 .cf-recent b{color:var(--fg);font-weight:600}
@@ -988,6 +1003,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="card field"><label for="cf-date">날짜 <em>*</em></label><input type="date" id="cf-date"></div>
       <div class="card field"><span class="flabel">항목 <em>*</em></span>
         <div class="catgrid" id="cf-cat" role="group" aria-label="지출 항목">
+          <button type="button" data-cat="기사" class="drvcat" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"/></svg>기사 운임 <small>다른 기사에게 맡긴 일</small></button>
           <button type="button" data-cat="주유" aria-pressed="false">주유</button>
           <button type="button" data-cat="요소수" aria-pressed="false">요소수</button>
           <button type="button" data-cat="통행료" aria-pressed="false">통행료</button>
@@ -997,6 +1013,12 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
           <button type="button" data-cat="식비" aria-pressed="false">식비</button>
           <button type="button" data-cat="기타" aria-pressed="false">기타</button>
         </div></div>
+      <div class="card field drvbox" id="cf-drv" hidden>
+        <label for="cf-client">화주</label><input type="text" id="cf-client" placeholder="예: 대한물류"><div class="recent" id="cr-client"></div>
+        <label for="cf-from"><i class="mk from"></i>상차지</label><input type="text" id="cf-from" placeholder="시·군 (예: 부산)"><div class="recent" id="cr-from"></div>
+        <label for="cf-to"><i class="mk to"></i>하차지</label><input type="text" id="cf-to" placeholder="시·군 (예: 대구)"><div class="recent" id="cr-to"></div>
+        <div class="drvlink" id="cf-link"></div>
+      </div>
       <div class="card field"><label for="cf-amt">금액 <em>*</em></label>
         <div class="amtbox"><input type="text" id="cf-amt" class="num" inputmode="numeric" placeholder="예: 80,000"><span>원</span></div>
         <div class="quick"><button type="button" data-cadd="10000">+1만</button><button type="button" data-cadd="50000">+5만</button><button type="button" data-cadd="100000">+10만</button><button type="button" data-cadd="0">지우기</button></div></div>

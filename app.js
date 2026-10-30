@@ -145,7 +145,7 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','sub','subPhone','subPaid','subTax','stopAt'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','sub','subPhone','subPaid','subTax','link','stopAt'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
     amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),got:Math.max(0,Math.round(Number(r.got)||0)),cut:Math.max(0,Math.round(Number(r.cut)||0)),subPay:Math.max(0,Math.round(Number(r.subPay)||0)),paid:r.paid?String(r.paid):null};
@@ -299,6 +299,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       +xStops(t,'to').map((x,i)=>addrBlk(`하차 ${i+2}`,'to',x.c,x.a,x.p,x.n)).join('')
       +(t.gotLog?`<div class="blk"><span class="bl">받은 기록</span><div class="num">${t.gotLog.split(',').filter(Boolean).map(x=>{const[d,a]=x.split(':');return md(d)+' '+won(Number(a))}).join(' · ')}${t.paid?'':`<br><b class="c-due">남은 돈 ${won(left(t))}</b>`}</div></div>`:'')
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
+      +(linkedCosts(t).length?`<div class="blk"><span class="bl">기사 운임 (지출)</span><div class="subm num">${linkedCosts(t).map(c=>`<div><span>${md(c.date)}</span><b>${won(c.amount)}</b></div>`).join('')}<div class="pay"><span>내 몫</span><b>${won(t.amount-linkedCosts(t).reduce((a,c)=>a+c.amount,0))}</b></div></div></div>`:'')
       +(t.sub?`<div class="blk"><span class="bl">맡긴 기사</span><div class="addr"><b>${esc(t.sub)}</b> ${subChipHtml(t)}</div>${ctHtml(t.subPhone,'')}`
         +`<div class="subm num"><div><span>운임</span><b>${won(t.amount)}</b></div><div><span>내 몫</span><b>${won(myCut(t))}</b></div><div class="pay"><span>기사에게 ${t.subPaid?'보낸':'줄'} 돈</span><b>${won(t.subPay)}</b></div></div>`
         +`<div>${t.subPaid?`${md(t.subPaid)}에 ${won(t.subPay)} 보냄`:'아직 안 보냄'} · ${t.subTax?`기사 계산서 받음 ${md(t.subTax)}`:'<span class="na">기사 계산서 안 받음</span>'}</div></div>`:'')
@@ -571,8 +572,8 @@ function renderLedger(){
   $('l-costh').textContent=span+' 지출';
   $('l-costsum').textContent=won(csum+subOut);
   $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
-  const byCat={};mc.forEach(c=>byCat[c.cat||'기타']=(byCat[c.cat||'기타']||0)+c.amount);
-  if(subOut)byCat['기사 운임']=subOut;
+  const byCat={};mc.forEach(c=>byCat[catName(c)]=(byCat[catName(c)]||0)+c.amount);
+  if(subOut)byCat['기사 운임']=(byCat['기사 운임']||0)+subOut;
   $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
   // 지출 목록: 적은 지출 + 기사 운임(맡긴 건), 날짜 최근 순
   const cshown=[...mc.map(c=>({d:c.date,k:c.createdAt||0,h:costRowHtml(c)})),...subL.map(t=>({d:t.date,k:t.createdAt||0,h:subCostRowHtml(t)}))].sort((a,b)=>b.d.localeCompare(a.d)||b.k-a.k);
@@ -690,13 +691,14 @@ let costOpen=null, costDel=null;
 const subCostRowHtml=t=>`<div class="row crow subc"><div class="chead" data-do="subcost" data-id="${t.id}" role="button" tabindex="0">`
   +`<span class="cat">기사 운임</span><span class="cmemo">${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
   +`<span class="cdate num">${md(t.date)} 운행 · ${t.subPaid?md(t.subPaid)+' 보냄':'아직 안 보냄'}</span></div></div>`;
+const catName=c=>c.cat==='기사'?'기사 운임':(c.cat||'기타');
 function costRowHtml(c){
   const open=costOpen===c.id;
   const act=!open?'':`<div class="act"><button type="button" class="btn ghost small" data-do="cedit" data-id="${c.id}">수정</button>`
     +(costDel===c.id?`<button type="button" class="btn danger small" data-do="cdelcfm" data-id="${c.id}">정말 삭제</button><button type="button" class="btn ghost small" data-do="cdelcancel">취소</button>`
       :`<button type="button" class="btn ghost small" data-do="cdel" data-id="${c.id}">삭제</button>`)+`</div>`;
   return `<div class="row crow${open?' open':''}"><div class="chead" data-do="copen" data-id="${c.id}" role="button" tabindex="0" aria-expanded="${open}">`
-    +`<span class="cat">${esc(c.cat||'기타')}</span><span class="cmemo">${esc(c.memo)}</span><b class="num camt">${comma(c.amount)}</b><span class="cdate num">${md(c.date)}</span></div>${act}</div>`;
+    +`<span class="cat">${c.cat==='기사'?'기사 운임':esc(c.cat||'기타')}</span><span class="cmemo">${esc(c.cat==='기사'?[[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · '),c.memo].filter(Boolean).join(' · '):c.memo)}</span><b class="num camt">${comma(c.amount)}</b><span class="cdate num">${md(c.date)}</span></div>${act}</div>`;
 }
 
 // ---------- 등록 ----------
@@ -902,7 +904,7 @@ function ledgerXlsx(list,costList,label){
   const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
   const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17,11,15,11,13,12,12],filterRows:L.length+1});
   // 지출 시트: 적은 지출 + 기사 운임(맡긴 건)
-  const SC=L.filter(t=>t.sub), CR=[...C.map(c=>({d:c.date,r:[day(c.date),c.cat,money(c.amount),c.memo]})),...SC.map(t=>({d:t.date,r:[day(t.date),'기사 운임',money(t.subPay),`${t.sub} · ${cities(t,'from')}→${cities(t,'to')} · ${t.subPaid?md(t.subPaid)+' 보냄':'아직 안 보냄'}`]}))].sort((a,b)=>a.d.localeCompare(b.d));
+  const SC=L.filter(t=>t.sub), CR=[...C.map(c=>({d:c.date,r:[day(c.date),catName(c),money(c.amount),c.cat==='기사'?[c.client,[c.from,c.to].filter(Boolean).join('→'),c.memo].filter(Boolean).join(' · '):c.memo]})),...SC.map(t=>({d:t.date,r:[day(t.date),'기사 운임',money(t.subPay),`${t.sub} · ${cities(t,'from')}→${cities(t,'to')} · ${t.subPaid?md(t.subPaid)+' 보냄':'아직 안 보냄'}`]}))].sort((a,b)=>a.d.localeCompare(b.d));
   const csAll=cs+SC.reduce((s,t)=>s+t.subPay,0);
   const cost=XL.sheet([['날짜','항목','금액','메모'],...CR.map(x=>x.r),...(CR.length?[[S('합계',5),S(CR.length+'건',5),S(csAll,6),S('',5)]]:[])],{widths:[12,12,13,40],filterRows:CR.length+1});
   // 요약: 큰 숫자 · 화주별 · 지출 항목별
@@ -910,8 +912,8 @@ function ledgerXlsx(list,costList,label){
   const subOut=L.filter(t=>t.sub).reduce((s,t)=>s+t.subPay,0), subSent=L.filter(t=>t.sub&&t.subPaid).reduce((s,t)=>s+t.subPay,0);
   const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
   const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
-  const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
-  if(subOut)byK['기사 운임']=subOut; // 맡긴 건의 기사 운임도 지출
+  const byK={};C.forEach(c=>byK[catName(c)]=(byK[catName(c)]||0)+c.amount);
+  if(subOut)byK['기사 운임']=(byK['기사 운임']||0)+subOut; // 맡긴 건의 기사 운임도 지출
   const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
     [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],[subOut?'지출 (기사 운임 포함)':'지출',money(cs+subOut)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
     ...(subOut?[['실제 번 돈 (맡긴 건은 내 몫만)',money(sum-subOut)]]:[]),
@@ -1341,7 +1343,7 @@ function renderTax(){
   const sum=L.reduce((s,t)=>s+t.amount,0), T=L.filter(t=>t.tax), tSum=T.reduce((s,t)=>s+t.amount,0), N=L.filter(t=>!t.tax), nSum=sum-tSum;
   const fees=L.reduce((s,t)=>s+(t.fee||0),0), cs0=C.reduce((s,c)=>s+c.amount,0);
   const SL=L.filter(t=>t.sub), subOut=SL.reduce((s,t)=>s+t.subPay,0), subGot=SL.filter(t=>t.subTax).length, cs=cs0+subOut; // cs: 지출 + 맡긴 기사 운임
-  const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
+  const byK={};C.forEach(c=>byK[catName(c)]=(byK[catName(c)]||0)+c.amount);
   const due=txP==='h1'?`${txY}년 7월 25일까지`:txP==='h2'?`${txY+1}년 1월 25일까지`:`${txY+1}년 5월 31일까지`;
   const row=(l,v,cls='')=>`<div class="txrow ${cls}"><span>${l}</span><b class="num">${v}</b></div>`;
   $('tx-body').innerHTML=`<p class="txdue"><b>${TXP[txP][3]} 신고</b> · ${due}<small>개인 일반과세자 기준이에요. 정확한 신고는 세무사와 확인하세요.</small></p>`
@@ -1826,18 +1828,49 @@ function setMode(){
 function setKind(k){formKind=k;setMode();if(k==='cost')renderCostRecent();else loadDraftNew()}
 
 // ---------- 지출 기록 ----------
-function setCat(c){costCat=c;document.querySelectorAll('#cf-cat [data-cat]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===c))}
-function resetCost(){costEditId=null;$('cf').reset();$('cf-date').value=todayIso;$('cf-err').textContent='';setCat('');setMode()}
+function setCat(c){costCat=c;document.querySelectorAll('#cf-cat [data-cat]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===c));
+  $('cf-drv').hidden=c!=='기사'; if(c==='기사')renderDrv()}
+function resetCost(){costEditId=null;$('cf').reset();$('cf-date').value=todayIso;$('cf-err').textContent='';cfLink='';cfLinkOff=false;setCat('');setMode()}
+// 기사 운임: 화주 · 상차지 · 하차지만 적음 · 최근 운행에 셋이 같은 건이 있으면 그 운행과 연결 (운임에서 기사 운임을 빼면 내 몫)
+// 연결은 link 칸(운행 id)에 저장 · 운행 상세에 "기사 운임" 줄이 생김
+let cfLink='', cfLinkOff=false;
+const linkedCosts=t=>costs.filter(c=>c.link===t.id);
+function drvMatches(){
+  const c=sNorm($('cf-client').value), f=sNorm($('cf-from').value), to=sNorm($('cf-to').value);
+  if(!c&&!f&&!to)return [];
+  return trips.filter(t=>(!c||sNorm(t.client)===c)&&(!f||sNorm(t.from)===f)&&(!to||sNorm(t.to)===to)&&!isPlan(t))
+    .sort(byNew).filter(t=>!costs.some(x=>x.link===t.id&&x.id!==costEditId)||t.id===cfLink).slice(0,3);
+}
+function renderDrv(){
+  [['client','cr-client','cf-client'],['from','cr-from','cf-from'],['to','cr-to','cf-to']].forEach(([k,box,inp])=>{
+    $(box).innerHTML=topVals(k).map(v=>`<button type="button" data-cfill="${inp}" data-v="${esc(v)}" aria-pressed="${v===$(inp).value.trim()}">${esc(v)}</button>`).join('')});
+  const m=drvMatches();
+  if(cfLink&&!m.some(t=>t.id===cfLink)&&!(costEditId!==null&&store.get(cfLink)))cfLink='';
+  if(!cfLink&&!cfLinkOff&&m.length)cfLink=m[0].id; // 가장 최근 같은 운행에 저절로 연결 (누르면 끊김)
+  const lt=cfLink?store.get(cfLink):null, list=lt&&!m.some(t=>t.id===lt.id)?[lt,...m]:m, amt=Number($('cf-amt').value.replace(/\D/g,''))||0;
+  $('cf-link').innerHTML=list.length?'<small>같은 운행 · 누르면 연결 / 끊기</small>'+list.map(t=>{const on=t.id===cfLink;
+    return `<button type="button" data-clink="${t.id}" aria-pressed="${on}"><small class="num">${md(t.date)}</small><span>${esc(t.client||'화주 미입력')} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num">${short(t.amount)}원</b>`
+      +(on?`<i>연결됨${amt?` · 내 몫 ${won(t.amount-amt)} (운임 ${short(t.amount)} − 기사 운임 ${short(amt)})`:' · 금액을 적으면 내 몫이 나와요'}</i>`:'')+'</button>'}).join(''):'';
+}
+['cf-client','cf-from','cf-to','cf-amt'].forEach(id=>$(id).addEventListener('input',()=>{if(costCat==='기사')renderDrv()}));
+$('cf').addEventListener('click',e=>{
+  const f=e.target.closest('[data-cfill]'); if(f){$(f.dataset.cfill).value=f.dataset.v;renderDrv();return}
+  const l=e.target.closest('[data-clink]'); if(l){const id=l.dataset.clink;
+    if(cfLink===id){cfLink='';cfLinkOff=true}else{cfLink=id;cfLinkOff=false;const t=store.get(id); // 연결하면 빈 칸은 그 운행 값으로
+      if(t){if(!$('cf-client').value.trim())$('cf-client').value=t.client||'';if(!$('cf-from').value.trim())$('cf-from').value=t.from;if(!$('cf-to').value.trim())$('cf-to').value=t.to}}
+    renderDrv()}
+});
 // 방금 적은 지출 확인용: 최근 5건
 function renderCostRecent(){
   const l=[...costs].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,5);
-  $('cf-recent').innerHTML=costEditId!==null||!l.length?'':'<span>최근 적은 지출</span>'+l.map(c=>`<span>${md(c.date)} <b>${esc(c.cat)}</b> ${comma(c.amount)}원${c.memo?' · '+esc(c.memo):''}</span>`).join('');
+  $('cf-recent').innerHTML=costEditId!==null||!l.length?'':'<span>최근 적은 지출</span>'+l.map(c=>`<span>${md(c.date)} <b>${c.cat==='기사'?'기사 운임':esc(c.cat)}</b> ${comma(c.amount)}원${c.cat==='기사'&&c.from?' · '+esc(c.from)+'→'+esc(c.to):''}${c.memo?' · '+esc(c.memo):''}</span>`).join('');
 }
 function startCostEdit(c){
   if(!c)return;
   backView=view==='add'?'ledger':view;
   resetCost(); costEditId=c.id; formKind='cost';
-  $('cf-date').value=c.date; setCat(c.cat||'기타'); $('cf-amt').value=comma(c.amount); $('cf-memo').value=c.memo||'';
+  $('cf-date').value=c.date; $('cf-amt').value=comma(c.amount); $('cf-memo').value=c.memo||'';
+  $('cf-client').value=c.client||''; $('cf-from').value=c.from||''; $('cf-to').value=c.to||''; cfLink=c.link||''; cfLinkOff=!c.link; setCat(c.cat||'기타');
   setMode(); renderCostRecent();
   view='add'; costOpen=costDel=null; pushOverlay({cedit:true,v:'add'}); render(); window.scrollTo(0,0);
 }
@@ -1845,22 +1878,23 @@ $('cf-amt').addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,''
 $('cf').addEventListener('submit',e=>{
   e.preventDefault();
   const date=$('cf-date').value, amount=Number($('cf-amt').value.replace(/\D/g,'')), memo=$('cf-memo').value.trim();
+  const drv=costCat==='기사', ex=drv?{client:$('cf-client').value.trim(),from:$('cf-from').value.trim(),to:$('cf-to').value.trim(),link:cfLink}:{client:'',from:'',to:'',link:''};
   const miss=[!date&&'날짜',!costCat&&'항목',!amount&&'금액'].filter(Boolean);
   if(miss.length){$('cf-err').textContent=`${miss.join(', ')}을(를) 입력해 주세요.`;return}
   const d=parseD(date); ledY=d.getFullYear(); ledM=d.getMonth(); ledKind='cost'; if(ledRange&&!inRange({date},ledRange))ledRange=null;
   if(costEditId!==null){
     const c=store.get(costEditId);
     if(!c){resetCost();popOverlay('cedit');go(backView);return}
-    const before={...c}; Object.assign(c,{date,cat:costCat,amount,memo}); saveTrip(c);
+    const before={...c}; Object.assign(c,{date,cat:costCat,amount,memo,...ex}); saveTrip(c);
     const id=c.id; resetCost(); view=backView; costOpen=id; popOverlay('cedit'); render(); window.scrollTo(0,0);
     toast('지출을 고쳤어요',()=>{Object.assign(c,before);saveTrip(c)});
     return;
   }
-  const c=normalize({id:newId(),createdAt:Date.now(),updatedAt:0,kind:'cost',date,cat:costCat,amount,memo});
+  const c=normalize({id:newId(),createdAt:Date.now(),updatedAt:0,kind:'cost',date,cat:costCat,amount,memo,...ex});
   saveTrip(c);
   // 주유·통행료처럼 이어서 적는 경우가 많아 화면은 그대로 두고 날짜만 유지
   resetCost(); $('cf-date').value=date; renderCostRecent();
-  toast(`${c.cat} ${comma(amount)}원 저장했어요`,()=>{removeTrip(c);renderCostRecent()});
+  toast(`${c.cat==='기사'?'기사 운임':c.cat} ${comma(amount)}원 저장했어요${c.link?' · 운행과 연결':''}`,()=>{removeTrip(c);renderCostRecent()});
 });
 
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
