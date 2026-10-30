@@ -142,6 +142,13 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .drvbox{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub)}
 .drvbox>label{font-size:15px;font-weight:700;margin-top:4px;display:flex;align-items:center;gap:6px}
 .drvlink{display:flex;flex-direction:column;gap:6px}
+.sortsw.umode{padding:4px}
+.sortsw.umode button{flex:1;font-size:15px;padding:9px 8px}
+.sortsw.umode button[data-umode="give"][aria-pressed="true"]{background:var(--sub);color:#fff}
+.sortsw.umode #u-givecnt{font-size:12px;font-weight:700;opacity:.85}
+#v-unpaid.givemode .hero{background:var(--sub);color:#fff}
+.udrv .udsec{font-size:13px;font-weight:700;color:var(--muted);margin-top:6px}
+.udrv .udi .done{font-size:13px;color:var(--paid);font-weight:700;white-space:nowrap}
 .udrv{border:1px solid var(--sub);background:var(--sub-soft);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .udrv .udh{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .udrv .udh b{font-size:16px;color:var(--sub)}
@@ -846,7 +853,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <div class="card udrv" id="u-drv" hidden></div>
+    <div class="sortsw umode" id="u-mode" role="group" aria-label="받을 돈 · 줄 돈"><button type="button" data-umode="recv" aria-pressed="true">받을 돈</button><button type="button" data-umode="give" aria-pressed="false">기사에게 줄 돈 <span class="num" id="u-givecnt"></span></button></div>
     <div class="seg kind" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true">목록</button><button type="button" data-uview="cal" aria-pressed="false">달력</button></div>
     <!-- 받을 돈 달력: 안 받은 날만 금액이 뜨고 누를 수 있음 (오래될수록 진한 빨강) -->
     <div class="card ucal" id="u-calbox" hidden>

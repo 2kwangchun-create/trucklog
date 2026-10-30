@@ -388,7 +388,12 @@ function initScope(id,inputId,key,onChange){
 let uRange=null, uPanel=false; // 받을 돈 기간 (null=전체) · uPanel은 예전 기간 패널용(지금은 늘 false)
 const rangeTxt=r=>r.start===r.end?md(r.start):`${md(r.start)} ~ ${md(r.end)}`;
 function renderUnpaid(){
-  renderDrvDue();
+  const give=uMode==='give', dd=drvDue();
+  document.querySelectorAll('#u-mode [data-umode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.umode===uMode));
+  $('u-givecnt').textContent=dd.length?dd.length+'건':'';
+  $('v-unpaid').classList.toggle('givemode',give);
+  ['u-view','u-searchbox','u-age','u-sortrow','u-rangebtn'].forEach(id=>$(id).hidden=give);
+  if(give){$('u-calbox').hidden=true;$('u-shint').hidden=true;renderGive(dd);return}
   document.querySelectorAll('#u-view [data-uview]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.uview===uView));
   const calMode=uView==='cal';
   // 달력으로 볼 땐 달력이 고르는 도구라 찾기 · 기간 · 미수 기간 · 순서는 숨김
@@ -1756,11 +1761,24 @@ function topSubs(){const c={};[...costs.filter(x=>x.cat==='기사'),...trips].fo
 // 기사에게 줄 돈: 기사 운임 지출 중 아직 안 준 것 + 예전 방식으로 맡긴 운행 중 안 준 것
 const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c.id,date:c.date,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
   ...trips.filter(t=>t.sub&&!t.subPaid).map(t=>({id:t.id,date:t.date,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort(byOld);
-function renderDrvDue(){const L=drvDue(),box=$('u-drv');box.hidden=!L.length;if(!L.length)return;
-  box.innerHTML=`<div class="udh"><b>기사에게 줄 돈 · ${L.length}건</b><span class="num">${won(L.reduce((a,x)=>a+x.amt,0))}</span></div>`
-    +L.map(x=>`<div class="udi"><div class="w"><b>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span><button type="button" class="btn small" data-drvpay="${x.id}">줬어요</button></div>`).join('')}
-$('u-drv').addEventListener('click',e=>{const b=e.target.closest('[data-drvpay]');if(!b)return;const r=store.get(b.dataset.drvpay);if(!r)return;
-  const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);renderDrvDue();toast(`${r.sub||'기사'}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);renderDrvDue()})});
+// 받을 돈 화면 [받을 돈 | 기사에게 줄 돈] (이 휴대폰에 기억)
+let uMode=ls.get('uMode')==='give'?'give':'recv';
+const drvItem=(x,done)=>`<div class="udi"><div class="w"><b>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span>`
+  +(done?`<span class="done">${md(x.paid)} 줌</span>`:`<button type="button" class="btn small" data-drvpay="${x.id}">줬어요</button>`)+'</div>';
+function renderGive(L){
+  const sum=L.reduce((a,x)=>a+x.amt,0), old=L.length?daysSince(L[0].date):0;
+  $('u-label').textContent='기사에게 줄 돈 (아직 안 준 것)'; $('u-total').textContent=won(sum);
+  $('u-sub').textContent=L.length?`${L.length}건 · 가장 오래된 것 ${old}일째`:'기사에게 줄 돈이 없어요';
+  // 최근에 준 것 5건 (확인용)
+  const paid=[...costs.filter(c=>c.cat==='기사'&&c.subPaid).map(c=>({id:c.id,date:c.date,paid:c.subPaid,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
+    ...trips.filter(t=>t.sub&&t.subPaid).map(t=>({id:t.id,date:t.date,paid:t.subPaid,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((x,y)=>y.paid.localeCompare(x.paid)).slice(0,5);
+  $('u-list').innerHTML=`<div class="card udrv">${L.length?L.map(x=>drvItem(x)).join(''):'<div class="empty">기사에게 줄 돈이 없어요. 지출 › 기사 운임에서 "아직 안 줌"으로 적으면 여기에 떠요.</div>'}`
+    +(paid.length?'<div class="udsec">최근에 준 것</div>'+paid.map(x=>drvItem(x,true)).join(''):'')+'</div>';
+}
+$('v-unpaid').addEventListener('click',e=>{
+  const m=e.target.closest('[data-umode]'); if(m){uMode=m.dataset.umode;ls.set('uMode',uMode);openId=payingId=null;renderUnpaid();window.scrollTo(0,0);return}
+  const b=e.target.closest('[data-drvpay]');if(!b)return;const r=store.get(b.dataset.drvpay);if(!r)return;
+  const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);renderUnpaid();toast(`${r.sub||'기사'}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);renderUnpaid()})});
 // 기사 운임: 화주 · 상차지 · 하차지만 적음 · 최근 운행에 셋이 같은 건이 있으면 그 운행과 연결 (운임에서 기사 운임을 빼면 내 몫)
 // 연결은 link 칸(운행 id)에 저장 · 운행 상세에 "기사 운임" 줄이 생김
 let cfLink='', cfLinkOff=false;
