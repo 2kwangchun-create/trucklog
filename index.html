@@ -427,8 +427,19 @@ body.selecting .head .cp{pointer-events:none}
 .chip.sdone{background:var(--paid-soft);color:var(--paid)}
 .chip.searly{background:var(--sub-soft);color:var(--sub)}
 .chip.sdue{background:var(--late-soft);color:var(--late)}
-.subm{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:15px}
-.subm b{color:var(--sub)}
+.subm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:4px}
+.subm div{display:flex;flex-direction:column;gap:1px;background:var(--bg);border-radius:10px;padding:8px 10px;min-width:0}
+.subm span{font-size:12px;color:var(--muted);font-weight:600}
+.subm b{font-size:15px;color:var(--fg)}
+.subm .pay{background:var(--sub-soft)}
+.subm .pay b{color:var(--sub)}
+/* 펼친 상세: 맡긴 기사 정산 버튼은 보라 상자 하나로 묶음 */
+.subact{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub);border-radius:12px;padding:8px;background:var(--sub-soft)}
+.subh{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--sub);padding:0 2px}
+.subh .ic{width:16px;height:16px}
+.subh span{margin-left:auto;font-weight:600}
+.subact .btn.ghost{background:var(--surface)}
+.subb .ic{width:14px;height:14px}
 .subbox{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .sublbl{font-size:15px;font-weight:700;margin-top:4px}
 .sublbl small{font-weight:500;color:var(--muted);margin-left:6px;font-size:13px}
@@ -1047,7 +1058,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card"><p id="s-stats" class="hint"></p></div>
     <div class="gt">업데이트 내용</div>
     <div class="card chgs" id="s-changes"></div>
-    <p class="ver">아빠장부 1.14.1</p>
+    <p class="ver">아빠장부 1.15.0</p>
   </section>
 </div>
 
