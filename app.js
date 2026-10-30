@@ -1271,13 +1271,13 @@ $('dp-ok').onclick=()=>{const r=store.get(dpId);if(!r){closeDp();return}
 
 // ---------- 기사 한눈에 보기 ----------
 // 기사 이름을 누르면: 연락처 · 아직 줄 돈 · 숫자 요약 · 맡긴 일 기록(5건씩 더보기) — 지출의 기사 운임 + 예전 방식으로 맡긴 운행
-let drName='', drRecs=[], drShow=5;
+let drName='', drRecs=[], drShow=5, drEdit=false;
 const drRecsOf=name=>[...costs.filter(c=>c.cat==='기사'&&c.sub===name).map(c=>{const lt=c.link?store.get(c.link):null;
     return {id:c.id,date:c.date,amt:c.amount,got:c.subPaid?0:(c.got||0),paid:c.subPaid,phone:c.subPhone,trip:lt&&!lt.deleted?lt:null,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')}}),
   ...trips.filter(t=>t.sub===name).map(t=>({id:t.id,date:t.date,amt:t.subPay,paid:t.subPaid,phone:t.subPhone,trip:t,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((a,b)=>b.date.localeCompare(a.date));
 function drListHtml(){
   return drRecs.slice(0,drShow).map(x=>`<div class="drr"><small class="num">${md(x.date)}</small><span>${esc(x.route||'경로 없음')}</span><b class="num" style="color:${x.paid?'var(--paid)':'var(--sub)'}">${short(x.paid?x.amt:x.amt-(x.got||0))}<small> ${x.paid?'줌':x.got?`남음 (${short(x.amt)} 중)`:'안 줌'}</small></b>`
-    +(x.paid?`<small class="st num">${md(x.paid)}에 줌</small>`:`<button type="button" class="btn small" data-drpay="${x.id}">줬어요</button>`)+'</div>').join('')
+    +`<span class="drbtns">${x.paid?`<small class="st num">${md(x.paid)}에 줌</small>`:`<button type="button" class="btn small" data-drpay="${x.id}">줬어요</button>`}<button type="button" class="btn ghost small" data-dredit="${x.id}">${ic(P.edit)}수정</button></span>`+'</div>').join('')
     +(drRecs.length>drShow?`<button type="button" class="clmore" id="dr-more">더보기 <span class="num">(남은 ${drRecs.length-drShow}건)</span></button>`:'');
 }
 function renderDriver(){
@@ -1285,19 +1285,36 @@ function renderDriver(){
   const oldest=due.length?due.reduce((a,x)=>x.date<a.date?x:a):null, ph=(all.find(x=>x.phone)||{}).phone;
   const linked=L.filter(x=>x.trip), mine=linked.reduce((a,x)=>a+(x.trip.amount-x.amt),0);
   $('dr-h').textContent=drName;
-  $('dr-body').innerHTML=perSw()+(ph?`<div class="clct"><a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a></div>`:'')
+  // 이름 · 전화 고치기: 이 기사의 모든 기록(지출 기사 운임 · 예전에 맡긴 운행)에 한 번에
+  const info=drEdit?`<div class="drinfo"><div class="contact"><input type="text" id="dr-n" value="${esc(drName)}" aria-label="기사 이름" placeholder="기사 이름"><input type="tel" id="dr-p" class="phone" inputmode="tel" value="${esc(ph||'')}" aria-label="기사 전화번호" placeholder="전화번호"></div>`
+      +`<p class="hint small">이 기사의 기록 ${all.length}건에 모두 바뀌어요.</p><div class="r1"><button type="button" class="btn" id="dr-save">저장</button><button type="button" class="btn ghost" id="dr-cancel">취소</button></div></div>`
+    :`<div class="clct">${ph?`<a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a>`:'<span class="na">전화번호 없음</span>'}<button type="button" class="btn ghost small drfix" id="dr-fix">${ic(P.edit)}이름 · 전화 고치기</button></div>`;
+  $('dr-body').innerHTML=perSw()+info
     +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${agoTxt(oldest.date)})</small></div>`:`<p class="clok">이 기사에게 ${pl?pl+' ':''}줄 돈이 없어요.</p>`)
     +`<div class="clstats"><div><span>맡긴 일</span><b class="num">${L.length}건</b></div><div><span>기사 운임 합계</span><b class="num">${short(L.reduce((a,x)=>a+x.amt,0))}원</b></div><div><span>준 돈</span><b class="num c-paid">${short(paid.reduce((a,x)=>a+x.amt,0))}원</b></div>`
     +`<div><span>마지막 일</span><b class="num">${L.length?md(L[0].date):'-'}</b></div><div><span>연결된 운행</span><b class="num">${linked.length}건</b></div><div><span>내 몫</span><b class="num">${linked.length?short(mine)+'원':'-'}</b></div></div>`
     +`<div class="section-title">${pl?pl+' ':''}맡긴 일 기록 <span class="num">${L.length}건</span></div><div class="clrecent drlist" id="dr-list">`+(L.length?drListHtml():`<div class="empty">${pl}에는 맡긴 일이 없어요.</div>`)+'</div>';
 }
-function openDriver(name){if(!name)return;drName=name;drShow=5;renderDriver();if($('drsheet').hidden){$('drsheet').hidden=false;pushOverlay({dsheet:true})}}
+function openDriver(name){if(!name)return;drName=name;drShow=5;drEdit=false;renderDriver();if($('drsheet').hidden){$('drsheet').hidden=false;pushOverlay({dsheet:true})}}
 function closeDriver(){$('drsheet').hidden=true;popOverlay('dsheet')}
 $('drsheet').addEventListener('click',e=>{
   if(e.target===$('drsheet')||e.target.closest('#dr-close')){closeDriver();return}
   if(e.target.closest('#dr-more')){drShow+=10;$('dr-list').innerHTML=drListHtml();return}
   const sp=e.target.closest('[data-sp]'); if(sp){setSheetPer(sp.dataset.sp);drShow=5;renderDriver();return}
   const b=e.target.closest('[data-drpay]'); if(b){openDp(b.dataset.drpay);return}
+  if(e.target.closest('#dr-fix')){drEdit=true;renderDriver();$('dr-n').focus();return}
+  if(e.target.closest('#dr-cancel')){drEdit=false;renderDriver();return}
+  if(e.target.closest('#dr-save')){
+    const n=$('dr-n').value.trim(), p=fmtPhone($('dr-p').value.trim());
+    if(!n){toast('기사 이름을 적어 주세요');return}
+    const recs=[...costs.filter(c=>c.cat==='기사'&&c.sub===drName),...trips.filter(t=>t.sub===drName)];
+    const before=recs.map(r=>({r,sub:r.sub,subPhone:r.subPhone})), old=drName;
+    recs.forEach(r=>{r.sub=n;r.subPhone=p});
+    saveTrips(recs); drName=n; drEdit=false; renderDriver(); render();
+    toast(`${old===n?'':old+' → '}${n} · ${recs.length}건 고쳤어요`,()=>{before.forEach(x=>{x.r.sub=x.sub;x.r.subPhone=x.subPhone});saveTrips(before.map(x=>x.r));drName=old;render();if(!$('drsheet').hidden)renderDriver()});return}
+  const ed=e.target.closest('[data-dredit]'); // 맡긴 일 한 건 고치기: 기사 운임이면 지출 수정, 예전에 맡긴 운행이면 운행 수정
+  if(ed){const r=store.get(ed.dataset.dredit); if(!r||r.deleted)return;
+    closeDriver(); setTimeout(()=>{if(r.kind==='cost')startCostEdit(r);else startEdit(r)},60); return}
 });
 
 // ---------- 화주 한눈에 보기 ----------

@@ -412,6 +412,15 @@ body.selecting .row .legs{display:none}
 .clrecent{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .clrecent div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;align-items:center}
 .clrecent div:first-child{border-top:0}
+/* 기사 한눈에 보기: 이름 · 전화 고치기, 기록마다 [수정] */
+.drfix{margin-left:auto}
+.drinfo{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--sub);border-radius:12px;background:var(--sub-soft)}
+.drinfo input{background:var(--surface)}
+.drbtns{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.drbtns .st{margin-right:auto}
+.drbtns .btn{min-height:38px}
+.drbtns .btn .ic{width:16px;height:16px}
+.drlist .drr .drbtns .btn.ghost{background:var(--surface);color:var(--fg);border-color:var(--line2);box-shadow:inset 0 0 0 1px var(--line2);gap:4px}
 .clrecent .clmore{border:0;border-top:1px solid var(--line);background:var(--bg);color:var(--accent);font:inherit;font-size:15px;font-weight:700;min-height:44px;cursor:pointer}
 .clrecent .clmore span{font-weight:500;color:var(--muted);font-size:13px}
 .clrecent small{color:var(--muted)}.srcetc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
