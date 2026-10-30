@@ -365,6 +365,15 @@ body.selecting .row .legs{display:none}
 .act .r2.three{grid-template-columns:repeat(3,1fr)}
 .act .r2.three .btn{padding-left:4px;padding-right:4px}
 .btn.cldue{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px}
+/* 기사 한눈에 보기 */
+.drdue{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px;border-radius:12px;background:var(--sub);color:#fff;text-align:center}
+.drdue span{font-size:15px;font-weight:700}
+.drdue b{font-size:22px;letter-spacing:-.3px}
+.drdue small{font-size:13px;font-weight:600;opacity:.9}
+.drlist .drr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center}
+.drlist .drr .st{grid-column:3;font-size:12px;text-align:right}
+.drlist .drr .btn{grid-column:3;min-height:32px;padding:2px 10px;font-size:13px;background:var(--sub);border-color:var(--sub);color:#fff}
+.tapname{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
 .btn.cldue span{font-size:15px}
 .btn.cldue b{font-size:22px;letter-spacing:-.3px}
 .btn.cldue small{font-size:13px;font-weight:600;opacity:.9}
@@ -1119,6 +1128,13 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="txyear"><button type="button" class="ib" id="tx-prev" aria-label="이전 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b id="tx-y" class="num"></b><button type="button" class="ib" id="tx-next" aria-label="다음 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
     <div class="seg" id="tx-per" role="group" aria-label="기간"><button type="button" data-txp="h1" aria-pressed="false">1~6월<br><span>부가세</span></button><button type="button" data-txp="h2" aria-pressed="false">7~12월<br><span>부가세</span></button><button type="button" data-txp="y" aria-pressed="false">1년<br><span>종합소득세</span></button></div>
     <div id="tx-body"></div>
+  </div>
+</div>
+<!-- 기사 한눈에 보기: 기사 이름을 누르면 (화주 한눈에 보기처럼) -->
+<div class="sheet" id="drsheet" role="dialog" aria-modal="true" aria-labelledby="dr-h" hidden>
+  <div class="sheet-in">
+    <div class="sheethead"><h2 id="dr-h">기사</h2><button type="button" class="ib" id="dr-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="clbody" id="dr-body"></div>
   </div>
 </div>
 <!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->

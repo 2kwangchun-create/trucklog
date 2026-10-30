@@ -278,7 +278,7 @@ const docChips=(t,prog=true)=>(prog?progChip(t):'')+(!t.paid&&t.got>0?`<span cla
 function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
   const client=t.client?`<span class="client tap" data-do="client" data-c="${esc(t.client)}" role="button" title="${esc(t.client)} 한눈에 보기">${esc(t.client)}</span>`:'<span class="client none">화주 미입력</span>';
-  const drvN=[...new Set(linkedCosts(t).map(c=>c.sub).filter(Boolean))].join(', '), drvB=drvN?`<span class="drvb">${ic(P.user)}${esc(drvN)}</span>`:'';
+  const drvN=[...new Set(linkedCosts(t).map(c=>c.sub).filter(Boolean))].join(', '), drvB=drvN?`<span class="drvb tapname" data-do="driver" data-s="${esc(drvN.split(', ')[0])}" role="button" title="기사 한눈에 보기">${ic(P.user)}${esc(drvN)}</span>`:'';
   const part=!t.paid&&t.got>0;
   const amt=part?`<b class="amt num c-due">${comma(left(t))}<small class="of">남은 돈 · 전체 ${short(t.amount)}원</small></b>`:`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
@@ -297,7 +297,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       +xStops(t,'to').map((x,i)=>addrBlk(`하차 ${i+2}`,'to',x.c,x.a,x.p,x.n)).join('')
       +(t.gotLog?`<div class="blk"><span class="bl">받은 기록</span><div class="num">${t.gotLog.split(',').filter(Boolean).map(x=>{const[d,a]=x.split(':');return md(d)+' '+won(Number(a))}).join(' · ')}${t.paid?'':`<br><b class="c-due">남은 돈 ${won(left(t))}</b>`}</div></div>`:'')
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
-      +(linkedCosts(t).length?`<div class="blk"><span class="bl">담당 기사 · 기사 운임</span>${linkedCosts(t).filter(c=>c.sub).map(c=>`<div class="addr"><b>${esc(c.sub)}</b> ${c.subPaid?`<span class="chip sdone">${md(c.subPaid)} 줌</span>`:'<span class="chip sgive">아직 안 줌</span>'}</div>${ctHtml(c.subPhone,'')}`).join('')}<div class="subm num">${linkedCosts(t).map(c=>`<div><span>${md(c.date)}</span><b>${won(c.amount)}</b></div>`).join('')}<div class="pay"><span>내 몫</span><b>${won(t.amount-linkedCosts(t).reduce((a,c)=>a+c.amount,0))}</b></div></div></div>`:'')
+      +(linkedCosts(t).length?`<div class="blk"><span class="bl">담당 기사 · 기사 운임</span>${linkedCosts(t).filter(c=>c.sub).map(c=>`<div class="addr"><b class="tapname" data-do="driver" data-s="${esc(c.sub)}" role="button">${esc(c.sub)}</b> ${c.subPaid?`<span class="chip sdone">${md(c.subPaid)} 줌</span>`:'<span class="chip sgive">아직 안 줌</span>'}</div>${ctHtml(c.subPhone,'')}`).join('')}<div class="subm num">${linkedCosts(t).map(c=>`<div><span>${md(c.date)}</span><b>${won(c.amount)}</b></div>`).join('')}<div class="pay"><span>내 몫</span><b>${won(t.amount-linkedCosts(t).reduce((a,c)=>a+c.amount,0))}</b></div></div></div>`:'')
       +(t.sub?`<div class="blk"><span class="bl">맡긴 기사 (예전 방식)</span><div class="addr"><b>${esc(t.sub)}</b></div>${ctHtml(t.subPhone,'')}`
         +`<div class="subm num"><div><span>운임</span><b>${won(t.amount)}</b></div><div><span>내 몫</span><b>${won(myCut(t))}</b></div><div class="pay"><span>기사에게 ${t.subPaid?'보낸':'줄'} 돈</span><b>${won(t.subPay)}</b></div></div>`
         +`<div>${t.subPaid?`${md(t.subPaid)}에 ${won(t.subPay)} 보냄`:'아직 안 보냄'} · ${t.subTax?`기사 계산서 받음 ${md(t.subTax)}`:'<span class="na">기사 계산서 안 받음</span>'}</div></div>`:'')
@@ -1242,6 +1242,37 @@ const Snap={
 };
 Snap.init();
 
+// ---------- 기사 한눈에 보기 ----------
+// 기사 이름을 누르면: 연락처 · 아직 줄 돈 · 숫자 요약 · 맡긴 일 기록(5건씩 더보기) — 지출의 기사 운임 + 예전 방식으로 맡긴 운행
+let drName='', drRecs=[], drShow=5;
+const drRecsOf=name=>[...costs.filter(c=>c.cat==='기사'&&c.sub===name).map(c=>{const lt=c.link?store.get(c.link):null;
+    return {id:c.id,date:c.date,amt:c.amount,paid:c.subPaid,phone:c.subPhone,trip:lt&&!lt.deleted?lt:null,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')}}),
+  ...trips.filter(t=>t.sub===name).map(t=>({id:t.id,date:t.date,amt:t.subPay,paid:t.subPaid,phone:t.subPhone,trip:t,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((a,b)=>b.date.localeCompare(a.date));
+function drListHtml(){
+  return drRecs.slice(0,drShow).map(x=>`<div class="drr"><small class="num">${md(x.date)}</small><span>${esc(x.route||'경로 없음')}</span><b class="num" style="color:${x.paid?'var(--paid)':'var(--sub)'}">${short(x.amt)}<small> ${x.paid?'줌':'안 줌'}</small></b>`
+    +(x.paid?`<small class="st num">${md(x.paid)}에 줌</small>`:`<button type="button" class="btn small" data-drpay="${x.id}">줬어요</button>`)+'</div>').join('')
+    +(drRecs.length>drShow?`<button type="button" class="clmore" id="dr-more">더보기 <span class="num">(남은 ${drRecs.length-drShow}건)</span></button>`:'');
+}
+function renderDriver(){
+  const L=drRecs=drRecsOf(drName), due=L.filter(x=>!x.paid), dueSum=due.reduce((a,x)=>a+x.amt,0), paid=L.filter(x=>x.paid);
+  const oldest=due.length?due.reduce((a,x)=>x.date<a.date?x:a):null, ph=(L.find(x=>x.phone)||{}).phone;
+  const linked=L.filter(x=>x.trip), mine=linked.reduce((a,x)=>a+(x.trip.amount-x.amt),0);
+  $('dr-h').textContent=drName;
+  $('dr-body').innerHTML=(ph?`<div class="clct"><a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a></div>`:'')
+    +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)</small></div>`:'<p class="clok">이 기사에게 줄 돈이 없어요.</p>')
+    +`<div class="clstats"><div><span>맡긴 일</span><b class="num">${L.length}건</b></div><div><span>기사 운임 합계</span><b class="num">${short(L.reduce((a,x)=>a+x.amt,0))}원</b></div><div><span>준 돈</span><b class="num c-paid">${short(paid.reduce((a,x)=>a+x.amt,0))}원</b></div>`
+    +`<div><span>마지막 일</span><b class="num">${L.length?md(L[0].date):'-'}</b></div><div><span>연결된 운행</span><b class="num">${linked.length}건</b></div><div><span>내 몫</span><b class="num">${linked.length?short(mine)+'원':'-'}</b></div></div>`
+    +`<div class="section-title">맡긴 일 기록 <span class="num">${L.length}건</span></div><div class="clrecent drlist" id="dr-list">`+drListHtml()+'</div>';
+}
+function openDriver(name){if(!name)return;drName=name;drShow=5;renderDriver();if($('drsheet').hidden){$('drsheet').hidden=false;pushOverlay({dsheet:true})}}
+function closeDriver(){$('drsheet').hidden=true;popOverlay('dsheet')}
+$('drsheet').addEventListener('click',e=>{
+  if(e.target===$('drsheet')||e.target.closest('#dr-close')){closeDriver();return}
+  if(e.target.closest('#dr-more')){drShow+=10;$('dr-list').innerHTML=drListHtml();return}
+  const b=e.target.closest('[data-drpay]'); if(b){const r=store.get(b.dataset.drpay);if(!r)return;const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);const keep=drShow;renderDriver();drShow=keep;$('dr-list').innerHTML=drListHtml();render();
+    toast(`${drName}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);if(!$('drsheet').hidden)renderDriver()})}
+});
+
 // ---------- 화주 한눈에 보기 ----------
 // 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
 let clName='', clTs=[], clShow=5;
@@ -1501,6 +1532,7 @@ window.addEventListener('popstate',e=>{
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
+  if(!$('drsheet').hidden&&!s.dsheet)$('drsheet').hidden=true;
   if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
@@ -1615,6 +1647,7 @@ document.addEventListener('click',e=>{
     case 'delcfm': removeTrip(t); deletingId=openId=null; toast('삭제했어요',()=>restoreTrip(t)); break;
     case 'day': if(calSel!==el.dataset.d)calFilter='all'; calSel=el.dataset.d; openId=payingId=null; break;
     case 'client': openClient(el.dataset.c); break;
+    case 'driver': openDriver(el.dataset.s); break;
     case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
     case 'subcost': ledKind='trip'; ledFilter='all'; openId=id; payingId=deletingId=null; render(); {const r=document.querySelector(`#l-list .row[data-id="${id}"]`);if(r)window.scrollTo(0,r.getBoundingClientRect().top+scrollY-80)} return;
     case 'cdel': costDel=id; break;
@@ -1763,7 +1796,7 @@ const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c
   ...trips.filter(t=>t.sub&&!t.subPaid).map(t=>({id:t.id,date:t.date,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort(byOld);
 // 받을 돈 화면 [받을 돈 | 기사에게 줄 돈] (이 휴대폰에 기억)
 let uMode=ls.get('uMode')==='give'?'give':'recv';
-const drvItem=(x,done)=>`<div class="udi"><div class="w"><b>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span>`
+const drvItem=(x,done)=>`<div class="udi"><div class="w"><b${x.sub?` class="tapname" data-drvname="${esc(x.sub)}" role="button"`:''}>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span>`
   +(done?`<span class="done">${md(x.paid)} 줌</span>`:`<button type="button" class="btn small" data-drvpay="${x.id}">줬어요</button>`)+'</div>';
 function renderGive(L){
   const sum=L.reduce((a,x)=>a+x.amt,0), old=L.length?daysSince(L[0].date):0;
@@ -1777,6 +1810,7 @@ function renderGive(L){
 }
 $('v-unpaid').addEventListener('click',e=>{
   const m=e.target.closest('[data-umode]'); if(m){uMode=m.dataset.umode;ls.set('uMode',uMode);openId=payingId=null;renderUnpaid();window.scrollTo(0,0);return}
+  const dn=e.target.closest('[data-drvname]'); if(dn){openDriver(dn.dataset.drvname);return}
   const b=e.target.closest('[data-drvpay]');if(!b)return;const r=store.get(b.dataset.drvpay);if(!r)return;
   const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);renderUnpaid();toast(`${r.sub||'기사'}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);renderUnpaid()})});
 // 기사 운임: 화주 · 상차지 · 하차지만 적음 · 최근 운행에 셋이 같은 건이 있으면 그 운행과 연결 (운임에서 기사 운임을 빼면 내 몫)
