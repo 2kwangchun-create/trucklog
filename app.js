@@ -145,10 +145,10 @@ const DB={
 const store=new Map();
 let trips=[], costs=[];
 function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost')}
-const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','stopAt'];
+const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','sub','subPhone','subPaid','subTax','stopAt'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
-    amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),got:Math.max(0,Math.round(Number(r.got)||0)),paid:r.paid?String(r.paid):null};
+    amount:Math.max(0,Math.round(Number(r.amount)||0)),fee:Math.max(0,Math.round(Number(r.fee)||0)),got:Math.max(0,Math.round(Number(r.got)||0)),cut:Math.max(0,Math.round(Number(r.cut)||0)),subPay:Math.max(0,Math.round(Number(r.subPay)||0)),paid:r.paid?String(r.paid):null};
   STR.forEach(k=>t[k]=r[k]==null?'':String(r[k]));
   if(!t.payType&&!t.kind)t.payType='인수증';
   if(t.kind==='profile'){const p=r.prof||{};t.prof={};PROF.forEach(k=>t.prof[k]=p[k]==null?'':String(p[k]))}
@@ -193,12 +193,21 @@ const recv=t=>t.paid?t.amount:Math.min(t.amount,t.got||0);   // 받은 돈
 const left=t=>t.paid?0:Math.max(0,t.amount-(t.got||0));       // 남은 받을 돈
 // 예정: 아직 운행 전(상차일이 오늘 뒤이고 상차 완료도 안 누름) → 미수와 따로, 회색으로
 const isPlan=t=>!t.paid&&t.date>todayIso&&!t.loadedAt;
-const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:f==='notax'?!t.tax:true;
-const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.',notax:'계산서 안 낸 건이 없어요.'};
+// 맡긴 일: 돈은 화주 → 아버지(전액) → 기사(내 몫 뺀 나머지) · 건마다 정산
+// sub 기사 이름 · subPhone 전화 · cut 내 몫 · subPay 기사에게 줄 돈 · subPaid 보낸 날(없으면 안 줌) · subTax 기사 계산서 받은 날
+// 상태: 미수(화주 ✗ 기사 ✗) · 기사 줄 차례(화주 ✓ 기사 ✗) · 끝(둘 다 ✓) · 먼저 줌(화주 ✗ 기사 ✓, 내 돈 먼저 나감)
+const subSt=t=>!t.sub?'':t.paid?(t.subPaid?'done':'give'):(t.subPaid?'early':'due');
+const SUBST={due:['미수','sdue'],give:['기사 줄 차례','sgive'],done:['끝','sdone'],early:['먼저 줌','searly']};
+const subChipHtml=t=>{const k=subSt(t);return k?`<span class="chip ${SUBST[k][1]}">${k==='done'?'기사 보냄 '+md(t.subPaid):SUBST[k][0]}</span>`:''};
+const kept=t=>t.sub?t.amount-t.subPay:t.amount; // 실제 번 돈: 맡긴 건은 운임 − 기사에게 줄 돈 (= 내 몫)
+const subText=t=>`${md(t.date)} ${cities(t,'from')}→${cities(t,'to')} / 운임 ${comma(t.amount)} / 내 몫 ${comma(t.cut)} / ${t.subPaid?`보낸 돈 ${comma(t.subPay)} (${md(t.subPaid)})`:`줄 돈 ${comma(t.subPay)}`}`;
+function copyPlain(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg),()=>toast('복사가 안 됐어요. 다시 눌러 주세요'))}catch(_){toast('복사가 안 됐어요. 다시 눌러 주세요')}}
+const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:f==='notax'?!t.tax:f==='nosubtax'?!!t.sub&&!t.subTax:true;
+const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.',notax:'계산서 안 낸 건이 없어요.',nosubtax:'기사 계산서 안 받은 건이 없어요.'};
 function segHtml(which,list,cur){
-  const n={all:list.length,paid:list.filter(t=>t.paid).length,due:list.filter(t=>!t.paid).length,notax:list.filter(t=>!t.tax).length};
+  const n={all:list.length,paid:list.filter(t=>t.paid).length,due:list.filter(t=>!t.paid).length,notax:list.filter(t=>!t.tax).length,nosubtax:list.filter(t=>t.sub&&!t.subTax).length};
   // 장부에는 '계산서 미발행'도 (세금 정리할 때 안 낸 건만 모아 보기)
-  return [['all','전체'],['paid','받은 돈'],['due','못 받은 돈'],...(which==='led'?[['notax','미발행']]:[])].map(([k,l])=>
+  return [['all','전체'],['paid','받은 돈'],['due','못 받은 돈'],...(which==='led'?[['notax','미발행'],...(list.some(t=>t.sub)?[['nosubtax','기사 계산서']]:[])]:[])].map(([k,l])=>
     `<button type="button" data-do="filter" data-which="${which}" data-f="${k}" aria-pressed="${cur===k}">${l} <span class="num">${n[k]}건</span></button>`).join('');
 }
 
@@ -266,7 +275,7 @@ const progChip=t=>t.unloadedAt?'<span class="chip done">하차 완료</span>':t.
 const stampTxt=s=>`${md(s)} ${s.slice(11,16)}`;
 // 문자 보낸 지 며칠 됐는지 색으로: 오늘 · 1~3일 · 4~7일 · 8일 넘음 (오래될수록 다시 연락할 때)
 const smsChip=s=>{const d=daysSince(s),c=d<=0?'s0':d<=3?'s1':d<=7?'s2':'s3';return `<span class="chip sms ${c}">문자 ${d<=0?'오늘':d+'일 전'}</span>`};
-const docChips=(t,prog=true)=>(prog?progChip(t):'')+(!t.paid&&t.got>0?`<span class="chip part">${short(t.got)}원 받음</span>`:'')+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?smsChip(t.smsAt):'');
+const docChips=(t,prog=true)=>(prog?progChip(t):'')+(subSt(t)==='due'?'':subChipHtml(t))+(!t.paid&&t.got>0?`<span class="chip part">${short(t.got)}원 받음</span>`:'')+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&!t.paid?smsChip(t.smsAt):'');
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
@@ -275,9 +284,9 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
   const amt=part?`<b class="amt num c-due">${comma(left(t))}<small class="of">남은 돈 · 전체 ${short(t.amount)}원</small></b>`:`<b class="amt num ${t.paid?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
   const head=mode==='month'
-    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
+    ?`<div class="head mini" ${attrs}><span class="dt">${ledMulti()?`<small class="mon num">${Number(t.date.slice(5,7))}월</small>`:''}<b class="num">${Number(t.date.slice(8,10))}</b><small>${wdOf(t.date)}</small></span><span class="cwrap">${srcBadge(t)}${client}${t.sub?`<span class="subb" data-do="subsheet" data-s="${esc(t.sub)}" role="button" title="${esc(t.sub)} 맡긴 일 보기">🤝 ${esc(t.sub)}</span>`:''}</span>${amt}${cInfo(t)}
       <span class="rt2">${routeHtml(t)}${t.memo?` · <span class="memo">${esc(t.memo)}</span>`:''}</span><span class="st ${t.paid?'c-paid':'c-due'}">${t.paid?'받음':'미수'}${t.tax?'<small class="taxm">계산서</small>':''}</span></div>`
-    :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}</span>${amt}${cInfo(t)}
+    :`<div class="head" ${attrs}><span class="cwrap">${srcBadge(t)}${client}${t.sub?`<span class="subb" data-do="subsheet" data-s="${esc(t.sub)}" role="button" title="${esc(t.sub)} 맡긴 일 보기">🤝 ${esc(t.sub)}</span>`:''}</span>${amt}${cInfo(t)}
       <div class="route"><span class="rt">${placeHtml(t,'from')}${ic(P.arrow)}${placeHtml(t,'to')}</span>${t.memo&&!open?`<span class="memo">${esc(t.memo)}</span>`:''}</div>
       <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="ptx">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span>${(d=>d?`<span class="docs">${d}</span>`:'')(docChips(t,!(role||open)))}</div></div>`;
   let detail='';
@@ -289,6 +298,9 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       +xStops(t,'to').map((x,i)=>addrBlk(`하차 ${i+2}`,'to',x.c,x.a,x.p,x.n)).join('')
       +(t.gotLog?`<div class="blk"><span class="bl">받은 기록</span><div class="num">${t.gotLog.split(',').filter(Boolean).map(x=>{const[d,a]=x.split(':');return md(d)+' '+won(Number(a))}).join(' · ')}${t.paid?'':`<br><b class="c-due">남은 돈 ${won(left(t))}</b>`}</div></div>`:'')
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
+      +(t.sub?`<div class="blk"><span class="bl">맡긴 기사</span><div class="addr"><b>🤝 ${esc(t.sub)}</b> ${subChipHtml(t)}</div>${ctHtml(t.subPhone,'')}`
+        +`<div class="subm num"><span>운임 ${won(t.amount)}</span><span>내 몫 ${won(t.cut)}</span><b>기사에게 줄 돈 ${won(t.subPay)}</b></div>`
+        +`<div>${t.subPaid?`보낸 날 ${md(t.subPaid)}`:'아직 안 보냄'} · ${t.subTax?`기사 계산서 받음 ${md(t.subTax)}`:'<span class="na">기사 계산서 안 받음</span>'}</div></div>`:'')
       +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
       +(t.tax||t.smsAt?`<div class="blk"><span class="bl">정산</span><div>${t.tax?`계산서 발행 ${md(t.tax)}`:'계산서 미발행'}${t.smsAt?` · 문자 보낸 날 ${md(t.smsAt)}`:''}</div></div>`:'')
       +(t.memo?`<div class="blk"><span class="bl">메모</span><div>${esc(t.memo)}</div></div>`:'')+`</div>`;
@@ -305,8 +317,9 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       :`<div class="r1">${B('','pay','입금 완료',P.check)}${B('ghost','sms','정산 문자')}</div>`;
     const sub=deletingId===t.id?`<div class="r2">${B('danger','delcfm','정말 삭제')}<button type="button" class="btn ghost" data-do="delcancel">취소</button></div>`
       :`<div class="r2 three">${B('ghost','goso','고소장',P.doc)}${B('ghost','edit','수정',P.edit)}${B('ghost warn','del','삭제',P.trash)}</div>`;
-    if(mode==='unpaid')act=`<div class="act">${main}${open?sub:''}</div>`;
-    else if(open)act=`<div class="act">${main}${sub}</div>`;
+    const subRow=t.sub&&open?`<div class="r3">${t.subPaid?B('ghost','subunpay','기사 보냄 취소'):B('subgo','subgive',`기사에게 보냄 ${short(t.subPay)}`)}${B('ghost','subtax',t.subTax?'계산서 받음 ✓':'기사 계산서 받음')}${B('ghost','subcopy','기사 정산 복사')}</div>`:'';
+    if(mode==='unpaid')act=`<div class="act">${main}${subRow}${open?sub:''}</div>`;
+    else if(open)act=`<div class="act">${main}${subRow}${sub}</div>`;
   }
   // 상차 완료 · 하차 완료: 달력에선 늘, 다른 곳에선 펼쳤을 때
   // 하차 완료는 상차 완료를 누른 뒤에만 누를 수 있음
@@ -328,7 +341,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
 }
 
 // ---------- 받을 돈 ----------
-const hay=t=>[t.src,t.from,t.fromAddr,t.to,t.toAddr,...stopsOf(t).flatMap(x=>[x.c,x.a,x.n,x.p]),t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
+const hay=t=>[t.sub,t.subPhone,t.src,t.from,t.fromAddr,t.to,t.toAddr,...stopsOf(t).flatMap(x=>[x.c,x.a,x.n,x.p]),t.client,t.payType,t.memo,t.clientPhone,t.fromPhone,t.toPhone,t.clientName,t.fromName,t.toName].join(' ').toLowerCase();
 
 // ---------- 찾기: 어디서 찾을지 (자동 · 전체 · 화주 · 지역 · 주소 · 메모) ----------
 const SF={client:['client','clientName','clientPhone'],src:['src'],region:['from','to'],addr:['fromAddr','toAddr','fromName','toName'],memo:['memo'],
@@ -466,7 +479,7 @@ function setLate(v){lateDays=v;ls.set('lateAlert',v?String(v):'off');document.qu
 $('c-late-go').onclick=()=>{uView='list';uRange=null;uAge=null;$('u-search').value='';navTab('unpaid');uLate=lateDays;renderUnpaid();window.scrollTo(0,0)};
 $('c-late-x').onclick=()=>{ls.set('lateHide',todayIso);renderLateBanner();toast('오늘은 알림을 안 띄울게요. 설정에서 끌 수도 있어요.')};
 function renderCal(){
-  renderBackupBanner(); renderLateBanner();
+  renderBackupBanner(); renderLateBanner(); renderSubBanner();
   $('c-first').hidden=trips.length>0;
   $('c-titletxt').textContent=`${calY}년 ${calM+1}월`;
   const mt=monthTrips(calY,calM);
@@ -536,19 +549,23 @@ function renderLedger(){
   const list=found.filter(t=>pass(t,ledFilter)).sort(byNew);
   $('l-list').innerHTML=list.length?list.map(t=>rowHtml(t,'month')).join(''):`<div class="empty">${q?'찾는 기록이 없어요.':span+'은 '+EMPTY[ledFilter]}</div>`;
   // 지출 · 순수익 (순수익 = 총 운임 − 수수료 − 지출)
-  const mc=ledCosts(), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-csum;
+  // 맡긴 건: 기사에게 줄 돈은 내 돈이 아니라서 순수익에서 뺌
+  const subL=all.filter(t=>t.sub), subOut=subL.reduce((s,t)=>s+t.subPay,0);
+  const mc=ledCosts(), fees=all.reduce((s,t)=>s+(t.fee||0),0), csum=mc.reduce((s,c)=>s+c.amount,0), net=sum-fees-subOut-csum;
+  $('l-earn').hidden=!subL.length;
+  if(subL.length)$('l-earn').innerHTML=`실제 번 돈 <b class="num">${won(sum-subOut)}</b> · 맡긴 ${subL.length}건은 내 몫만 (기사에게 줄 돈 ${short(subOut)}원 뺌)`;
   $('l-ntrip').textContent=all.length+'건'; $('l-ncost').textContent=mc.length+'건';
   $('l-netlabel').textContent=span+' 순수익';
   $('l-costlabel').textContent=fees?'수수료·지출':'지출';
   $('l-cost').textContent=short(fees+csum);
   $('l-net').textContent=(net<0?'-':'')+won(Math.abs(net)); $('l-net').className='num '+(net<0?'c-due':'c-paid');
   // 실제로 들어온 돈 기준: 받은 돈 − 받은 건의 수수료 − 지출 (못 받은 돈이 많으면 마이너스일 수 있음)
-  const cash=paid-all.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0)-csum;
+  const cash=paid-all.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0)-subL.filter(t=>t.subPaid).reduce((s,t)=>s+t.subPay,0)-csum;
   $('l-cash').textContent=(cash<0?'-':'')+won(Math.abs(cash)); $('l-cash').className='num '+(cash<0?'c-due':'c-paid');
   // 스위치: 전체(못 받은 돈 포함) ↔ 지금까지 들어온 돈 기준
   const byCash=netMode==='cash';
   $('l-net').hidden=byCash; $('l-cash').hidden=!byCash;
-  $('l-netcap').textContent=byCash?'받은 돈 − 받은 건 수수료 − 지출 · 지금까지 실제로 들어온 돈':'운임 − 수수료 − 지출 · 못 받은 돈까지 포함';
+  $('l-netcap').textContent=byCash?`받은 돈 − 받은 건 수수료${subL.length?' − 기사에게 보낸 돈':''} − 지출 · 지금까지 실제로 들어온 돈`:`운임 − 수수료${subL.length?' − 기사에게 줄 돈':''} − 지출 · 못 받은 돈까지 포함`;
   document.querySelectorAll('#l-netsw [data-netmode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.netmode===netMode));
   $('l-costh').textContent=span+' 지출';
   $('l-costsum').textContent=won(csum);
@@ -871,21 +888,23 @@ function ledgerXlsx(list,costList,label){
   const S=(v,s)=>({v,s}), money=v=>S(v,2), day=v=>S(v||'',7);
   const st=t=>t.paid?S('받음',4):t.got?S('일부 받음',9):isPlan(t)?S('예정',7):S('못 받음',3);
   // 운행: 자주 보는 칸을 앞에, 담당자·완료 시각 같은 건 뒤에
-  const tripHead=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','하차지','하차 상세주소','운임','수수료','입금 상태','입금일','받은 금액','남은 금액','미수 일수','계산서 발행일','문자 보낸 날','메모','운임 방식','상차 담당자','상차 연락처','하차 담당자','하차 연락처','상차 완료','하차 완료'];
+  const tripHead=['상차일','하차일','콜','화주','화주 담당자','화주 연락처','상차지','상차 상세주소','하차지','하차 상세주소','운임','수수료','입금 상태','입금일','받은 금액','남은 금액','미수 일수','계산서 발행일','문자 보낸 날','메모','운임 방식','상차 담당자','상차 연락처','하차 담당자','하차 연락처','상차 완료','하차 완료','맡긴 기사','기사 연락처','내 몫','기사에게 줄 돈','기사 보낸 날','기사 계산서'];
   const tripRows=L.map(t=>[day(t.date),day(t.toDate||t.date),t.src,t.client,t.clientName,t.clientPhone,cities(t,'from'),[t.fromAddr,...xStops(t,'from').map(x=>x.c+' '+(x.a||''))].filter(x=>x&&x.trim()).join(' / '),cities(t,'to'),[t.toAddr,...xStops(t,'to').map(x=>x.c+' '+(x.a||''))].filter(x=>x&&x.trim()).join(' / '),money(t.amount),money(t.fee||0),st(t),day(t.paid),money(recv(t)),money(left(t)),
-    t.paid||isPlan(t)?S('',7):S(Math.max(0,daysSince(t.date)),7),day(t.tax),day(t.smsAt),t.memo,t.payType,t.fromName,t.fromPhone,t.toName,t.toPhone,day(t.loadedAt),day(t.unloadedAt)]);
+    t.paid||isPlan(t)?S('',7):S(Math.max(0,daysSince(t.date)),7),day(t.tax),day(t.smsAt),t.memo,t.payType,t.fromName,t.fromPhone,t.toName,t.toPhone,day(t.loadedAt),day(t.unloadedAt),t.sub,t.subPhone,t.sub?money(t.cut):'',t.sub?money(t.subPay):'',day(t.subPaid),day(t.subTax)]);
   const sum=L.reduce((s,t)=>s+t.amount,0), fees=L.reduce((s,t)=>s+(t.fee||0),0), got=L.reduce((s,t)=>s+recv(t),0), due=L.reduce((s,t)=>s+left(t),0), cs=C.reduce((s,c)=>s+c.amount,0);
   const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
-  const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17],filterRows:L.length+1});
+  const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17,11,15,11,13,12,12],filterRows:L.length+1});
   const cost=XL.sheet([['날짜','항목','금액','메모'],...C.map(c=>[day(c.date),c.cat,money(c.amount),c.memo]),...(C.length?[[S('합계',5),S(C.length+'건',5),S(cs,6),S('',5)]]:[])],{widths:[12,12,13,34],filterRows:C.length+1});
   // 요약: 큰 숫자 · 화주별 · 지출 항목별
   const taxSum=L.filter(t=>t.tax).reduce((s,t)=>s+t.amount,0);
+  const subOut=L.filter(t=>t.sub).reduce((s,t)=>s+t.subPay,0), subSent=L.filter(t=>t.sub&&t.subPaid).reduce((s,t)=>s+t.subPay,0);
   const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
   const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
   const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
   const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
     [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],['지출',money(cs)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
-    [S('순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-cs,6)],[S('들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-cs,6)],[],
+    ...(subOut?[['맡긴 건 기사에게 줄 돈',money(subOut)],['실제 번 돈 (맡긴 건은 내 몫만)',money(sum-subOut)]]:[]),
+    [S(subOut?'순수익 (운임 − 수수료 − 기사에게 줄 돈 − 지출)':'순수익 (운임 − 수수료 − 지출)',5),S(sum-fees-subOut-cs,6)],[S(subOut?'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 기사에게 보낸 돈 − 지출)':'들어온 돈 기준 (받은 돈 − 받은 건 수수료 − 지출)',5),S(got-paidFee-subSent-cs,6)],[],
     [S('화주',1),S('건수',1),S('운임',1),S('받은 돈',1),S('남은 돈',1)],
     ...Object.entries(byC).sort((a,b)=>b[1].a-a[1].a).map(([k,o])=>[k,S(o.n,0),money(o.a),money(o.g),money(o.d)])];
   if(C.length)sumRows.push([],[S('지출 항목',1),S('금액',1)],...Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,money(v)]));
@@ -1163,6 +1182,55 @@ async function doCopy(){
   $('cp-hint').classList.toggle('errline',!ok);$('cp-hint').classList.toggle('okline2',ok);
   if(ok)toast('복사했어요');
 }
+// ---------- 맡긴 일: 기사에게 줄 돈 · 기사별 보기 ----------
+// name 없음: 화주 돈은 받았는데 기사에게 아직 안 준 건(기사 줄 차례)만 · name: 그 기사에게 맡긴 건 전부
+let sbName=null;
+function sbItem(t,showName){const k=subSt(t);
+  return `<div class="sbi"><div class="sbt"><small class="num">${md(t.date)}</small><span>${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num">${comma(t.subPay)}</b></div>`
+    +`<div class="sbm"><span class="chip ${SUBST[k][1]}">${SUBST[k][0]}</span>${showName?`<span class="subb" data-sbname="${esc(t.sub)}">🤝 ${esc(t.sub)}</span>`:''}${t.subTax?'':'<span class="na">계산서 안 받음</span>'}`
+    +`<span class="sbb">${t.subPaid?`<small>보냄 ${md(t.subPaid)}</small>`:`<button type="button" class="btn small" data-sbgive="${t.id}">보냄</button>`}<button type="button" class="btn small ghost" data-sbcopy="${t.id}">복사</button></span></div></div>`}
+function renderSub(){
+  const name=sbName;
+  if(!name){
+    const L=trips.filter(t=>subSt(t)==='give').sort(byOld), sum=L.reduce((a,t)=>a+t.subPay,0);
+    $('sb-h').textContent='기사에게 줄 돈';
+    $('sb-body').innerHTML=`<div class="sbstats"><div><span>줄 차례</span><b class="num">${L.length}건</b></div><div><span>줄 돈</span><b class="num" style="color:var(--sub)">${won(sum)}</b></div></div>`
+      +(L.length?'<div class="sbl">'+L.map(t=>sbItem(t,true)).join('')+'</div>':'<p class="clok">기사에게 줄 차례인 돈이 없어요.</p>')
+      +'<p class="hint small">화주 돈을 받은 건만 보여요. 화주 돈을 받기 전에 먼저 보낸 건은 기사 이름을 눌러서 보세요.</p>';
+    return;
+  }
+  const ts=trips.filter(t=>t.sub===name).sort(byNew), unpaid=ts.filter(t=>!t.subPaid), sent=ts.filter(t=>t.subPaid), notax=ts.filter(t=>!t.subTax);
+  const ct=ts.find(t=>t.subPhone);
+  $('sb-h').textContent='🤝 '+name;
+  $('sb-body').innerHTML=(ct?`<div class="clct"><a class="callbtn" href="${telHref(ct.subPhone)}">${ic(P.phone)}${esc(ct.subPhone)}</a></div>`:'')
+    +`<div class="sbstats"><div><span>맡긴 일</span><b class="num">${ts.length}건</b></div><div><span>아직 줄 돈</span><b class="num" style="color:var(--sub)">${won(unpaid.reduce((a,t)=>a+t.subPay,0))}</b><small class="num">${unpaid.length}건</small></div>`
+    +`<div><span>보낸 돈</span><b class="num">${won(sent.reduce((a,t)=>a+t.subPay,0))}</b><small class="num">${sent.length}건</small></div><div><span>계산서 안 받음</span><b class="num">${notax.length}건</b></div></div>`
+    +'<div class="section-title">맡긴 일</div><div class="sbl">'+ts.slice(0,30).map(t=>sbItem(t,false)).join('')+'</div>';
+}
+function openSub(name){sbName=name||null;renderSub();if($('sbsheet').hidden){$('sbsheet').hidden=false;pushOverlay({sbsheet:true})}}
+function closeSub(){$('sbsheet').hidden=true;popOverlay('sbsheet')}
+$('sbsheet').addEventListener('click',e=>{
+  if(e.target===$('sbsheet')||e.target.closest('#sb-close')){closeSub();return}
+  const nm=e.target.closest('[data-sbname]'); if(nm){sbName=nm.dataset.sbname;renderSub();return}
+  const g=e.target.closest('[data-sbgive]');
+  if(g){const t=store.get(g.dataset.sbgive);if(!t)return;const before={subPaid:t.subPaid};t.subPaid=todayIso;saveTrip(t);renderSub();render();
+    toast(t.paid?`${t.sub}에게 ${comma(t.subPay)}원 보냈어요`:'화주 돈 받기 전에 먼저 보냈어요 (내 돈 먼저 나감)',()=>{Object.assign(t,before);saveTrip(t);renderSub()});return}
+  const c=e.target.closest('[data-sbcopy]'); if(c){const t=store.get(c.dataset.sbcopy);if(t)copyPlain(subText(t),'기사 정산 내용을 복사했어요. 문자 · 카톡에 붙여넣기 하세요');return}
+});
+// 화주 돈을 다 받았을 때: "김기사에게 270,000원 보내셨어요?" [보냈어요] [나중에]
+let saId=null;
+function askSub(t){saId=t.id;$('sa-h').textContent=`${t.sub}에게 ${comma(t.subPay)}원 보내셨어요?`;
+  $('sa-sub').textContent=`${md(t.date)} ${cities(t,'from')} → ${cities(t,'to')} · 운임 ${comma(t.amount)} − 내 몫 ${comma(t.cut)}`;
+  $('subask').hidden=false;pushOverlay({subask:true})}
+function closeAsk(){$('subask').hidden=true;popOverlay('subask')}
+$('sa-yes').onclick=()=>{const t=store.get(saId);closeAsk();if(!t)return;t.subPaid=todayIso;saveTrip(t);render();toast(`${t.sub}에게 보낸 걸로 표시했어요`,()=>{t.subPaid='';saveTrip(t);render()})};
+$('sa-no').onclick=()=>{closeAsk();toast('기사 줄 차례로 남겨 둘게요. 달력 맨 위에서 볼 수 있어요')};
+$('subask').addEventListener('click',e=>{if(e.target===$('subask'))closeAsk()});
+// 달력 맨 위: 기사에게 줄 돈 ○원 (n건)
+function renderSubBanner(){const L=trips.filter(t=>subSt(t)==='give');$('c-subdue').hidden=!L.length;if(!L.length)return;
+  $('c-subdue-txt').innerHTML=`<span><b>기사에게 줄 돈</b></span><b class="num">${won(L.reduce((a,t)=>a+t.subPay,0))} (${L.length}건)</b>`}
+$('c-subdue-go').onclick=()=>openSub(null);
+
 // ---------- 화주 한눈에 보기 ----------
 // 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
 let clName='';
@@ -1201,7 +1269,8 @@ function renderTax(){
   document.querySelectorAll('#tx-per [data-txp]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.txp===txP));
   const r=txRange(), L=trips.filter(t=>inRange(t,r)), C=costs.filter(c=>inRange(c,r));
   const sum=L.reduce((s,t)=>s+t.amount,0), T=L.filter(t=>t.tax), tSum=T.reduce((s,t)=>s+t.amount,0), N=L.filter(t=>!t.tax), nSum=sum-tSum;
-  const fees=L.reduce((s,t)=>s+(t.fee||0),0), cs=C.reduce((s,c)=>s+c.amount,0);
+  const fees=L.reduce((s,t)=>s+(t.fee||0),0), cs0=C.reduce((s,c)=>s+c.amount,0);
+  const SL=L.filter(t=>t.sub), subOut=SL.reduce((s,t)=>s+t.subPay,0), subGot=SL.filter(t=>t.subTax).length, cs=cs0+subOut; // cs: 지출 + 맡긴 기사 운임
   const byK={};C.forEach(c=>byK[c.cat||'기타']=(byK[c.cat||'기타']||0)+c.amount);
   const due=txP==='h1'?`${txY}년 7월 25일까지`:txP==='h2'?`${txY+1}년 1월 25일까지`:`${txY+1}년 5월 31일까지`;
   const row=(l,v,cls='')=>`<div class="txrow ${cls}"><span>${l}</span><b class="num">${v}</b></div>`;
@@ -1210,7 +1279,7 @@ function renderTax(){
     +row(`계산서 발행 <small>${T.length}건</small>`,won(tSum))+row('부가세 (10%)',won(Math.round(tSum*0.1)),'sub')+row('발행 합계 (부가세 포함)',won(tSum+Math.round(tSum*0.1)),'sub')
     +row(`계산서 미발행 <small>${N.length}건</small>`,won(nSum))+`</div>`
     +`<div class="txcard"><h3>경비</h3>`+row('수수료',won(fees))+Object.entries(byK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>row(esc(k),won(v),'sub')).join('')
-    +row(`지출 합계 <small>${C.length}건</small>`,won(cs))+row('경비 합계 (수수료 + 지출)',won(fees+cs),'sum')+`</div>`
+    +(SL.length?row(`맡긴 기사 운임 <small>${SL.length}건</small>`,won(subOut))+row(`기사 계산서 받음 ${subGot}건 · 안 받음 ${SL.length-subGot}건`,'','sub'):'')+row(`지출 합계 <small>${C.length}건</small>`,won(cs0))+row(SL.length?'경비 합계 (수수료 + 기사 운임 + 지출)':'경비 합계 (수수료 + 지출)',won(fees+cs),'sum')+`</div>`
     +`<div class="txnet"><span>남는 돈 (운임 − 경비)</span><b class="num">${won(sum-fees-cs)}</b></div>`
     +`<div class="txbtns"><button type="button" class="btn" id="tx-xlsx">세무사에게 보낼 엑셀</button>`
     +(N.length?`<button type="button" class="btn ghost" id="tx-notax">계산서 안 낸 ${N.length}건 보기</button>`:'')+`</div>`
@@ -1415,6 +1484,8 @@ window.addEventListener('popstate',e=>{
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
+  if(!$('sbsheet').hidden&&!s.sbsheet)$('sbsheet').hidden=true;
+  if(!$('subask').hidden&&!s.subask)$('subask').hidden=true;
   if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
@@ -1468,6 +1539,8 @@ document.addEventListener('click',e=>{
   if(ed){startEdit(store.get(ed.dataset.id));return}
   const ast=e.target.closest('[data-addstop]');
   if(ast){const k=ast.dataset.addstop,l=readStops(true);l.push({k});renderStops(l);const b=$('f-x'+k).lastElementChild;b&&b.querySelector('.xc').focus();saveDraft();return}
+  const sf=e.target.closest('[data-subfill]');
+  if(sf){$('f-sub').value=sf.dataset.subfill;const p=[...trips].sort(byNew).find(t=>t.sub===sf.dataset.subfill&&t.subPhone);if(p&&!$('f-subphone').value)$('f-subphone').value=p.subPhone;syncSubBox();saveDraft();return}
   const xf=e.target.closest('[data-xfill]');
   if(xf){const el=xf.closest('.xstop');el.querySelector('.xc').value=xf.dataset.xfill;renderXPlaces(el);saveDraft();return}
   const xp=e.target.closest('[data-xplace]');
@@ -1499,7 +1572,7 @@ document.addEventListener('click',e=>{
   const pt=e.target.closest('[data-pt]');
   if(pt){setPt(pt.dataset.pt);return}
   const q=e.target.closest('[data-add]');
-  if(q){const a=Number(q.dataset.add),cur=Number(($('f-amt').value||'0').replace(/\D/g,''));$('f-amt').value=a?comma(cur+a):'';return}
+  if(q){const a=Number(q.dataset.add),cur=Number(($('f-amt').value||'0').replace(/\D/g,''));$('f-amt').value=a?comma(cur+a):'';syncSubPay();return}
   // 설정 화면 버튼
   const sid=e.target.closest('button')&&e.target.closest('button').id;
   if(sid==='s-login'){Cloud.signIn();return}
@@ -1518,7 +1591,8 @@ document.addEventListener('click',e=>{
       t.got=(t.got||0)+a; t.gotLog=(t.gotLog?t.gotLog+',':'')+v+':'+a;
       if(t.got>=t.amount)t.paid=v;
       payingId=null; saveTrip(t);
-      toast(t.paid?`${t.from}→${t.to} ${comma(t.amount)}원 다 받았어요`:`${comma(a)}원 받았어요 · 남은 돈 ${won(left(t))}`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+      toast(t.paid?`${t.from}→${t.to} ${comma(t.amount)}원 다 받았어요`:`${comma(a)}원 받았어요 · 남은 돈 ${won(left(t))}`,()=>{Object.assign(t,before);saveTrip(t);render()});
+      if(t.paid&&t.sub&&!t.subPaid)setTimeout(()=>askSub(t),0); break; }
     case 'unpay': { // 마지막에 받은 것 하나를 취소 (일부 받은 기록이 있으면 그만큼만 되돌림)
       const before={paid:t.paid,got:t.got,gotLog:t.gotLog}, log=(t.gotLog||'').split(',').filter(Boolean), last=log.pop();
       t.paid=null; if(last){t.got=Math.max(0,(t.got||0)-Number(last.split(':')[1]||0));t.gotLog=log.join(',')}
@@ -1529,6 +1603,13 @@ document.addEventListener('click',e=>{
     case 'delcfm': removeTrip(t); deletingId=openId=null; toast('삭제했어요',()=>restoreTrip(t)); break;
     case 'day': if(calSel!==el.dataset.d)calFilter='all'; calSel=el.dataset.d; openId=payingId=null; break;
     case 'client': openClient(el.dataset.c); break;
+    case 'subsheet': openSub(el.dataset.s); break;
+    case 'subgive': { // 화주 돈을 받기 전이어도 보낼 수 있음 (먼저 줌 · 경고만)
+      const before={subPaid:t.subPaid}; t.subPaid=todayIso; saveTrip(t);
+      toast(t.paid?`${t.sub}에게 ${comma(t.subPay)}원 보냈어요`:`화주 돈 받기 전에 먼저 보냈어요 (내 돈 먼저 나감)`,()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+    case 'subunpay': { const before={subPaid:t.subPaid}; t.subPaid=''; saveTrip(t); toast('기사에게 보낸 기록을 지웠어요',()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+    case 'subtax': { const before={subTax:t.subTax}; t.subTax=t.subTax?'':todayIso; saveTrip(t); toast(t.subTax?'기사 계산서 받음으로 표시했어요':'기사 계산서 받음을 지웠어요',()=>{Object.assign(t,before);saveTrip(t);render()}); break; }
+    case 'subcopy': copyPlain(subText(t),'기사 정산 내용을 복사했어요. 문자 · 카톡에 붙여넣기 하세요'); break;
     case 'copen': costOpen=costOpen===id?null:id; costDel=null; break;
     case 'cdel': costDel=id; break;
     case 'cdelcancel': costDel=null; break;
@@ -1640,13 +1721,25 @@ function renderXPlaces(el){const q=sel=>el.querySelector(sel), l=placesFor(q('.x
   el.querySelectorAll('[data-xfill]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.xfill===q('.xc').value.trim()))}
 $('f').addEventListener('input',e=>{if(e.target.classList.contains('xc'))renderXPlaces(e.target.closest('.xstop'))});
 $('f').addEventListener('input',e=>{if(e.target.classList.contains('xp'))e.target.value=fmtPhone(e.target.value)});
+// 다른 기사에게 맡김: 켜면 칸이 열림 · 기사에게 줄 돈 = 운임 − 내 몫 (직접 고치면 그 값을 그대로 둠)
+const numOf=id=>Number(($(id).value||'').replace(/\D/g,''))||0;
+const autoSubPay=()=>Math.max(0,numOf('f-amt')-numOf('f-cut'));
+let subPayManual=false;
+function syncSubPay(){if(!subPayManual&&$('f-subon').checked){const a=autoSubPay();$('f-subpay').value=a?comma(a):''}}
+function syncSubBox(){const on=$('f-subon').checked;$('f-subbox').hidden=!on;
+  if(on)$('r-sub').innerHTML=topVals('sub').map(v=>`<button type="button" data-subfill="${esc(v)}" aria-pressed="${v===$('f-sub').value.trim()}">${esc(v)}</button>`).join('')}
+const subForm=()=>{const on=$('f-subon').checked;return on?{sub:$('f-sub').value.trim(),subPhone:$('f-subphone').value.trim(),cut:numOf('f-cut'),subPay:$('f-subpay').value.trim()?numOf('f-subpay'):autoSubPay()}:{sub:'',subPhone:'',cut:0,subPay:0}};
+$('f-subon').addEventListener('change',()=>{if($('f-subon').checked){syncSubBox();syncSubPay();setTimeout(()=>$('f-sub').focus(),0)}else syncSubBox()});
+['f-amt','f-cut'].forEach(id=>$(id).addEventListener('input',syncSubPay));
+$('f-subpay').addEventListener('input',()=>{subPayManual=!!$('f-subpay').value&&numOf('f-subpay')!==autoSubPay()});
+$('f-sub').addEventListener('input',syncSubBox);
 const readForm=()=>({src:srcValue(),date:$('f-date').value,toDate:$('f-todate').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
   fromAddr:$('f-fromaddr').value.trim(),toAddr:$('f-toaddr').value.trim(),payType:formPt,client:$('f-client').value.trim(),
   clientPhone:$('f-clientphone').value.trim(),fromPhone:$('f-fromphone').value.trim(),toPhone:$('f-tophone').value.trim(),
   clientName:$('f-clientname').value.trim(),fromName:$('f-fromname').value.trim(),toName:$('f-toname').value.trim(),
-  amount:Number($('f-amt').value.replace(/\D/g,'')),fee:Number($('f-fee').value.replace(/\D/g,''))||0,memo:$('f-memo').value.trim(),stops:(l=>l.length?JSON.stringify(l):'')(readStops().filter(x=>x.c))});
-function formMissing(f){if(readStops().some(x=>!x.c))return ['추가한 곳의 시·군'];return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
-['f-amt','f-fee'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
+  amount:Number($('f-amt').value.replace(/\D/g,'')),fee:Number($('f-fee').value.replace(/\D/g,''))||0,memo:$('f-memo').value.trim(),...subForm(),stops:(l=>l.length?JSON.stringify(l):'')(readStops().filter(x=>x.c))});
+function formMissing(f){if($('f-subon').checked&&!$('f-sub').value.trim())return ['맡긴 기사 이름'];if(readStops().some(x=>!x.c))return ['추가한 곳의 시·군'];return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
+['f-amt','f-fee','f-cut','f-subpay'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
 function setPt(v){formPt=v;document.querySelectorAll('#f-pt [data-pt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pt===v))}
 // 등록 화면 위쪽: [운행 기록 | 지출 기록] 고르기, 제목·취소 버튼은 지금 하는 일에 맞춤
 let formKind='trip', costEditId=null, costCat='';
@@ -1739,7 +1832,7 @@ function setTextSize(z){
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
 setLate(lateDays);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;setMode(false);showDraftNote('');renderStops([]);subPayManual=false;syncSubBox();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 // 하차일은 [+ 하차일]을 눌러야 펼쳐짐 · 날짜가 있으면(수정 · 또 등록 · 적던 것) 펼쳐서 보여줌
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
@@ -1752,20 +1845,20 @@ function syncMore(){if($('f-fee').value.trim())$('f-more').open=true}
 // ---------- 적는 중 임시 저장 ----------
 // 저장 버튼을 누르기 전 내용도 이 휴대폰에 바로 보관 → 새로고침하거나 앱이 닫혀도 이어서 쓸 수 있음
 // draftNew: 새로 적던 것 (저장하거나 [새로 쓰기]를 누를 때까지) · draftEdit: 고치던 것 (수정 저장·취소하면 지움)
-const F_IDS=['f-date','f-todate','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
+const F_IDS=['f-sub','f-subphone','f-cut','f-subpay','f-date','f-todate','f-client','f-clientname','f-clientphone','f-from','f-fromaddr','f-fromname','f-fromphone','f-to','f-toaddr','f-toname','f-tophone','f-amt','f-fee','f-memo'];
 const readDraft=k=>{try{return JSON.parse(ls.get(k)||'null')}catch(_){return null}};
-function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,stops:readStops(true),src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
+function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,stops:readStops(true),subOn:$('f-subon').checked,subPaid:$('f-subpaid').checked,subTaxNow:$('f-subtaxnow').checked,src:srcValue(),pt:formPt,paid:$('f-paidnow').checked,tax:$('f-taxnow').checked,more:$('f-more').open}}
 function saveDraft(){
   if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
-  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&!readStops().length&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
+  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&!readStops().length&&!s.subOn&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
   ls.set('draftNew',blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});renderStops(s.stops||[]);setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});renderStops(s.stops||[]);$('f-subon').checked=!!s.subOn;$('f-subpaid').checked=!!s.subPaid;$('f-subtaxnow').checked=!!s.subTaxNow;syncSubBox();setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
 function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
-const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,!!s.tax,s.src||'',(s.stops||[]).filter(x=>x.c||x.a||x.n||x.p)]);
+const snapKey=s=>JSON.stringify([s.v,s.pt,s.paid,!!s.tax,s.src||'',!!s.subOn,!!s.subPaid,!!s.subTaxNow,(s.stops||[]).filter(x=>x.c||x.a||x.n||x.p)]);
 let editOrig='';
 // 수정하다가 [수정 저장]·[수정 취소] 없이 나가면(탭 이동·뒤로 버튼) 고친 내용을 보관하고 돌아갈지 물어봄
 function leaveEdit(){
@@ -1822,6 +1915,8 @@ function fillTrip(t){
   $('f-fee').value=t.fee?comma(t.fee):''; $('f-memo').value=t.memo||'';
   $('f-clientphone').value=t.clientPhone||''; $('f-fromphone').value=t.fromPhone||''; $('f-tophone').value=t.toPhone||'';
   $('f-clientname').value=t.clientName||''; $('f-fromname').value=t.fromName||''; $('f-toname').value=t.toName||'';
+  $('f-subon').checked=!!t.sub; $('f-sub').value=t.sub||''; $('f-subphone').value=t.subPhone||''; $('f-cut').value=t.cut?comma(t.cut):''; $('f-subpay').value=t.sub&&t.subPay?comma(t.subPay):'';
+  $('f-subpaid').checked=!!t.subPaid; $('f-subtaxnow').checked=!!t.subTax; subPayManual=!!t.sub&&t.subPay!==Math.max(0,t.amount-t.cut); syncSubBox();
   renderStops(stopsOf(t)); paintTod(); renderPlaces('from'); renderPlaces('to'); renderCPast();
 }
 // 등록할 때 전에 적었던 화주면 한 줄로: 받음 몇 건 · 못 받음 몇 건(남은 돈) · [자세히]
@@ -1842,7 +1937,7 @@ function againTrip(t){
   // 묻지 않고 바로 등록 화면으로 (적던 내용이 있었으면 알림의 [되돌리기]로 다시 불러옴)
   const prev=readDraft('draftNew');
   navTab('add');
-  formKind='trip'; resetForm(); fillTrip(t);
+  formKind='trip'; resetForm(); fillTrip(t); $('f-subpaid').checked=false; $('f-subtaxnow').checked=false;
   const n=t.toDate?Math.round((parseD(t.toDate)-parseD(t.date))/86400000):0;
   $('f-date').value=todayIso; $('f-todate').value=n>0?iso(new Date(TODAY.getTime()+n*86400000)):''; paintTod();
   syncMore(); saveDraft();
@@ -1863,7 +1958,8 @@ $('f').addEventListener('submit',e=>{
     const t=store.get(editingId);
     if(!t){resetForm();popOverlay('edit');go(backView);return}
     const before={...t};
-    Object.assign(t,f,{paid:$('f-paidnow').checked?(t.paid||todayIso):null,tax:$('f-taxnow').checked?(t.tax||todayIso):''});
+    Object.assign(t,f,{paid:$('f-paidnow').checked?(t.paid||todayIso):null,tax:$('f-taxnow').checked?(t.tax||todayIso):'',
+      subPaid:f.sub&&$('f-subpaid').checked?(t.subPaid||todayIso):'',subTax:f.sub&&$('f-subtaxnow').checked?(t.subTax||todayIso):''});
     saveTrip(t);
     const id=t.id; resetForm();
     if(backView==='cal'){const d=parseD(date);calY=d.getFullYear();calM=d.getMonth();calSel=date}
@@ -1872,7 +1968,7 @@ $('f').addEventListener('submit',e=>{
     toast('수정했어요',()=>{Object.assign(t,before);saveTrip(t)});
     return;
   }
-  const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null,tax:$('f-taxnow').checked?todayIso:''};
+  const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:$('f-paidnow').checked?date:null,tax:$('f-taxnow').checked?todayIso:'',subPaid:f.sub&&$('f-subpaid').checked?todayIso:'',subTax:f.sub&&$('f-subtaxnow').checked?todayIso:''};
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
   resetForm(); ls.set('draftNew',''); goCal();
