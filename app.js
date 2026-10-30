@@ -392,8 +392,9 @@ function renderUnpaid(){
   document.querySelectorAll('#u-mode [data-umode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.umode===uMode));
   $('u-givecnt').textContent=dd.length?dd.length+'건':'';
   $('v-unpaid').classList.toggle('givemode',give);
-  ['u-view','u-searchbox','u-age','u-sortrow','u-rangebtn'].forEach(id=>$(id).hidden=give);
-  if(give){$('u-calbox').hidden=true;$('u-shint').hidden=true;renderGive(dd);return}
+  $('u-scope').hidden=give; $('u-search').placeholder=give?'기사, 화주, 지역, 메모로 찾기':SPH[scopeOf('u-scope')]||SPH.auto;
+  if(give){renderGive(dd);return}
+  $('u-view').hidden=false;
   document.querySelectorAll('#u-view [data-uview]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.uview===uView));
   const calMode=uView==='cal';
   // 달력으로 볼 땐 달력이 고르는 도구라 찾기 · 기간 · 미수 기간 · 순서는 숨김
@@ -460,7 +461,7 @@ function renderUnpaidCal(){
 }
 $('uc-prev').onclick=()=>ucJump(-1);
 $('uc-next').onclick=()=>ucJump(1);
-function ucJump(n){const months=[...new Set(trips.filter(t=>left(t)>0).map(t=>t.date.slice(0,7)))].sort(),i=months.indexOf(`${ucY}-${pad(ucM+1)}`),m=months[i+n];if(!m)return;ucY=+m.slice(0,4);ucM=+m.slice(5,7)-1;uDay=null;openId=payingId=null;renderUnpaid()}
+function ucJump(n){const months=[...new Set((uMode==='give'?drvDue():trips.filter(t=>left(t)>0)).map(t=>t.date.slice(0,7)))].sort(),i=months.indexOf(`${ucY}-${pad(ucM+1)}`),m=months[i+n];if(!m)return;ucY=+m.slice(0,4);ucM=+m.slice(5,7)-1;uDay=null;openId=payingId=null;renderUnpaid()}
 // ---------- 달력 ----------
 function monthTrips(y,m){const p=`${y}-${pad(m+1)}`;return trips.filter(t=>t.date.startsWith(p))}
 function renderBackupBanner(){
@@ -1801,21 +1802,61 @@ function setCfPaid(v){cfPaid=!!v;document.querySelectorAll('#cf-paid [data-cfpai
 // 기사 이름: 지출의 기사 운임 + 예전 맡긴 기록에서 자주 쓴 순
 function topSubs(){const c={};[...costs.filter(x=>x.cat==='기사'),...trips].forEach(x=>{if(!x.sub)return;const w=Math.pow(0.5,Math.max(0,daysSince(x.date))/14);c[x.sub]=(c[x.sub]||0)+w});return Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,6)}
 // 기사에게 줄 돈: 기사 운임 지출 중 아직 안 준 것 + 예전 방식으로 맡긴 운행 중 안 준 것
-const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c.id,date:c.date,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
-  ...trips.filter(t=>t.sub&&!t.subPaid).map(t=>({id:t.id,date:t.date,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort(byOld);
+const drvDue=()=>[...costs.filter(c=>c.cat==='기사'&&!c.subPaid).map(c=>({id:c.id,date:c.date,sub:c.sub,phone:c.subPhone,memo:c.memo,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
+  ...trips.filter(t=>t.sub&&!t.subPaid).map(t=>({id:t.id,date:t.date,sub:t.sub,phone:t.subPhone,memo:t.memo,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort(byOld);
 // 받을 돈 화면 [받을 돈 | 기사에게 줄 돈] (이 휴대폰에 기억)
 let uMode=ls.get('uMode')==='give'?'give':'recv';
 const drvItem=(x,done)=>`<div class="udi"><div class="w"><b${x.sub?` class="tapname" data-drvname="${esc(x.sub)}" role="button"`:''}>${esc(x.sub||'기사 이름 없음')}</b><span>${md(x.date)} · ${esc(x.route||'')}</span></div><span class="num">${comma(x.amt)}</span>`
   +(done?`<span class="done">${md(x.paid)} 줌</span>`:`<button type="button" class="btn small" data-drvpay="${x.id}">줬어요</button>`)+'</div>';
-function renderGive(L){
-  const sum=L.reduce((a,x)=>a+x.amt,0), old=L.length?daysSince(L[0].date):0;
-  $('u-label').textContent='기사에게 줄 돈 (아직 안 준 것)'; $('u-total').textContent=won(sum);
-  $('u-sub').textContent=L.length?`${L.length}건 · 가장 오래된 것 ${old}일째`:'기사에게 줄 돈이 없어요';
-  // 최근에 준 것 5건 (확인용)
-  const paid=[...costs.filter(c=>c.cat==='기사'&&c.subPaid).map(c=>({id:c.id,date:c.date,paid:c.subPaid,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
+function renderGive(all){
+  // 받을 돈과 같은 도구: [목록 | 달력] · 찾기 · 기간 · 미수 기간 · 순서 (값도 받을 돈과 같이 씀)
+  document.querySelectorAll('#u-view [data-uview]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.uview===uView));
+  $('u-view').hidden=false;
+  const calMode=uView==='cal';
+  ['u-searchbox','u-age','u-sortrow','u-rangebtn'].forEach(id=>$(id).hidden=calMode); $('u-calbox').hidden=!calMode; $('u-shint').hidden=true;
+  if(calMode){renderGiveCal(all);return}
+  const qr=$('u-search').value.trim(), q=sNorm(qr);
+  const base=all.filter(x=>!uRange||(x.date>=uRange.start&&x.date<=uRange.end)).filter(x=>!q||sNorm([x.sub,x.route,x.phone,x.memo].join(' ')).includes(q));
+  const cnt={};base.forEach(x=>{const k=ageLevel(x);cnt[k]=(cnt[k]||0)+1});
+  if(uAge&&!cnt[uAge])uAge=null;
+  $('u-age').classList.toggle('picking',!!uAge);
+  $('u-age').innerHTML=`<button type="button" class="chip all" data-age="" aria-pressed="${!uAge}">전체 ${base.length}</button>`+
+    AGES.map(([k,l])=>`<button type="button" class="chip ${k}" data-age="${k}" aria-pressed="${uAge===k}" ${cnt[k]?'':'disabled'}>${l} ${cnt[k]||0}</button>`).join('');
+  const L=base.filter(x=>!uAge||ageLevel(x)===uAge).sort(uSort==='new'?(x,y)=>y.date.localeCompare(x.date):(x,y)=>x.date.localeCompare(y.date));
+  document.querySelectorAll('#u-sort [data-usort]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.usort===uSort));
+  $('u-rangetxt').textContent=uRange?rLabel(uRange):'전체 기간'; $('u-rangebtn').classList.toggle('on',!!uRange);
+  const filtered=!!(q||uRange||uAge), sum=L.reduce((a,x)=>a+x.amt,0), oldest=L.length?L.reduce((a,x)=>x.date<a.date?x:a):null;
+  const ageTxt=uAge?` · ${AGES.find(a=>a[0]===uAge)[1]}`:'';
+  $('u-label').textContent=`기사에게 줄 돈 (${uRange?rLabel(uRange):'전체 기간'}${ageTxt}${qr?` · "${qr}"`:''})`; $('u-total').textContent=won(sum);
+  $('u-sub').textContent=L.length?`${L.length}건 · 가장 오래된 것 ${daysSince(oldest.date)}일째${filtered?` · 전체 줄 돈 ${won(all.reduce((a,x)=>a+x.amt,0))}`:''}`:(filtered?'조건에 맞는 줄 돈이 없어요':'기사에게 줄 돈이 없어요');
+  // 최근에 준 것 5건 (확인용 · 찾거나 고를 땐 숨김)
+  const paid=filtered?[]:[...costs.filter(c=>c.cat==='기사'&&c.subPaid).map(c=>({id:c.id,date:c.date,paid:c.subPaid,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
     ...trips.filter(t=>t.sub&&t.subPaid).map(t=>({id:t.id,date:t.date,paid:t.subPaid,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((x,y)=>y.paid.localeCompare(x.paid)).slice(0,5);
-  $('u-list').innerHTML=`<div class="card udrv">${L.length?L.map(x=>drvItem(x)).join(''):'<div class="empty">기사에게 줄 돈이 없어요. 지출 › 기사 운임에서 "아직 안 줌"으로 적으면 여기에 떠요.</div>'}`
+  $('u-list').innerHTML=`<div class="card udrv">${L.length?L.map(x=>drvItem(x)).join(''):`<div class="empty">${filtered?'조건에 맞는 줄 돈이 없어요.':'기사에게 줄 돈이 없어요. 지출 › 기사 운임에서 "아직 안 줌"으로 적으면 여기에 떠요.'}</div>`}`
     +(paid.length?'<div class="udsec">최근에 준 것</div>'+paid.map(x=>drvItem(x,true)).join(''):'')+'</div>';
+}
+// 줄 돈 달력: 안 준 날만 금액이 뜨고 누를 수 있음 (받을 돈 달력과 같은 모양)
+function renderGiveCal(all){
+  const months=[...new Set(all.map(x=>x.date.slice(0,7)))].sort();
+  if(ucY===null||!months.includes(`${ucY}-${pad(ucM+1)}`)){const cur=todayIso.slice(0,7),pick=months.includes(cur)?cur:months[months.length-1]||cur;ucY=+pick.slice(0,4);ucM=+pick.slice(5,7)-1}
+  const pfx=`${ucY}-${pad(ucM+1)}`, mine=all.filter(x=>x.date.startsWith(pfx)), i=months.indexOf(pfx);
+  if(uDay&&!uDay.startsWith(pfx))uDay=null;
+  $('uc-prev').disabled=i<=0; $('uc-next').disabled=i<0||i>=months.length-1;
+  $('uc-title').textContent=`${ucY}년 ${ucM+1}월`;
+  const first=new Date(ucY,ucM,1).getDay(), days=new Date(ucY,ucM+1,0).getDate();
+  let g=''; for(let k=0;k<first;k++)g+='<div class="day blank"></div>';
+  for(let d=1;d<=days;d++){
+    const ds=`${pfx}-${pad(d)}`, xs=mine.filter(x=>x.date===ds), wd=(first+d-1)%7, dc=`d num${wd===0?' sun':wd===6?' sat':''}`;
+    if(!xs.length){g+=`<div class="day uoff${ds===todayIso?' today':''}"><span class="${dc}">${d}</span></div>`;continue}
+    const sm=xs.reduce((a,x)=>a+x.amt,0);
+    g+=`<button type="button" class="day uhas ${ageLevel(xs[0])}${ds===uDay?' upick':''}" data-ucd="${ds}" aria-label="${ucM+1}월 ${d}일 ${xs.length}건 줄 돈 ${comma(sm)}원"><span class="${dc}">${d}</span><span class="s num">${short(sm)}</span></button>`;
+  }
+  $('uc-grid').innerHTML=g;
+  const L=(uDay?mine.filter(x=>x.date===uDay):mine).sort((x,y)=>x.date.localeCompare(y.date)), sum=L.reduce((a,x)=>a+x.amt,0);
+  $('uc-hint').textContent=uDay?`${dayK(uDay)} · ${L.length}건 · 다시 누르면 이 달 전체`:mine.length?'색칠된 날을 누르면 그날 줄 돈만 보여요':'이 달은 줄 돈이 없어요';
+  $('u-label').textContent=`기사에게 줄 돈 (${uDay?dayK(uDay):`${ucY}년 ${ucM+1}월`})`; $('u-total').textContent=won(sum);
+  $('u-sub').textContent=`${L.length}건 · 전체 줄 돈 ${won(all.reduce((a,x)=>a+x.amt,0))}`;
+  $('u-list').innerHTML=`<div class="card udrv">${L.length?L.map(x=>drvItem(x)).join(''):'<div class="empty">줄 돈이 없어요.</div>'}</div>`;
 }
 $('v-unpaid').addEventListener('click',e=>{
   const m=e.target.closest('[data-umode]'); if(m){uMode=m.dataset.umode;ls.set('uMode',uMode);openId=payingId=null;renderUnpaid();window.scrollTo(0,0);return}
