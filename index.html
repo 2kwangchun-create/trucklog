@@ -434,9 +434,6 @@ body.selecting .head .cp{pointer-events:none}
 .act{display:flex;flex-direction:column;gap:8px}
 .act .r1{display:grid;grid-template-columns:3fr 2fr;gap:8px}
 /* 맡긴 일 */
-.act .r3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:6px}
-.act .r3 .btn{min-height:44px;font-size:14px;font-weight:700;padding:6px 4px;word-break:keep-all}
-.btn.subgo{background:var(--sub);color:#fff;border-color:var(--sub)}
 .subb{display:inline-flex;align-items:center;gap:3px;font-size:13px;font-weight:700;color:var(--sub);background:var(--sub-soft);border-radius:999px;padding:2px 9px;white-space:nowrap;cursor:pointer}
 .chip.sgive{background:var(--due-soft);color:var(--due)}
 .chip.sdone{background:var(--paid-soft);color:var(--paid)}
@@ -448,36 +445,7 @@ body.selecting .head .cp{pointer-events:none}
 .subm b{font-size:15px;color:var(--fg)}
 .subm .pay{background:var(--sub-soft)}
 .subm .pay b{color:var(--sub)}
-/* 펼친 상세: 맡긴 기사 정산 버튼은 보라 상자 하나로 묶음 */
-.subact{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub);border-radius:12px;padding:8px;background:var(--sub-soft)}
-.subh{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--sub);padding:0 2px}
-.subh .ic{width:16px;height:16px}
-.subh span{margin-left:auto;font-weight:600}
-.subact .btn.ghost{background:var(--surface)}
 .subb .ic{width:14px;height:14px}
-.subbox{display:flex;flex-direction:column;gap:8px;margin-top:6px}
-.sublbl{font-size:15px;font-weight:700;margin-top:4px}
-.sublbl small{font-weight:500;color:var(--muted);margin-left:6px;font-size:13px}
-.swl{font-weight:700}
-.banner.subdue{background:var(--sub-soft);flex-wrap:nowrap}
-.banner.subdue #c-subdue-txt{display:flex;flex-direction:column;gap:1px}
-.banner.subdue #c-subdue-txt b.num{font-size:18px;color:var(--sub)}
-.banner.subdue .lbtns{flex:none}
-.earn{margin:6px 0 0;padding:8px 12px;border-radius:10px;background:var(--sub-soft);font-size:14px}
-.earn b{font-size:16px;color:var(--sub)}
-.sbstats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-.sbstats div{background:var(--bg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
-.sbstats span{font-size:13px;color:var(--muted);font-weight:600}
-.sbstats b{font-size:17px}
-.sbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.sbi{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
-.sbi:first-child{border-top:0}
-.sbt{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;font-size:15px}
-.sbt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sbt b{color:var(--sub)}
-.sbm{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px}
-.sbm .sbb{margin-left:auto;display:flex;gap:6px;align-items:center}
-.sbm .sbb .btn{min-height:36px;padding:4px 12px;font-size:14px}
 .act .r1.one{grid-template-columns:1fr}
 .act .r2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .act .r2 .btn{min-height:44px;font-weight:600}
@@ -892,7 +860,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <button type="button" class="todaybtn" id="c-today">오늘</button>
     </header>
     <div class="banner" id="c-backup" hidden><span><b>백업해 두세요.</b> <span id="c-backup-txt"></span> 휴대폰을 잃어버리면 기록도 사라질 수 있어요.</span><button type="button" class="btn small" data-goto="set">백업하기</button></div>
-    <div class="banner subdue" id="c-subdue" hidden><span id="c-subdue-txt"></span><span class="lbtns"><button type="button" class="btn small" id="c-subdue-go">보기</button></span></div>
     <div class="banner late" id="c-late" hidden><span id="c-late-txt"></span><span class="lbtns"><button type="button" class="btn small" id="c-late-go">보기</button><button type="button" class="ib" id="c-late-x" aria-label="오늘은 그만 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></div>
     <div class="first" id="c-first" hidden><b>아빠장부를 시작해 볼까요?</b><span>아래 가운데 <b>[등록]</b>을 눌러 첫 운행을 적으면, 달력에 받은 돈은 초록, 못 받은 돈은 빨강으로 표시돼요.</span></div>
     <div class="seg lu" id="c-lu" role="group" aria-label="달력에서 볼 것"><button type="button" data-lu="all" aria-pressed="true">운임 보기</button><button type="button" data-lu="load" aria-pressed="false"><i class="mk from"></i>상차 일정</button><button type="button" data-lu="unload" aria-pressed="false"><i class="mk to"></i>하차 일정</button></div>
@@ -926,7 +893,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         <div class="stat"><span>못 받은 돈</span><b class="num c-due" id="l-due"></b></div>
         <div class="stat"><span id="l-costlabel">지출</span><b class="num c-cost" id="l-cost"></b></div>
       </div>
-      <p class="earn" id="l-earn" hidden></p>
     </div>
     <div class="seg kind" id="l-kind" role="group" aria-label="장부에서 볼 것"><button type="button" data-lkind="trip" aria-pressed="true">운행 <span class="num" id="l-ntrip"></span></button><button type="button" data-lkind="cost" aria-pressed="false">지출 <span class="num" id="l-ncost"></span></button></div>
     <div class="grp" id="l-tripgrp">
@@ -984,17 +950,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
         <label class="check"><input type="checkbox" id="f-taxnow">전자 계산서 발행했어요</label>
         <details class="more" id="f-more"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>수수료</summary>
           <div class="field"><input type="text" id="f-fee" inputmode="numeric" placeholder="수수료 (원)" aria-label="수수료 (원)"></div></details></div>
-      <div class="card field subcard"><label class="check swl"><input type="checkbox" id="f-subon">다른 기사에게 맡김</label>
-        <div class="subbox" id="f-subbox" hidden>
-          <div class="recent" id="r-sub"></div>
-          <div class="contact"><input type="text" id="f-sub" placeholder="기사 이름" aria-label="기사 이름"><input type="tel" id="f-subphone" class="phone" inputmode="tel" placeholder="기사 전화번호" aria-label="기사 전화번호"></div>
-          <label class="sublbl" for="f-cut">내 몫 <small>소개비 · 내가 갖는 돈</small></label>
-          <div class="amtbox"><input type="text" id="f-cut" class="num" inputmode="numeric" placeholder="예: 30,000"><span>원</span></div>
-          <label class="sublbl" for="f-subpay">기사에게 줄 돈 <small>운임 − 내 몫 · 고칠 수 있어요</small></label>
-          <div class="amtbox"><input type="text" id="f-subpay" class="num" inputmode="numeric" placeholder="운임 − 내 몫"><span>원</span></div>
-          <label class="check"><input type="checkbox" id="f-subpaid">기사에게 이미 보냈어요</label>
-          <label class="check"><input type="checkbox" id="f-subtaxnow">기사 계산서 받았어요</label>
-        </div></div>
       <div class="card field"><label for="f-memo">메모 <em>*</em></label><textarea id="f-memo" rows="2" placeholder="예: 인수증 사진 카톡으로 보냄, 지게차 하차"></textarea></div>
       <div class="savebar"><div class="err" id="f-err" role="alert"></div><button class="btn big" type="submit" id="f-submit">저장</button></div>
     </form>
@@ -1140,24 +1095,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="txyear"><button type="button" class="ib" id="tx-prev" aria-label="이전 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b id="tx-y" class="num"></b><button type="button" class="ib" id="tx-next" aria-label="다음 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
     <div class="seg" id="tx-per" role="group" aria-label="기간"><button type="button" data-txp="h1" aria-pressed="false">1~6월<br><span>부가세</span></button><button type="button" data-txp="h2" aria-pressed="false">7~12월<br><span>부가세</span></button><button type="button" data-txp="y" aria-pressed="false">1년<br><span>종합소득세</span></button></div>
     <div id="tx-body"></div>
-  </div>
-</div>
-<!-- 맡긴 일: 기사에게 줄 돈 · 기사별 보기 -->
-<div class="sheet" id="sbsheet" role="dialog" aria-modal="true" aria-labelledby="sb-h" hidden>
-  <div class="sheet-in">
-    <div class="sheethead"><h2 id="sb-h">기사에게 줄 돈</h2><button type="button" class="ib" id="sb-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <div class="clbody" id="sb-body"></div>
-  </div>
-</div>
-<!-- 화주 돈을 다 받으면: 기사에게 보냈는지 -->
-<div class="sheet" id="subask" role="dialog" aria-modal="true" aria-labelledby="sa-h" hidden>
-  <div class="sheet-in">
-    <h2 id="sa-h"></h2>
-    <p class="hint" id="sa-sub"></p>
-    <div class="paybox"><label for="sa-date">언제 보냈어요?</label><input type="date" id="sa-date">
-      <label for="sa-amt">얼마 보냈어요?<small id="sa-hint"></small></label><div class="amtbox"><input type="text" id="sa-amt" class="num" inputmode="numeric"><span>원</span></div>
-      <p class="hint small">콜 수수료 등을 빼고 줬으면 실제로 보낸 만큼 적으세요.</p></div>
-    <div class="btnrow"><button type="button" class="btn" id="sa-yes">보냈어요</button><button type="button" class="btn ghost" id="sa-no">나중에</button></div>
   </div>
 </div>
 <!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
