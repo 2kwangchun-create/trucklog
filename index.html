@@ -142,6 +142,11 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .drvbox{display:flex;flex-direction:column;gap:6px;border:1px solid var(--sub)}
 .drvbox>label{font-size:15px;font-weight:700;margin-top:4px;display:flex;align-items:center;gap:6px}
 .drvlink{display:flex;flex-direction:column;gap:6px}
+/* 받을 돈 위쪽: [받을 돈 | 기사에게 줄 돈]은 맨 위, [목록 | 달력]은 제목 옆 작은 아이콘 */
+.hbtns{display:flex;align-items:center;gap:6px}
+.vsw{display:flex;gap:2px;background:var(--track);border-radius:12px;padding:3px}
+.vsw button{border:0;background:transparent;width:40px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);padding:0}
+.vsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .sortsw.umode{padding:4px}
 .sortsw.umode button{flex:1;font-size:15px;padding:9px 8px}
 .sortsw.umode button[data-umode="give"][aria-pressed="true"]{background:var(--sub);color:#fff}
@@ -369,12 +374,12 @@ body.selecting .row .legs{display:none}
 .sortsw.psw{align-self:flex-start}
 .sortsw.psw button{padding:7px 16px;font-size:14px}
 /* 기사 한눈에 보기 */
+.btn.small.dpbtn{background:var(--sub);border-color:var(--sub);color:#fff}
 .drdue{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px;border-radius:12px;background:var(--sub);color:#fff;text-align:center}
 .drdue span{font-size:15px;font-weight:700}
 .drdue b{font-size:22px;letter-spacing:-.3px}
 .drdue small{font-size:13px;font-weight:600;opacity:.9}
 .drlist .drr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center}
-.btn.small.dpbtn{background:var(--sub);border-color:var(--sub);color:#fff}
 .drlist .drr .st{grid-column:3;font-size:12px;text-align:right}
 .drlist .drr .btn{grid-column:3;min-height:32px;padding:2px 10px;font-size:13px;background:var(--sub);border-color:var(--sub);color:#fff}
 .tapname{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
@@ -638,7 +643,10 @@ details.todmore>.todate{margin-top:8px}
 .savebar{position:sticky;bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;flex-direction:column;gap:6px;padding:12px 0 4px;background:linear-gradient(rgba(0,0,0,0),var(--bg) 30%)}
 .savebar .btn{box-shadow:0 4px 14px rgba(31,94,74,.3)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;font-size:16px;max-width:calc(100% - 32px);z-index:30}
-.toast button{background:transparent;border:0;color:var(--bg);font-weight:700;text-decoration:underline;pointer-events:auto;padding:4px 2px}
+.toast button{background:transparent;border:0;color:var(--bg);font-weight:700;text-decoration:underline;pointer-events:auto;padding:4px 2px;flex:none;white-space:nowrap}
+.toast #toast-msg{flex:1;min-width:0;line-height:1.4}
+.toast{width:max-content;max-width:min(528px,calc(100% - 32px));z-index:50}
+.udrv .udi:first-of-type{border-top:0}
 .toast{pointer-events:none}
 /* 수정하다 나갔을 때 돌아갈지 묻는 창 (탭 바로 위에 고정) */
 .askbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));width:min(528px,calc(100% - 32px));background:var(--surface);border:2px solid var(--accent);border-radius:16px;padding:14px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;z-index:20}
@@ -682,8 +690,8 @@ body.selecting nav.tabs{display:none}
 .selbtns .btn{padding:12px 4px;font-size:15px}
 .selbtns .btn:disabled{opacity:.4}
 /* 스샷 버튼 (떠 있는 동그란 버튼) */
-.snapfab{position:fixed;right:14px;bottom:calc(170px + env(safe-area-inset-bottom,0px));z-index:45;width:46px;height:46px;border-radius:50%;border:0;padding:0;
-  display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-fg);opacity:.82;box-shadow:0 3px 10px rgba(0,0,0,.25);
+.snapfab{position:fixed;right:10px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:45;width:42px;height:42px;border-radius:50%;border:0;padding:0;
+  display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-fg);opacity:.7;box-shadow:0 3px 10px rgba(0,0,0,.25);
   touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:transform .15s,opacity .15s}
 .snapfab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
 .snapfab:active{transform:scale(.92)}
@@ -860,15 +868,15 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   <!-- 받을 돈 -->
   <section class="view" id="v-unpaid">
     <header class="top"><h1>남은 돈</h1>
-      <button type="button" class="rangebtn" id="u-rangebtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="u-rangetxt">기간: 전체</span></button></header>
+      <div class="hbtns"><div class="vsw" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true" aria-label="목록으로 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button><button type="button" data-uview="cal" aria-pressed="false" aria-label="달력으로 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></button></div>
+      <button type="button" class="rangebtn" id="u-rangebtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="u-rangetxt">기간: 전체</span></button></div></header>
+    <div class="sortsw umode" id="u-mode" role="group" aria-label="받을 돈 · 줄 돈"><button type="button" data-umode="recv" aria-pressed="true">받을 돈</button><button type="button" data-umode="give" aria-pressed="false">기사에게 줄 돈 <span class="num" id="u-givecnt"></span></button></div>
     <div class="hero">
       <div class="label" id="u-label">아직 못 받은 돈</div>
       <div class="big num" id="u-total">0원</div>
       <div class="sub" id="u-sub"></div>
     </div>
-    <div class="sortsw umode" id="u-mode" role="group" aria-label="받을 돈 · 줄 돈"><button type="button" data-umode="recv" aria-pressed="true">받을 돈</button><button type="button" data-umode="give" aria-pressed="false">기사에게 줄 돈 <span class="num" id="u-givecnt"></span></button></div>
-    <div class="seg kind" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true">목록</button><button type="button" data-uview="cal" aria-pressed="false">달력</button></div>
-    <!-- 받을 돈 달력: 안 받은 날만 금액이 뜨고 누를 수 있음 (오래될수록 진한 빨강) -->
+        <!-- 받을 돈 달력: 안 받은 날만 금액이 뜨고 누를 수 있음 (오래될수록 진한 빨강) -->
     <div class="card ucal" id="u-calbox" hidden>
       <div class="ucal-h"><button type="button" class="ib sm" id="uc-prev" aria-label="이전 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b class="num" id="uc-title"></b><button type="button" class="ib sm" id="uc-next" aria-label="다음 미수 달"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
       <div class="cal"><div class="wk"><div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div></div>
@@ -1052,7 +1060,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <p class="hint small smark-note">고른 날짜보다 오래 못 받은 돈이 있으면 달력 맨 위에 알려 줘요. 알림의 ✕를 누르면 그날 하루는 안 보여요.</p>
     <div class="gt">세금</div>
     <div class="card items">
-      <button type="button" class="item" id="s-tax"><span class="ii" style="background:var(--paid-soft);color:var(--paid)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="tx"><b>세금 신고용 정리</b><small>부가세 · 종합소득세 · 세무사에게 보낼 엑셀</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button type="button" class="item" id="s-tax"><span class="ii" style="background:var(--paid-soft);color:var(--paid)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="tx"><b>세금 신고용 정리</b><small>부가세 · 종소세 · 세무사용 엑셀</small></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
     <div class="gt">서류</div>
     <div class="card items">
@@ -1072,7 +1080,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="card"><p id="s-stats" class="hint"></p></div>
     <div class="gt">업데이트 내용</div>
     <div class="card chgs" id="s-changes"></div>
-    <p class="ver">아빠장부 1.15.0</p>
+    <p class="ver">아빠장부 1.16.0</p>
   </section>
 </div>
 
@@ -1141,14 +1149,6 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="clbody" id="dr-body"></div>
   </div>
 </div>
-<!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
-<div class="sheet" id="clsheet" role="dialog" aria-modal="true" aria-labelledby="cl-h" hidden>
-  <div class="sheet-in">
-    <div class="sheethead"><h2 id="cl-h">화주</h2><button type="button" class="ib" id="cl-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <div class="clbody" id="cl-body"></div>
-  </div>
-</div><!-- 정산 문자: 운행 한 건마다 화주에게 운임 입금 확인 문자 -->
-<div class="sheet" id="smsheet" role="dialog" aria-modal="true" aria-labelledby="sm-title" hidden>
 <!-- 기사에게 준 돈: 언제 · 얼마 (덜 줬으면 남은 돈은 계속 줄 돈으로) -->
 <div class="sheet" id="dpsheet" role="dialog" aria-modal="true" aria-labelledby="dp-h" hidden>
   <div class="sheet-in">
@@ -1160,6 +1160,14 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="btnrow"><button type="button" class="btn" id="dp-ok">줬어요</button><button type="button" class="btn ghost" id="dp-no">취소</button></div>
   </div>
 </div>
+<!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
+<div class="sheet" id="clsheet" role="dialog" aria-modal="true" aria-labelledby="cl-h" hidden>
+  <div class="sheet-in">
+    <div class="sheethead"><h2 id="cl-h">화주</h2><button type="button" class="ib" id="cl-close" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="clbody" id="cl-body"></div>
+  </div>
+</div><!-- 정산 문자: 운행 한 건마다 화주에게 운임 입금 확인 문자 -->
+<div class="sheet" id="smsheet" role="dialog" aria-modal="true" aria-labelledby="sm-title" hidden>
   <div class="sheet-in">
     <h2 id="sm-title">정산 문자</h2>
     <p class="hint" id="sm-to"></p>

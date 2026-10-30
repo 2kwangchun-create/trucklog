@@ -212,10 +212,12 @@ function segHtml(which,list,cur){
 function ageLevel(t){const d=daysSince(t.date);return d>=90?'a5':d>=60?'a4':d>=30?'a3':d>=14?'a2':'a1'}
 const AGES=[['a1','2주 미만'],['a2','2주~1달'],['a3','1~2달'],['a4','2~3달'],['a5','3달 이상']];
 let uAge=null;
+// 며칠째: 오늘이면 '오늘', 아니면 'N일째'
+const agoTxt=s=>{const d=daysSince(s);return d<=0?'오늘':d+'일째'};
 function ageChip(t){
   if(t.paid) return `<span class="chip paid">입금 ${md(t.paid)}</span>`;
   const d=daysSince(t.date);
-  return `<span class="chip ${ageLevel(t)}">${d<0?'예정':'미수 '+d+'일째'}</span>`;
+  return `<span class="chip ${ageLevel(t)}">${d<0?'예정':d===0?'미수 오늘':'미수 '+d+'일째'}</span>`;
 }
 // 상차지 · 하차지 여러 곳: 첫 곳은 from · to 칸 그대로, 더 있는 곳은 stops(글자로 바꾼 목록) [{k:'from'|'to',c:시·군,a:상세주소,n:담당자,p:연락처}]
 const stopsOf=t=>{try{const v=JSON.parse(t.stops||'[]');return Array.isArray(v)?v.filter(x=>x&&x.c&&(x.k==='from'||x.k==='to')):[]}catch(_){return []}};
@@ -777,7 +779,7 @@ function renderSettings(){
   const due=trips.filter(t=>!t.paid);
   const dates=trips.map(t=>t.date).sort();
   $('s-stats').innerHTML=trips.length
-    ?`운행 기록 <b class="num">${comma(trips.length)}건</b> (${md(dates[0])}/${dates[0].slice(2,4)} ~ ${md(dates[dates.length-1])}/${dates[dates.length-1].slice(2,4)})<br>못 받은 돈 <b class="num c-due">${comma(due.length)}건 · ${won(due.reduce((s,t)=>s+left(t),0))}</b>`
+    ?`운행 기록 <b class="num">${comma(trips.length)}건</b> (${((a,b)=>a.slice(0,4)===b.slice(0,4)?`${a.slice(0,4)}년 ${md(a)} ~ ${md(b)}`:`${a.slice(2,4)}년 ${md(a)} ~ ${b.slice(2,4)}년 ${md(b)}`)(dates[0],dates[dates.length-1])})<br>못 받은 돈 <b class="num c-due">${comma(due.length)}건 · ${won(due.reduce((s,t)=>s+left(t),0))}</b>`
     :'아직 운행 기록이 없어요.';
   if(costs.length)$('s-stats').innerHTML+=`<br>지출 기록 <b class="num">${comma(costs.length)}건</b>`;
   // 자동 저장 현황: 기록을 저장·수정·삭제할 때마다 휴대폰과 클라우드에 바로 저장됨
@@ -1243,8 +1245,6 @@ const Snap={
 };
 Snap.init();
 
-// ---------- 기사 한눈에 보기 ----------
-// 기사 이름을 누르면: 연락처 · 아직 줄 돈 · 숫자 요약 · 맡긴 일 기록(5건씩 더보기) — 지출의 기사 운임 + 예전 방식으로 맡긴 운행
 // ---------- 기사에게 준 돈 적기 ----------
 // 언제 · 얼마 (남은 줄 돈이 미리 채워짐) · 덜 주면 그만큼만 기록(got · gotLog)하고 남은 돈은 계속 줄 돈 · 다 주면 준 날(subPaid)
 // 예전 방식으로 맡긴 운행은 한 번에: 적은 금액이 기사에게 준 돈이 됨
@@ -1269,6 +1269,8 @@ $('dp-ok').onclick=()=>{const r=store.get(dpId);if(!r){closeDp();return}
   const left2=r.kind==='cost'?r.amount-r.got:0;
   toast(`${r.sub||'기사'}에게 ${comma(a)}원 줌 (${md(d)})${left2>0?` · 남은 줄 돈 ${won(left2)}`:''}`,()=>{Object.assign(r,before);saveTrip(r);render();if(!$('drsheet').hidden)renderDriver()})};
 
+// ---------- 기사 한눈에 보기 ----------
+// 기사 이름을 누르면: 연락처 · 아직 줄 돈 · 숫자 요약 · 맡긴 일 기록(5건씩 더보기) — 지출의 기사 운임 + 예전 방식으로 맡긴 운행
 let drName='', drRecs=[], drShow=5;
 const drRecsOf=name=>[...costs.filter(c=>c.cat==='기사'&&c.sub===name).map(c=>{const lt=c.link?store.get(c.link):null;
     return {id:c.id,date:c.date,amt:c.amount,got:c.subPaid?0:(c.got||0),paid:c.subPaid,phone:c.subPhone,trip:lt&&!lt.deleted?lt:null,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')}}),
@@ -1284,7 +1286,7 @@ function renderDriver(){
   const linked=L.filter(x=>x.trip), mine=linked.reduce((a,x)=>a+(x.trip.amount-x.amt),0);
   $('dr-h').textContent=drName;
   $('dr-body').innerHTML=perSw()+(ph?`<div class="clct"><a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a></div>`:'')
-    +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)</small></div>`:`<p class="clok">이 기사에게 ${pl?pl+' ':''}줄 돈이 없어요.</p>`)
+    +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${agoTxt(oldest.date)})</small></div>`:`<p class="clok">이 기사에게 ${pl?pl+' ':''}줄 돈이 없어요.</p>`)
     +`<div class="clstats"><div><span>맡긴 일</span><b class="num">${L.length}건</b></div><div><span>기사 운임 합계</span><b class="num">${short(L.reduce((a,x)=>a+x.amt,0))}원</b></div><div><span>준 돈</span><b class="num c-paid">${short(paid.reduce((a,x)=>a+x.amt,0))}원</b></div>`
     +`<div><span>마지막 일</span><b class="num">${L.length?md(L[0].date):'-'}</b></div><div><span>연결된 운행</span><b class="num">${linked.length}건</b></div><div><span>내 몫</span><b class="num">${linked.length?short(mine)+'원':'-'}</b></div></div>`
     +`<div class="section-title">${pl?pl+' ':''}맡긴 일 기록 <span class="num">${L.length}건</span></div><div class="clrecent drlist" id="dr-list">`+(L.length?drListHtml():`<div class="empty">${pl}에는 맡긴 일이 없어요.</div>`)+'</div>';
@@ -1323,7 +1325,7 @@ function renderClient(){
   $('cl-h').textContent=name;
   // 순서: 연락처(바로 전화) → 못 받은 돈 보기(가장 많이 누를 것) → 숫자 요약 → 운행 기록
   $('cl-body').innerHTML=perSw()+(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
-    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:`<p class="clok">이 화주는 ${pl?pl+'에 ':''}못 받은 돈이 없어요.</p>`)
+    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${agoTxt(oldest.date)})`:''}</small></button>`:`<p class="clok">이 화주는 ${pl?pl+'에 ':''}못 받은 돈이 없어요.</p>`)
     +`<div class="clstats">`
     +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b></div>`
     +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b></div><div><span>예정</span><b class="num">${plan.length}건</b></div></div>`
@@ -1566,9 +1568,9 @@ window.addEventListener('popstate',e=>{
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
   if(!$('drsheet').hidden&&!s.dsheet)$('drsheet').hidden=true;
+  if(!$('dpsheet').hidden&&!s.dpsheet)$('dpsheet').hidden=true;
   if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
-  if(!$('dpsheet').hidden&&!s.dpsheet)$('dpsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
   if(selMode&&!s.select&&!s.sheet)exitSelect(true);
   if(editingId!==null&&!s.edit)leaveEdit();
@@ -1584,9 +1586,9 @@ document.addEventListener('click',e=>{
   if(selMode){const row=e.target.closest('.list .row[data-id]');
     if(row){e.preventDefault();const id=row.dataset.id;sel.has(id)?sel.delete(id):sel.add(id);refreshSel();return}}
   if(e.target.closest('a[href^="tel:"]'))return; // 전화 앱 키패드로 번호만 넘김
+  const dpo=e.target.closest('[data-dpopen]'); if(dpo){openDp(dpo.dataset.dpopen);return}
   const cp=e.target.closest('[data-copy]');
   if(cp){const v=cp.dataset.copy;
-  const dpo=e.target.closest('[data-dpopen]'); if(dpo){openDp(dpo.dataset.dpopen);return}
     try{navigator.clipboard.writeText(v).then(()=>toast(`${v} 복사했어요`),()=>toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요'))}
     catch(_){toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요')}
     return}
@@ -1853,7 +1855,7 @@ function renderGive(all){
   const filtered=!!(q||uRange||uAge), sum=L.reduce((a,x)=>a+x.amt,0), oldest=L.length?L.reduce((a,x)=>x.date<a.date?x:a):null;
   const ageTxt=uAge?` · ${AGES.find(a=>a[0]===uAge)[1]}`:'';
   $('u-label').textContent=`기사에게 줄 돈 (${uRange?rLabel(uRange):'전체 기간'}${ageTxt}${qr?` · "${qr}"`:''})`; $('u-total').textContent=won(sum);
-  $('u-sub').textContent=L.length?`${L.length}건 · 가장 오래된 것 ${daysSince(oldest.date)}일째${filtered?` · 전체 줄 돈 ${won(all.reduce((a,x)=>a+x.amt,0))}`:''}`:(filtered?'조건에 맞는 줄 돈이 없어요':'기사에게 줄 돈이 없어요');
+  $('u-sub').textContent=L.length?`${L.length}건 · 가장 오래된 것 ${agoTxt(oldest.date)}${filtered?` · 전체 줄 돈 ${won(all.reduce((a,x)=>a+x.amt,0))}`:''}`:(filtered?'조건에 맞는 줄 돈이 없어요':'기사에게 줄 돈이 없어요');
   // 최근에 준 것 5건 (확인용 · 찾거나 고를 땐 숨김)
   const paid=filtered?[]:[...costs.filter(c=>c.cat==='기사'&&c.subPaid).map(c=>({id:c.id,date:c.date,paid:c.subPaid,sub:c.sub,amt:c.amount,route:[c.client,[c.from,c.to].filter(Boolean).join('→')].filter(Boolean).join(' · ')})),
     ...trips.filter(t=>t.sub&&t.subPaid).map(t=>({id:t.id,date:t.date,paid:t.subPaid,sub:t.sub,amt:t.subPay,route:[t.client,cities(t,'from')+'→'+cities(t,'to')].filter(Boolean).join(' · ')}))].sort((x,y)=>y.paid.localeCompare(x.paid)).slice(0,5);
@@ -1957,12 +1959,13 @@ $('cf').addEventListener('submit',e=>{
   saveTrip(c);
   // 주유·통행료처럼 이어서 적는 경우가 많아 화면은 그대로 두고 날짜만 유지
   resetCost(); $('cf-date').value=date; renderCostRecent();
-  toast(`${c.cat==='기사'?'기사 운임':c.cat} ${comma(amount)}원 저장했어요${c.link?' · 운행과 연결':''}${c.cat==='기사'&&!c.subPaid?' · 받을 돈 화면에 줄 돈으로':''}`,()=>{removeTrip(c);renderCostRecent()});
+  toast(`${c.cat==='기사'?'기사 운임':c.cat} ${short(amount)}원 저장${c.link?' · 운행 연결':''}${c.cat==='기사'&&!c.subPaid?' · 줄 돈에 추가':''}`,()=>{removeTrip(c);renderCostRecent()});
 });
 
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
+  {v:'1.16.0',d:'10/30',items:['기사 운임은 지출에서: 등록 › 지출은 기사 운임이 기본 · 기사 · 화주 · 상차지 · 하차지 · 같은 운행이 있으면 저절로 연결(담당 기사 · 내 몫)','[받을 돈] 탭 이름을 [남은 돈]으로 · 안에서 [받을 돈 | 기사에게 줄 돈] 고르기 · 줄 돈에도 목록/달력 · 찾기 · 기간 · 순서','기사에게 [줬어요]: 언제 · 얼마 적기 (덜 주면 남은 줄 돈) · 장부 지출에서도','기사 한눈에 보기 · 화주 · 기사 창에 [이번 달 | 전체]','운행 등록의 [다른 기사에게 맡김]은 없앰 (예전 기록은 그대로 보임) · 목록/달력은 제목 옆 아이콘으로']},
   {v:'1.15.0',d:'10/30',items:['맡긴 일 정산: 등록에서 [다른 기사에게 맡김] · 내 몫 · 기사에게 줄 돈(자동, 고칠 수 있음)','화주 돈을 다 받으면 "기사에게 보내셨어요?" · 기사에게 보낸 날짜 · 금액 적기 · 달력 위 기사에게 줄 돈','기사별 보기 · 기사 계산서 받음 표시 · 기사 정산 복사 · 장부에 실제 번 돈, 기사 운임은 지출로','스샷 버튼: 누르면 지금 화면을 사진으로, 꾹 누르면 자리 옮기기','화주 한눈에 보기: 운행 기록 [더보기]']},
   {v:'1.14.1',d:'10/26',items:['여러 곳 들르는 운행: 들르는 곳 순서표에서 곳마다 상차 · 하차 완료 (하차는 상차를 다 끝낸 뒤)','목록에서 추가한 곳이 보이게: 서울 [+안산] → 부산 [+청주]','추가한 상차지 · 하차지에도 자주 간 곳 버튼과 전에 갔던 곳(주소 · 담당자)']},
   {v:'1.14.0',d:'10/26',items:['설정 › 서류 › 고소장 만들기: 칸을 채우면 경찰서 고소장 엑셀 양식에 그대로 넣어서 저장 (육하원칙으로 범죄사실 문장 만들기)','운행 상세의 [또 등록] 자리에 [고소장]: 그 운행의 화주 · 날짜 · 못 받은 운임으로 고소장 칸을 채워서 열기','등록: 상차지 · 하차지 여러 곳 (+ 상차지 추가 · + 하차지 추가)','등록: 하차일은 [하차일 더보기]를 눌러야 펼쳐짐','화주 한눈에 보기: 연락처 → 못 받은 돈 → 숫자 요약 순서로','전에 갔던 곳 버튼을 크고 누르기 쉽게']},
