@@ -200,7 +200,8 @@ const subSt=t=>!t.sub?'':t.paid?(t.subPaid?'done':'give'):(t.subPaid?'early':'du
 const SUBST={due:['미수','sdue'],give:['기사 줄 차례','sgive'],done:['끝','sdone'],early:['먼저 줌','searly']};
 const subChipHtml=t=>{const k=subSt(t);return k?`<span class="chip ${SUBST[k][1]}">${k==='done'?'기사 보냄 '+md(t.subPaid):SUBST[k][0]}</span>`:''};
 const kept=t=>t.sub?t.amount-t.subPay:t.amount; // 실제 번 돈: 맡긴 건은 운임 − 기사에게 줄 돈 (= 내 몫)
-const subText=t=>`${md(t.date)} ${cities(t,'from')}→${cities(t,'to')} / 운임 ${comma(t.amount)} / 내 몫 ${comma(t.cut)} / ${t.subPaid?`보낸 돈 ${comma(t.subPay)} (${md(t.subPaid)})`:`줄 돈 ${comma(t.subPay)}`}`;
+const myCut=t=>t.subPaid?t.amount-t.subPay:t.cut; // 내 몫: 보내기 전엔 적은 값, 보낸 뒤엔 운임 − 실제로 보낸 돈
+const subText=t=>`${md(t.date)} ${cities(t,'from')}→${cities(t,'to')} / 운임 ${comma(t.amount)} / 내 몫 ${comma(myCut(t))} / ${t.subPaid?`보낸 돈 ${comma(t.subPay)} (${md(t.subPaid)})`:`줄 돈 ${comma(t.subPay)}`}`;
 function copyPlain(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg),()=>toast('복사가 안 됐어요. 다시 눌러 주세요'))}catch(_){toast('복사가 안 됐어요. 다시 눌러 주세요')}}
 const pass=(t,f)=>f==='paid'?!!t.paid:f==='due'?!t.paid:f==='notax'?!t.tax:f==='nosubtax'?!!t.sub&&!t.subTax:true;
 const EMPTY={all:'기록이 없어요.',paid:'받은 돈 기록이 없어요.',due:'못 받은 돈이 없어요.',notax:'계산서 안 낸 건이 없어요.',nosubtax:'기사 계산서 안 받은 건이 없어요.'};
@@ -299,7 +300,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       +(t.gotLog?`<div class="blk"><span class="bl">받은 기록</span><div class="num">${t.gotLog.split(',').filter(Boolean).map(x=>{const[d,a]=x.split(':');return md(d)+' '+won(Number(a))}).join(' · ')}${t.paid?'':`<br><b class="c-due">남은 돈 ${won(left(t))}</b>`}</div></div>`:'')
       +`<div class="blk money"><span class="bl">운임 · ${esc(t.payType||'인수증')}</span><span class="bl">수수료</span><b class="num">${won(t.amount)}</b><span class="num">${t.fee?won(t.fee):'없음'}</span></div>`
       +(t.sub?`<div class="blk"><span class="bl">맡긴 기사</span><div class="addr"><b>🤝 ${esc(t.sub)}</b> ${subChipHtml(t)}</div>${ctHtml(t.subPhone,'')}`
-        +`<div class="subm num"><span>운임 ${won(t.amount)}</span><span>내 몫 ${won(t.cut)}</span><b>기사에게 줄 돈 ${won(t.subPay)}</b></div>`
+        +`<div class="subm num"><span>운임 ${won(t.amount)}</span><span>내 몫 ${won(myCut(t))}</span><b>기사에게 줄 돈 ${won(t.subPay)}</b></div>`
         +`<div>${t.subPaid?`${md(t.subPaid)}에 ${won(t.subPay)} 보냄`:'아직 안 보냄'} · ${t.subTax?`기사 계산서 받음 ${md(t.subTax)}`:'<span class="na">기사 계산서 안 받음</span>'}</div></div>`:'')
       +(mode==='month'?`<div class="blk"><span class="bl">상태</span><div>${dayK(t.date)} 상차 · ${ageChip(t)}</div></div>`:'')
       +(t.tax||t.smsAt?`<div class="blk"><span class="bl">정산</span><div>${t.tax?`계산서 발행 ${md(t.tax)}`:'계산서 미발행'}${t.smsAt?` · 문자 보낸 날 ${md(t.smsAt)}`:''}</div></div>`:'')
@@ -1182,6 +1183,52 @@ async function doCopy(){
   $('cp-hint').classList.toggle('errline',!ok);$('cp-hint').classList.toggle('okline2',ok);
   if(ok)toast('복사했어요');
 }
+// ---------- 스샷 버튼 ----------
+// 누르면: 지금 보이는 화면을 그림으로 만들어 공유(카톡 · 갤러리 저장) 또는 다운로드 · 그림 만드는 도구(html2canvas)는 처음 누를 때 받아 둠
+// 꾹 누르면(0.5초): 손가락을 따라 옮겨지고, 놓은 자리를 이 휴대폰에 기억
+const Snap={
+  el:$('snapfab'), timer:null, drag:false, moved:false, sx:0, sy:0, ox:0, oy:0,
+  init(){
+    const e=this.el;
+    try{const p=JSON.parse(ls.get('snapPos')||'null');if(p)this.place(p.x*innerWidth,p.y*innerHeight)}catch(_){}
+    e.addEventListener('pointerdown',ev=>{this.sx=ev.clientX;this.sy=ev.clientY;const r=e.getBoundingClientRect();this.ox=ev.clientX-r.left;this.oy=ev.clientY-r.top;this.moved=false;
+      clearTimeout(this.timer);this.timer=setTimeout(()=>{this.drag=true;e.classList.add('drag');try{navigator.vibrate&&navigator.vibrate(25)}catch(_){}},500);
+      try{e.setPointerCapture(ev.pointerId)}catch(_){}});
+    e.addEventListener('pointermove',ev=>{
+      if(this.drag){this.moved=true;this.place(ev.clientX-this.ox,ev.clientY-this.oy);ev.preventDefault();return}
+      if(Math.abs(ev.clientX-this.sx)+Math.abs(ev.clientY-this.sy)>10)clearTimeout(this.timer)});
+    const end=()=>{clearTimeout(this.timer);if(this.drag){this.drag=false;e.classList.remove('drag');const r=e.getBoundingClientRect();
+      ls.set('snapPos',JSON.stringify({x:r.left/innerWidth,y:r.top/innerHeight}));this.justDragged=true;setTimeout(()=>this.justDragged=false,350)}};
+    e.addEventListener('pointerup',end);e.addEventListener('pointercancel',end);
+    e.addEventListener('contextmenu',ev=>ev.preventDefault());
+    e.addEventListener('click',ev=>{ev.stopPropagation();if(this.justDragged||this.moved)return;this.shoot()});
+    addEventListener('resize',()=>{const r=e.getBoundingClientRect();this.place(r.left,r.top)});
+  },
+  place(x,y){const e=this.el,s=e.offsetWidth||46;x=Math.max(6,Math.min(innerWidth-s-6,x));y=Math.max(6,Math.min(innerHeight-s-6,y));
+    e.style.left=x+'px';e.style.top=y+'px';e.style.right='auto';e.style.bottom='auto'},
+  async shoot(){
+    const e=this.el; if(e.classList.contains('busy'))return; e.classList.add('busy');
+    try{
+      if(!window.html2canvas)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      // 그림 도구는 ::before 글자를 진짜 칸으로 바꿔서, 비어 있으면 숨기는 칸(:empty)이 그림에서만 보이게 됨 → 지금 화면에서 숨은 빈 칸은 그림에서도 숨김
+      const hid=[...document.querySelectorAll('body :empty')].filter(n=>getComputedStyle(n).display==='none');hid.forEach(n=>n.setAttribute('data-snaphide',''));
+      const bg=getComputedStyle(document.body).backgroundColor||'#fff';
+      const c=await html2canvas(document.body,{backgroundColor:bg,scale:Math.min(2,devicePixelRatio||1),useCORS:true,logging:false,
+        x:scrollX,y:scrollY,width:innerWidth,height:innerHeight,windowWidth:document.documentElement.clientWidth,windowHeight:innerHeight,
+        ignoreElements:n=>n.id==='snapfab'||n.id==='toast'||n.id==='snapflash',
+        onclone:d=>d.querySelectorAll('[data-snaphide]').forEach(n=>n.style.display='none')}).finally(()=>hid.forEach(n=>n.removeAttribute('data-snaphide')));
+      const f=$('snapflash');f.hidden=false;f.style.animation='none';void f.offsetWidth;f.style.animation='';setTimeout(()=>f.hidden=true,400);
+      const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+      if(!blob)throw new Error('blob');
+      const d=new Date(), name=`아빠장부_${iso(d)}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
+      const r=await giveFile(blob,name,'image/png',true);
+      if(r!=='cancel')toast(r==='shared'?'스샷을 보냈어요':'스샷을 "다운로드" 폴더에 저장했어요');
+    }catch(err){toast(navigator.onLine?'스샷을 못 찍었어요. 다시 눌러 주세요':'처음 한 번은 인터넷이 연결돼 있어야 스샷을 찍을 수 있어요')}
+    finally{e.classList.remove('busy')}
+  }
+};
+Snap.init();
+
 // ---------- 맡긴 일: 기사에게 줄 돈 · 기사별 보기 ----------
 // name 없음: 화주 돈은 받았는데 기사에게 아직 안 준 건(기사 줄 차례)만 · name: 그 기사에게 맡긴 건 전부
 let sbName=null;

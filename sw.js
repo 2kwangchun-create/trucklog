@@ -8,7 +8,7 @@ const RUNTIME = 'trucklog-runtime';
 const FILES = ['./', './index.html', './app.js', './firebase-config.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
   './icons/call-one.webp', './icons/call-24.png', './goso.js', './goso-template.xlsx'];
-const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com'];
+const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com', 'cdnjs.cloudflare.com'];
 
 self.addEventListener('install', e => {
   // cache:'reload' — 휴대폰·GitHub 쪽 임시 저장본이 아니라 방금 올린 파일을 바로 받음

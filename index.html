@@ -651,6 +651,17 @@ body.selecting nav.tabs{display:none}
 .selbtns{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;max-width:560px;width:100%;margin:0 auto}
 .selbtns .btn{padding:12px 4px;font-size:15px}
 .selbtns .btn:disabled{opacity:.4}
+/* 스샷 버튼 (떠 있는 동그란 버튼) */
+.snapfab{position:fixed;right:14px;bottom:calc(170px + env(safe-area-inset-bottom,0px));z-index:45;width:46px;height:46px;border-radius:50%;border:0;padding:0;
+  display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-fg);opacity:.82;box-shadow:0 3px 10px rgba(0,0,0,.25);
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:transform .15s,opacity .15s}
+.snapfab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.snapfab:active{transform:scale(.92)}
+.snapfab.drag{opacity:1;transform:scale(1.18);box-shadow:0 8px 22px rgba(0,0,0,.35);transition:none}
+.snapfab.busy{opacity:.4;pointer-events:none}
+body.gated .snapfab{display:none}
+.snapflash{position:fixed;inset:0;z-index:70;background:#fff;pointer-events:none;animation:snapfl .35s ease-out forwards}
+@keyframes snapfl{from{opacity:.85}to{opacity:0}}
 .sheet{position:fixed;inset:0;z-index:40;background:rgba(15,20,17,.5);display:flex;align-items:flex-end;justify-content:center}
 .sheet-in{background:var(--surface);width:100%;max-width:560px;border-radius:22px 22px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;max-height:90%;overflow-y:auto}
 .sheet-in::before{content:"";width:40px;height:5px;border-radius:3px;background:var(--line2);align-self:center;flex:none}
@@ -1036,6 +1047,9 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
   </section>
 </div>
 
+<!-- 스샷: 누르면 지금 화면을 사진으로 · 꾹 누르면 끌어서 옮기기 -->
+<button type="button" class="snapfab" id="snapfab" aria-label="지금 화면 스샷 찍기 (꾹 누르면 옮기기)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+<div class="snapflash" id="snapflash" hidden></div>
 <nav class="tabs" aria-label="화면 이동"><div class="in" role="tablist">
   <button role="tab" data-v="cal" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>달력</button>
   <button role="tab" data-v="unpaid" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>받을 돈</button>
