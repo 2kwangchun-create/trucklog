@@ -1254,55 +1254,64 @@ function drListHtml(){
     +(drRecs.length>drShow?`<button type="button" class="clmore" id="dr-more">더보기 <span class="num">(남은 ${drRecs.length-drShow}건)</span></button>`:'');
 }
 function renderDriver(){
-  const L=drRecs=drRecsOf(drName), due=L.filter(x=>!x.paid), dueSum=due.reduce((a,x)=>a+x.amt,0), paid=L.filter(x=>x.paid);
-  const oldest=due.length?due.reduce((a,x)=>x.date<a.date?x:a):null, ph=(L.find(x=>x.phone)||{}).phone;
+  const all=drRecsOf(drName), L=drRecs=all.filter(x=>inPer(x.date)), pl=perLbl(), due=L.filter(x=>!x.paid), dueSum=due.reduce((a,x)=>a+x.amt,0), paid=L.filter(x=>x.paid);
+  const oldest=due.length?due.reduce((a,x)=>x.date<a.date?x:a):null, ph=(all.find(x=>x.phone)||{}).phone;
   const linked=L.filter(x=>x.trip), mine=linked.reduce((a,x)=>a+(x.trip.amount-x.amt),0);
   $('dr-h').textContent=drName;
-  $('dr-body').innerHTML=(ph?`<div class="clct"><a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a></div>`:'')
-    +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)</small></div>`:'<p class="clok">이 기사에게 줄 돈이 없어요.</p>')
+  $('dr-body').innerHTML=perSw()+(ph?`<div class="clct"><a class="callbtn" href="${telHref(ph)}">${ic(P.phone)}${esc(ph)}</a></div>`:'')
+    +(due.length?`<div class="drdue"><span>이 기사에게 아직 줄 돈${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건 · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)</small></div>`:`<p class="clok">이 기사에게 ${pl?pl+' ':''}줄 돈이 없어요.</p>`)
     +`<div class="clstats"><div><span>맡긴 일</span><b class="num">${L.length}건</b></div><div><span>기사 운임 합계</span><b class="num">${short(L.reduce((a,x)=>a+x.amt,0))}원</b></div><div><span>준 돈</span><b class="num c-paid">${short(paid.reduce((a,x)=>a+x.amt,0))}원</b></div>`
     +`<div><span>마지막 일</span><b class="num">${L.length?md(L[0].date):'-'}</b></div><div><span>연결된 운행</span><b class="num">${linked.length}건</b></div><div><span>내 몫</span><b class="num">${linked.length?short(mine)+'원':'-'}</b></div></div>`
-    +`<div class="section-title">맡긴 일 기록 <span class="num">${L.length}건</span></div><div class="clrecent drlist" id="dr-list">`+drListHtml()+'</div>';
+    +`<div class="section-title">${pl?pl+' ':''}맡긴 일 기록 <span class="num">${L.length}건</span></div><div class="clrecent drlist" id="dr-list">`+(L.length?drListHtml():`<div class="empty">${pl}에는 맡긴 일이 없어요.</div>`)+'</div>';
 }
 function openDriver(name){if(!name)return;drName=name;drShow=5;renderDriver();if($('drsheet').hidden){$('drsheet').hidden=false;pushOverlay({dsheet:true})}}
 function closeDriver(){$('drsheet').hidden=true;popOverlay('dsheet')}
 $('drsheet').addEventListener('click',e=>{
   if(e.target===$('drsheet')||e.target.closest('#dr-close')){closeDriver();return}
   if(e.target.closest('#dr-more')){drShow+=10;$('dr-list').innerHTML=drListHtml();return}
+  const sp=e.target.closest('[data-sp]'); if(sp){setSheetPer(sp.dataset.sp);drShow=5;renderDriver();return}
   const b=e.target.closest('[data-drpay]'); if(b){const r=store.get(b.dataset.drpay);if(!r)return;const before={subPaid:r.subPaid};r.subPaid=todayIso;saveTrip(r);const keep=drShow;renderDriver();drShow=keep;$('dr-list').innerHTML=drListHtml();render();
     toast(`${drName}에게 ${comma(r.kind==='cost'?r.amount:r.subPay)}원 줬어요`,()=>{Object.assign(r,before);saveTrip(r);if(!$('drsheet').hidden)renderDriver()})}
 });
 
 // ---------- 화주 한눈에 보기 ----------
 // 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
+// 화주 · 기사 한눈에 보기: 이번 달 것만 볼지 전체를 볼지 (둘이 같이 씀 · 이 휴대폰에 기억)
+let sheetPer=ls.get('sheetPer')==='month'?'month':'all';
+const perMonth=()=>todayIso.slice(0,7);
+const inPer=d=>sheetPer==='all'||String(d).startsWith(perMonth());
+const perLbl=()=>sheetPer==='month'?`${Number(perMonth().slice(5,7))}월`:'';
+const perSw=()=>`<div class="sortsw psw" role="group" aria-label="기간"><button type="button" data-sp="month" aria-pressed="${sheetPer==='month'}">이번 달 (${Number(perMonth().slice(5,7))}월)</button><button type="button" data-sp="all" aria-pressed="${sheetPer==='all'}">전체</button></div>`;
+function setSheetPer(v){sheetPer=v==='month'?'month':'all';ls.set('sheetPer',sheetPer)}
 let clName='', clTs=[], clShow=5;
 // 운행 기록: 처음엔 5건, [더보기]를 누를 때마다 10건씩 더
 function clListHtml(){
   return clTs.slice(0,clShow).map(t=>`<div><small class="num">${md(t.date)}</small><span>${routeHtml(t)}</span><b class="num ${t.paid?'c-paid':isPlan(t)?'':'c-due'}">${short(t.paid?t.amount:left(t))}<small> ${t.paid?'받음':isPlan(t)?'예정':t.got>0?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`).join('')
     +(clTs.length>clShow?`<button type="button" class="clmore" id="cl-more">더보기 <span class="num">(남은 ${clTs.length-clShow}건)</span></button>`:'');
 }
-function openClient(name){
-  clName=name; const ts=trips.filter(t=>(t.client||'')===name).sort(byNew); clTs=ts; clShow=5;
+function openClient(name){clName=name;clShow=5;renderClient();$('clsheet').hidden=false;pushOverlay({csheet:true})}
+function renderClient(){
+  const name=clName, all=trips.filter(t=>(t.client||'')===name), ts=all.filter(t=>inPer(t.date)).sort(byNew); clTs=ts; const pl=perLbl();
   const sum=ts.reduce((s,t)=>s+t.amount,0), got=ts.reduce((s,t)=>s+recv(t),0);
   const due=ts.filter(t=>!t.paid&&!isPlan(t)), dueSum=due.reduce((s,t)=>s+left(t),0), plan=ts.filter(isPlan);
   const paidT=ts.filter(t=>t.paid), avg=paidT.length?Math.round(paidT.reduce((s,t)=>s+Math.max(0,(parseD(t.paid)-parseD(t.date))/86400000),0)/paidT.length):null;
-  const oldest=due.length?due.reduce((a,t)=>t.date<a.date?t:a):null, ct=ts.find(t=>t.clientPhone||t.clientName);
+  const oldest=due.length?due.reduce((a,t)=>t.date<a.date?t:a):null, ct=[...all].sort(byNew).find(t=>t.clientPhone||t.clientName);
   $('cl-h').textContent=name;
   // 순서: 연락처(바로 전화) → 못 받은 돈 보기(가장 많이 누를 것) → 숫자 요약 → 운행 기록
-  $('cl-body').innerHTML=(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
-    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:'<p class="clok">이 화주는 못 받은 돈이 없어요.</p>')
+  $('cl-body').innerHTML=perSw()+(ct?`<div class="clct">${ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${ct.clientPhone?`<a class="callbtn" href="${telHref(ct.clientPhone)}">${ic(P.phone)}${esc(ct.clientPhone)}</a>`:''}</div>`:'')
+    +(due.length?`<button type="button" class="btn cldue" id="cl-due"><span>이 화주 못 받은 돈 보기${pl?` (${pl})`:''}</span><b class="num">${won(dueSum)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${daysSince(oldest.date)}일째)`:''}</small></button>`:`<p class="clok">이 화주는 ${pl?pl+'에 ':''}못 받은 돈이 없어요.</p>`)
     +`<div class="clstats">`
     +`<div><span>운행</span><b class="num">${ts.length}건</b></div><div><span>총 운임</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b></div>`
     +`<div><span>입금까지 평균</span><b class="num">${avg===null?'-':avg+'일'}</b></div><div><span>마지막 운행</span><b class="num">${ts.length?md(ts[0].date):'-'}</b></div><div><span>예정</span><b class="num">${plan.length}건</b></div></div>`
-    +`<div class="section-title">운행 기록 <span class="num">${ts.length}건</span></div><div class="clrecent" id="cl-list">`+clListHtml()+'</div>';
-  $('clsheet').hidden=false; pushOverlay({csheet:true});
+    +`<div class="section-title">${pl?pl+' ':''}운행 기록 <span class="num">${ts.length}건</span></div><div class="clrecent" id="cl-list">`+(ts.length?clListHtml():`<div class="empty">${pl}에는 운행이 없어요.</div>`)+'</div>';
 }
 function closeClient(){$('clsheet').hidden=true;popOverlay('csheet')}
 $('clsheet').addEventListener('click',e=>{
   if(e.target===$('clsheet')||e.target.closest('#cl-close')){closeClient();return}
   if(e.target.closest('#cl-more')){clShow+=10;$('cl-list').innerHTML=clListHtml();return}
+  const sp=e.target.closest('[data-sp]'); if(sp){setSheetPer(sp.dataset.sp);clShow=5;renderClient();return}
   if(e.target.closest('#cl-due')){ // 받을 돈 목록에서 이 화주만
-    closeClient(); setTimeout(()=>{uView='list';uRange=null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
+    closeClient(); setTimeout(()=>{uMode='recv';uView='list';uRange=sheetPer==='month'?{start:perMonth()+'-01',end:iso(new Date(+perMonth().slice(0,4),+perMonth().slice(5,7),0))}:null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
   }
 });
 
