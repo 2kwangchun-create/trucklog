@@ -143,8 +143,8 @@ const DB={
 // 모든 기록(삭제 표시 포함)은 store, 화면에 쓰는 살아있는 운행은 trips, 지출(kind:'cost')은 costs
 // 지출도 같은 저장소·클라우드(trips 컬렉션)에 함께 넣어 동기화·백업을 그대로 씀
 const store=new Map();
-let trips=[], costs=[];
-function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost');buildOffsets();if(!migBusy&&typeof needMig==='function'&&needMig())setTimeout(migrateSubs,300)}
+let trips=[], costs=[], pays=[]; // pays: 기사에게 준 돈 (kind 'pay' · client=사람 · amount)
+function rebuild(){const live=[...store.values()].filter(t=>!t.deleted);trips=live.filter(t=>!t.kind||t.kind==='trip');costs=live.filter(t=>t.kind==='cost');pays=live.filter(t=>t.kind==='pay');buildOffsets();if(!migBusy&&typeof needMig==='function'&&needMig())setTimeout(migrateSubs,300)}
 const STR=['date','client','clientName','clientPhone','from','fromAddr','fromName','fromPhone','to','toAddr','toName','toPhone','payType','memo','kind','cat','src','smsAt','tax','toDate','loadedAt','unloadedAt','gotLog','stops','sub','subPhone','subPaid','subTax','link','stopAt','settled'];
 function normalize(r){
   const t={id:String(r.id),createdAt:Number(r.createdAt)||Number(r.updatedAt)||Date.now(),updatedAt:Number(r.updatedAt)||0,deleted:!!r.deleted,
@@ -193,19 +193,25 @@ let ledRange=null; // 장부: 하루·기간을 고르면 {start,end}, 아니면
 // 사람별 남은 돈: 그 사람이 기사인 맡긴 일의 기사 운임을, 그 사람이 화주인 못 받은 운행에 오래된 것부터 입금된 것처럼 나눠 침(상계)
 //   저장하지 않고 그릴 때마다 계산 → 맡긴 일을 고치거나 지워도 저절로 맞음 · 상계하고 남은 맡긴 일 금액은 그 사람에게 '줄 돈'
 //   settled(예전에 기사에게 돈을 줘서 정리한 것)는 빼고, subCash(예전에 일부 준 돈)는 그만큼 빼고 계산
-var OFF=new Map(), OFFBY=new Map(), PLEFT=new Map(), SUBUSED=new Map(); // 운행 id → 상계 금액 · 운행 id → [{s:맡긴 일, a:금액}] · 사람 → 줄 돈
+var OFF=new Map(), OFFBY=new Map(), PLEFT=new Map(), SUBUSED=new Map(), PEXTRA=new Map(); // PEXTRA: 줄 돈보다 더 준 돈(미리 준 돈) // 운행 id → 상계 금액 · 운행 id → [{s:맡긴 일, a:금액}] · 사람 → 줄 돈
 const pkey=v=>String(v||'').trim();
 const subLeft=t=>t.sub&&!t.settled?Math.max(0,t.subPay-(t.subCash||0)):0;
 const byOldC=(a,b)=>a.date.localeCompare(b.date)||((a.createdAt||0)-(b.createdAt||0));
 function buildOffsets(){
-  OFF=new Map(); OFFBY=new Map(); PLEFT=new Map(); SUBUSED=new Map();
+  OFF=new Map(); OFFBY=new Map(); PLEFT=new Map(); SUBUSED=new Map(); PEXTRA=new Map();
   const pool=new Map(); trips.forEach(t=>{const a=subLeft(t);if(!a)return;const k=pkey(t.sub);if(!pool.has(k))pool.set(k,[]);pool.get(k).push({s:t,a})});
+  // 기사에게 준 돈: 그 사람 맡긴 일을 오래된 것부터 갚은 것으로 (남은 것만 받을 돈과 상계) · 맡긴 일보다 더 준 돈은 미리 준 돈(받을 돈)
+  const payBy=new Map(); pays.forEach(p=>{const k=pkey(p.client);payBy.set(k,(payBy.get(k)||0)+p.amount)});
+  payBy.forEach((v,k)=>{if(!pool.has(k))PEXTRA.set(k,v)});
   pool.forEach((subs,k)=>{
     subs.sort((x,y)=>byOldC(x.s,y.s));
+    let pay=payBy.get(k)||0;
+    for(const x of subs){if(pay<=0)break;const u=Math.min(pay,x.a);x.a-=u;pay-=u;SUBUSED.set(x.s.id,(SUBUSED.get(x.s.id)||0)+u)}
+    if(pay>0)PEXTRA.set(k,pay);
     const recs=trips.filter(t=>pkey(t.client)===k&&t.amount>0&&!t.paid).sort(byOldC);
     let i=0;
     recs.forEach(r=>{let need=Math.max(0,r.amount-(r.got||0)),off=0;const by=[];
-      while(need>0&&i<subs.length){const x=subs[i],u=Math.min(need,x.a);x.a-=u;need-=u;off+=u;by.push({s:x.s,a:u});SUBUSED.set(x.s.id,(SUBUSED.get(x.s.id)||0)+u);if(x.a<=0)i++}
+      while(need>0&&i<subs.length){const x=subs[i],u=Math.min(need,x.a);if(!u){i++;continue}x.a-=u;need-=u;off+=u;by.push({s:x.s,a:u});SUBUSED.set(x.s.id,(SUBUSED.get(x.s.id)||0)+u);if(x.a<=0)i++}
       if(off){OFF.set(r.id,off);OFFBY.set(r.id,by)}});
     const rest=subs.reduce((a,x)=>a+x.a,0); if(rest>0)PLEFT.set(k,rest);
   });
@@ -217,7 +223,7 @@ const subUsed=t=>!t.sub?0:t.settled?t.subPay:Math.min(t.subPay,(t.subCash||0)+(S
 const done=t=>t.amount>0&&left(t)===0;   // 받음 (현금 · 맡긴 일로 정리)
 const owes=t=>left(t)>0;                 // 아직 받을 돈이 있음
 // 한 사람의 남은 돈: + 받을 돈 · − 줄 돈
-const personBal=name=>{const k=pkey(name);return trips.filter(t=>pkey(t.client)===k).reduce((a,t)=>a+left(t),0)-(PLEFT.get(k)||0)};
+const personBal=name=>{const k=pkey(name);return trips.filter(t=>pkey(t.client)===k).reduce((a,t)=>a+left(t),0)-(PLEFT.get(k)||0)+(PEXTRA.get(k)||0)};
 // 예정: 아직 운행 전(상차일이 오늘 뒤이고 상차 완료도 안 누름) → 미수와 따로, 회색으로
 const isPlan=t=>t.amount>0&&!done(t)&&t.date>todayIso&&!t.loadedAt;
 const pass=(t,f)=>f==='paid'?done(t):f==='due'?owes(t):f==='notax'?!t.tax:true;
@@ -424,7 +430,7 @@ function renderDrivers(){
   $('u-label').textContent='기사 · 맡긴 일이 있는 사람'; $('u-total').textContent=give?`줄 돈 ${won(give)}`:`${all.length}명`;
   $('u-sub').textContent=all.length?`${all.length}명 · 받을 돈 ${won(get)} · 줄 돈 ${won(give)}`:'아직 맡긴 일이 없어요';
   $('u-list').innerHTML=L.length?L.map(o=>{const c=o.bal<0?'c-sub':o.bal>0?'c-due':'c-paid';
-    return `<button type="button" class="drvrow${o.bal<0?' owe':''}" data-do="client" data-c="${esc(o.name)}"><b>🤝 ${esc(o.name)}</b><span class="bal num ${c}">${o.bal?won(Math.abs(o.bal)):'0원'}<small>${o.bal<0?'줄 돈':o.bal>0?'받을 돈':'다 정리됨'}</small></span><small>맡긴 일 ${o.subs}건 · 내가 뛴 일 ${o.own}건 · 마지막 ${md(o.last)}</small></button>`}).join('')
+    return `<div class="drvrow${o.bal<0?' owe':''}" data-do="client" data-c="${esc(o.name)}" role="button" tabindex="0"><b>🤝 ${esc(o.name)}</b><span class="bal num ${c}">${o.bal?won(Math.abs(o.bal)):'0원'}<small>${o.bal<0?'줄 돈':o.bal>0?'받을 돈':'다 정리됨'}</small></span><small>맡긴 일 ${o.subs}건 · 내가 뛴 일 ${o.own}건 · 마지막 ${md(o.last)}</small>${o.bal<0?`<button type="button" class="btn gvbtn" data-gv="${esc(o.name)}">💵 돈 줌</button>`:''}</div>`}).join('')
     :`<div class="empty">${q?'찾는 기사가 없어요.':'아직 맡긴 일이 없어요. 등록에서 [🤝 맡긴 일]로 적으면 여기에 떠요.'}</div>`;
 }
 function renderUnpaid(){
@@ -467,9 +473,9 @@ function renderUnpaid(){
   $('u-rangebtn').classList.toggle('on',!!uRange);
   const planHtml=plans.length&&!uAge&&!uLate?`<div class="lsec plan"><i class="mk from"></i><b>예정</b><span class="num">${plans.length}건 · ${short(planSum)}원</span><small>아직 운행 전</small></div>`+plans.map(t=>rowHtml(t,'unpaid')).join(''):'';
   // 줄 돈: 맡긴 일이 받을 돈보다 많은 사람 (남은 돈이 마이너스)
-  const owe=[...PLEFT.entries()].sort((a,b)=>b[1]-a[1]);
+  const owe=[...PLEFT.keys()].map(k=>[k,-personBal(k)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
   const oweHtml=owe.length&&!filtered?`<div class="lsec owe"><b>줄 돈</b><span class="num">${owe.length}명 · ${short(owe.reduce((a,x)=>a+x[1],0))}원</span><small>맡긴 일이 받을 돈보다 많은 사람</small></div>`
-    +owe.map(([k,v])=>`<button type="button" class="owei" data-do="client" data-c="${esc(k)}"><b>🤝 ${esc(k)}</b><span class="num">${won(v)}</span><small>이 사람에게 줄 돈 · 눌러서 장부 보기</small></button>`).join(''):'';
+    +owe.map(([k,v])=>`<div class="owei" data-do="client" data-c="${esc(k)}" role="button" tabindex="0"><b>🤝 ${esc(k)}</b><span class="num">${won(v)}</span><small>이 사람에게 줄 돈 · 눌러서 장부 보기</small><button type="button" class="btn gvbtn" data-gv="${esc(k)}">💵 돈 줌</button></div>`).join(''):'';
   $('u-list').innerHTML=(list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`)+planHtml+oweHtml;
 }
 // 받을 돈: 순서(오래된 것 위로 · 최근 것 위로)
@@ -1291,6 +1297,22 @@ const Snap={
 };
 Snap.init();
 
+// ---------- 기사에게 돈 줌 ----------
+// 줄 돈이 있는 사람에게 돈을 줬을 때: 언제 · 얼마(줄 돈이 미리 채워짐) → kind 'pay' 기록 · 그만큼 줄 돈이 줄어듦 · 그 사람 장부에 '+ 줌'으로
+let gvName='';
+function openGive(name){gvName=name;const owe=Math.max(0,-personBal(name));
+  $('gv-h').textContent=`${name}에게 준 돈`; $('gv-sub').textContent=owe?`지금 줄 돈 ${won(owe)}`:'지금은 줄 돈이 없어요. 미리 주는 거면 적어 두세요.';
+  $('gv-date').value=todayIso; $('gv-amt').value=owe?comma(owe):''; $('gv-hint').textContent=owe?`줄 돈 ${won(owe)}`:'';
+  $('gvsheet').hidden=false; pushOverlay({gvsheet:true})}
+function closeGive(){$('gvsheet').hidden=true;popOverlay('gvsheet')}
+$('gv-amt').addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''});
+$('gv-no').onclick=closeGive;
+$('gvsheet').addEventListener('click',e=>{if(e.target===$('gvsheet'))closeGive()});
+$('gv-ok').onclick=()=>{const a=Number($('gv-amt').value.replace(/\D/g,''));if(!a){$('gv-amt').focus();return}
+  const p=normalize({id:newId(),createdAt:Date.now(),updatedAt:0,kind:'pay',date:$('gv-date').value||todayIso,client:gvName,amount:a,memo:''});
+  closeGive(); saveTrip(p); if(!$('clsheet').hidden)renderClient(); render();
+  const b=personBal(gvName); toast(`${gvName}에게 ${comma(a)}원 줬어요 · ${b<0?`남은 줄 돈 ${won(-b)}`:b>0?`받을 돈 ${won(b)}`:'다 정리됐어요'}`,()=>{removeTrip(p);if(!$('clsheet').hidden)renderClient();render()})};
+
 // ---------- 화주 한눈에 보기 ----------
 // 목록에서 화주 이름을 누르면: 운행 수 · 총 운임 · 받은 돈 · 못 받은 돈 · 평균 입금까지 걸린 날 · 연락처 · 최근 운행
 // 화주 · 기사 한눈에 보기: 이번 달 것만 볼지 전체를 볼지 (둘이 같이 씀 · 이 휴대폰에 기억)
@@ -1303,10 +1325,12 @@ function setSheetPer(v){sheetPer=v==='month'?'month':'all';ls.set('sheetPer',she
 let clName='', clTs=[], clShow=5;
 // 운행 기록: 처음엔 5건, [더보기]를 누를 때마다 10건씩 더
 // 한 사람의 기록: 그 사람이 화주인 운행(내가 뛴 일) + 그 사람이 기사인 맡긴 일, 최근 순
-const personRecs=name=>{const k=pkey(name);return [...trips.filter(t=>pkey(t.client)===k&&t.amount>0).map(t=>({t,own:true})),...trips.filter(t=>t.sub&&pkey(t.sub)===k).map(t=>({t,own:false}))]
+const personRecs=name=>{const k=pkey(name);return [...trips.filter(t=>pkey(t.client)===k&&t.amount>0).map(t=>({t,own:true})),...trips.filter(t=>t.sub&&pkey(t.sub)===k).map(t=>({t,own:false})),...pays.filter(p=>pkey(p.client)===k).map(t=>({t,own:false,pay:true}))]
   .sort((a,b)=>b.t.date.localeCompare(a.t.date)||((b.t.createdAt||0)-(a.t.createdAt||0)))};
 function clListHtml(){
-  return clTs.slice(0,clShow).map(({t,own})=>own
+  return clTs.slice(0,clShow).map(({t,own,pay})=>pay
+    ?`<div><small class="num">${md(t.date)}</small><span>💵 기사에게 돈 줌<button type="button" class="gvdel" data-gvdel="${t.id}">지우기</button></span><b class="num c-paid">+${short(t.amount)}<small> 줌</small></b></div>`
+    :own
     ?`<div><small class="num">${md(t.date)}</small><span>${routeHtml(t)}</span><b class="num ${done(t)?'c-paid':isPlan(t)?'':'c-due'}">${short(done(t)?t.amount:left(t))}<small> ${t.paid?'받음':done(t)?'맡긴 일로 정리':isPlan(t)?'예정':(t.got||OFF.get(t.id))?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`
     :`<div${t.settled?' class="oldset"':''}><small class="num">${md(t.date)}</small><span>🤝 맡긴 일 · ${routeHtml(t)}</span><b class="num c-sub">−${short(t.subPay)}<small> ${t.settled?'예전에 정리함':'맡긴 일'}</small></b></div>`).join('')
     +(clTs.length>clShow?`<button type="button" class="clmore" id="cl-more">더보기 <span class="num">(남은 ${clTs.length-clShow}건)</span></button>`:'');
@@ -1321,7 +1345,7 @@ function renderClient(){
   const ownAll=all.filter(x=>x.own).map(x=>x.t).sort(byNew), ct=ownAll.find(t=>t.clientPhone||t.clientName), sp=all.map(x=>x.t).find(t=>t.sub&&pkey(t.sub)===k&&t.subPhone);
   $('cl-h').textContent=name;
   const top=bal>0?`<button type="button" class="btn cldue" id="cl-due"><span>이 사람에게 받을 돈</span><b class="num">${won(bal)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${agoTxt(oldest.date)})`:''} · 눌러서 보기</small></button>`
-    :bal<0?`<div class="drdue"><span>이 사람에게 줄 돈</span><b class="num">${won(-bal)}</b><small>맡긴 일이 받을 돈보다 많아요. 다음에 이 사람 일을 하면 거기서 먼저 깎여요.</small></div>`
+    :bal<0?`<div class="drdue"><span>이 사람에게 줄 돈</span><b class="num">${won(-bal)}</b><small>맡긴 일이 받을 돈보다 많아요. 다음에 이 사람 일을 하면 거기서 먼저 깎여요.</small><button type="button" class="btn gvbtn" data-gv="${esc(name)}">💵 돈 줌</button></div>`
     :'<p class="clok">남은 돈 0원 · 다 정리됐어요</p>';
   $('cl-body').innerHTML=perSw()+(ct||sp?`<div class="clct">${ct&&ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${(ct&&ct.clientPhone)||(sp&&sp.subPhone)?`<a class="callbtn" href="${telHref((ct&&ct.clientPhone)||sp.subPhone)}">${ic(P.phone)}${esc((ct&&ct.clientPhone)||sp.subPhone)}</a>`:''}</div>`:'')
     +top
@@ -1565,6 +1589,7 @@ window.addEventListener('popstate',e=>{
   if(!$('cpsheet').hidden&&!s.sheet)$('cpsheet').hidden=true;
   if(!$('smsheet').hidden&&!s.sms)$('smsheet').hidden=true;
   if(!$('clsheet').hidden&&!s.csheet)$('clsheet').hidden=true;
+  if(!$('gvsheet').hidden&&!s.gvsheet)$('gvsheet').hidden=true;
   if(!$('taxsheet').hidden&&!s.tsheet)$('taxsheet').hidden=true;
   if(!$('calsheet').hidden&&!s.jump)$('calsheet').hidden=true;
   if(!$('ledsheet').hidden&&!s.lpick)$('ledsheet').hidden=true;
@@ -1582,6 +1607,8 @@ document.addEventListener('click',e=>{
   if(selMode){const row=e.target.closest('.list .row[data-id]');
     if(row){e.preventDefault();const id=row.dataset.id;sel.has(id)?sel.delete(id):sel.add(id);refreshSel();return}}
   if(e.target.closest('a[href^="tel:"]'))return; // 전화 앱 키패드로 번호만 넘김
+  const gv=e.target.closest('[data-gv]'); if(gv){openGive(gv.dataset.gv);return}
+  const gd=e.target.closest('[data-gvdel]'); if(gd){const p=store.get(gd.dataset.gvdel);if(p){removeTrip(p);if(!$('clsheet').hidden)renderClient();render();toast(`준 돈 ${won(p.amount)} 기록을 지웠어요`,()=>{restoreTrip(p);if(!$('clsheet').hidden)renderClient();render()})}return}
   const cp=e.target.closest('[data-copy]');
   if(cp){const v=cp.dataset.copy;
     try{navigator.clipboard.writeText(v).then(()=>toast(`${v} 복사했어요`),()=>toast('복사가 안 되면 번호를 길게 눌러 복사해 주세요'))}

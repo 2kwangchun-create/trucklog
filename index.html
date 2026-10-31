@@ -403,6 +403,10 @@ body.selecting .row .legs{display:none}
 .owei b{font-size:16px}
 .owei .num{font-size:18px;font-weight:800;color:var(--sub)}
 .owei small{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.btn.gvbtn,.btn.gvok{background:var(--sub);border-color:var(--sub);color:#fff}
+.drdue .gvbtn{margin-top:8px;background:#fff;color:var(--sub);border-color:#fff;min-height:40px;padding:6px 18px;font-weight:800}
+.drvrow .gvbtn,.owei .gvbtn{grid-column:1/-1;justify-self:start;min-height:36px;padding:4px 14px;font-size:14px;margin-top:4px}
+.clrecent .gvdel{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;padding:0 0 0 6px;cursor:pointer}
 .drdue{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px;border-radius:12px;background:var(--sub);color:#fff;text-align:center}
 .drdue span{font-size:15px;font-weight:700}
 .drdue b{font-size:22px;letter-spacing:-.3px}
@@ -1173,6 +1177,17 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="txyear"><button type="button" class="ib" id="tx-prev" aria-label="이전 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><b id="tx-y" class="num"></b><button type="button" class="ib" id="tx-next" aria-label="다음 해"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
     <div class="seg" id="tx-per" role="group" aria-label="기간"><button type="button" data-txp="h1" aria-pressed="false">1~6월<br><span>부가세</span></button><button type="button" data-txp="h2" aria-pressed="false">7~12월<br><span>부가세</span></button><button type="button" data-txp="y" aria-pressed="false">1년<br><span>종합소득세</span></button></div>
     <div id="tx-body"></div>
+  </div>
+</div>
+<!-- 기사에게 돈 줌: 언제 · 얼마 (줄 돈이 미리 채워짐) -->
+<div class="sheet" id="gvsheet" role="dialog" aria-modal="true" aria-labelledby="gv-h" hidden>
+  <div class="sheet-in">
+    <h2 id="gv-h">기사에게 준 돈</h2>
+    <p class="hint" id="gv-sub"></p>
+    <div class="paybox"><label for="gv-date">언제 줬어요?</label><input type="date" id="gv-date">
+      <label for="gv-amt">얼마 줬어요?<small id="gv-hint"></small></label><div class="amtbox"><input type="text" id="gv-amt" class="num" inputmode="numeric"><span>원</span></div>
+      <p class="hint small">덜 줬으면 준 만큼만 적으세요. 남은 돈은 계속 줄 돈으로 남아요.</p></div>
+    <div class="btnrow"><button type="button" class="btn gvok" id="gv-ok">줬어요</button><button type="button" class="btn ghost" id="gv-no">취소</button></div>
   </div>
 </div>
 <!-- 화주 한눈에 보기: 목록에서 화주 이름을 누르면 -->
