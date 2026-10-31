@@ -263,7 +263,7 @@ const routeHtml=t=>`${placeHtml(t,'from')} → ${placeHtml(t,'to')}`;
 const telHref=p=>'tel:'+p.replace(/\D/g,'');
 // 선 아이콘 (그림 문자 대신)
 const ic=d=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
-const P={user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+const P={cash:'M3 7h18v10H3zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4M6 10v4M18 10v4',user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',arrow:'M5 12h14M13 6l6 6-6 6',chev:'M6 9l6 6 6-6',check:'M5 12l5 5L20 7',edit:'M4 20h4L19 9l-4-4L4 16z',trash:'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
   nav:'M3 11l18-8-8 18-2-8z',plus:'M12 5v14M5 12h14',doc:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',
   phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'};
 const WD='일월화수목금토', wdOf=s=>WD[parseD(s).getDay()];
@@ -303,12 +303,12 @@ const progChip=t=>t.unloadedAt?'<span class="chip done">하차 완료</span>':t.
 const stampTxt=s=>`${md(s)} ${s.slice(11,16)}`;
 // 문자 보낸 지 며칠 됐는지 색으로: 오늘 · 1~3일 · 4~7일 · 8일 넘음 (오래될수록 다시 연락할 때)
 const smsChip=s=>{const d=daysSince(s),c=d<=0?'s0':d<=3?'s1':d<=7?'s2':'s3';return `<span class="chip sms ${c}">문자 ${d<=0?'오늘':d+'일 전'}</span>`};
-const docChips=(t,prog=true)=>(prog?progChip(t):'')+(!t.paid&&t.got>0?`<span class="chip part">${short(t.got)}원 받음</span>`:'')+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&owes(t)?smsChip(t.smsAt):'')+(t.sub&&t.amount?`<span class="chip sub2">🤝 기사 운임 ${short(t.subPay)}</span>`:'');
+const docChips=(t,prog=true)=>(prog?progChip(t):'')+(!t.paid&&t.got>0?`<span class="chip part">${short(t.got)}원 받음</span>`:'')+(!t.paid&&OFF.get(t.id)?`<span class="chip offc">맡긴 일로 ${short(OFF.get(t.id))}원 깎음</span>`:'')+(t.tax?'<span class="chip tax">계산서</span>':'')+(t.smsAt&&owes(t)?smsChip(t.smsAt):'')+(t.sub&&t.amount?`<span class="chip sub2">기사 운임 ${short(t.subPay)}</span>`:'');
 // mode: unpaid(받을 돈) · ledger(달력의 하루 목록) · month(장부: 날짜를 왼쪽에 둔 한 줄)
 function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하차(unload) · 같은 날 둘 다(both)
   const open=openId===t.id;
   const client=t.client?`<span class="client tap" data-do="client" data-c="${esc(t.client)}" role="button" title="${esc(t.client)} 한눈에 보기">${esc(t.client)}</span>`:t.sub?'':'<span class="client none">화주 미입력</span>';
-  const subB=t.sub?`<span class="subb tapname" data-do="client" data-c="${esc(t.sub)}" role="button" title="${esc(t.sub)} 장부 보기">🤝 ${esc(t.sub)}</span>`:'';
+  const subB=t.sub?`<span class="subb tapname" data-do="client" data-c="${esc(t.sub)}" role="button" title="${esc(t.sub)} 장부 보기">${ic(P.user)}${esc(t.sub)}</span>`:'';
   const off=OFF.get(t.id)||0, dn=done(t), part=!t.paid&&left(t)>0&&(t.got>0||off>0);
   const amt=!t.amount&&t.sub?`<b class="amt num c-sub">−${comma(t.subPay)}<small class="of">${t.settled?'예전에 정리함':'기사 운임'}</small></b>`:part?`<b class="amt num c-due">${comma(left(t))}<small class="of">남은 돈 · 전체 ${short(t.amount)}원</small></b>`:`<b class="amt num ${dn?'c-paid':'c-due'}">${comma(t.amount)}</b>`;
   const attrs=`data-do="open" data-id="${t.id}" role="button" tabindex="0" aria-expanded="${open}"`;
@@ -320,7 +320,7 @@ function rowHtml(t,mode,role){ // role: 달력에서 그날 상차(load) · 하�
       <div class="meta"><span class="num">${md(t.date)}${t.toDate&&t.toDate!==t.date?'→'+md(t.toDate):''}</span><span class="ptx">${esc(t.payType||'인수증')}</span>${ageChip(t)}<span class="end"><span class="more">${open?'접기':'상세'}${ic(P.chev)}</span></span>${(d=>d?`<span class="docs">${d}</span>`:'')(docChips(t,!(role||open)))}</div></div>`;
   let detail='';
   if(open){
-    const subBlk=t.sub?`<div class="blk"><span class="bl">맡긴 일 · 기사</span><div class="addr"><b class="tapname" data-do="client" data-c="${esc(t.sub)}" role="button">🤝 ${esc(t.sub)}</b>${t.settled?` <span class="chip">예전에 정리함 ${md(t.settled)}</span>`:''}</div>${ctHtml(t.subPhone,'')}`
+    const subBlk=t.sub?`<div class="blk"><span class="bl">맡긴 일 · 기사</span><div class="addr"><b class="tapname" data-do="client" data-c="${esc(t.sub)}" role="button">${esc(t.sub)}</b>${t.settled?` <span class="chip">예전에 정리함 ${md(t.settled)}</span>`:''}</div>${ctHtml(t.subPhone,'')}`
       +`<div class="subm num"><div class="pay"><span>기사 운임</span><b>${won(t.subPay)}</b></div>${t.amount?`<div><span>운임</span><b>${won(t.amount)}</b></div><div><span>운임 − 기사 운임</span><b>${won(t.amount-t.subPay)}</b></div>`:''}</div>`
       +`<div>${t.subTax?`계산서 받음 ${md(t.subTax)}`:'<span class="na">계산서 안 받음</span>'}${t.subCash?` · 예전에 ${won(t.subCash)} 줌`:''}</div></div>`:'';
     detail=`<div class="detail">${subBlk}${t.client||!t.sub?`<div class="blk"><span class="bl">${t.sub?'원래 화주':'화주'}</span><div class="addr">${t.client?`<b>${esc(t.client)}</b>`:'<span class="na">화주 미입력</span>'}</div>${ctHtml(t.clientPhone,t.clientName)}</div>`:''}`
@@ -427,11 +427,12 @@ function renderDrivers(){
   const q=sNorm($('u-search').value), all=drvPeople(), L=all.filter(o=>!q||sNorm(o.name).includes(q))
     .sort((a,b)=>(a.bal<0)!==(b.bal<0)?(a.bal<0?-1:1):Math.abs(b.bal)-Math.abs(a.bal)||b.last.localeCompare(a.last));
   const give=all.filter(o=>o.bal<0).reduce((a,o)=>a-o.bal,0), get=all.filter(o=>o.bal>0).reduce((a,o)=>a+o.bal,0);
-  $('u-label').textContent='기사 · 맡긴 일이 있는 사람'; $('u-total').textContent=give?`줄 돈 ${won(give)}`:`${all.length}명`;
-  $('u-sub').textContent=all.length?`${all.length}명 · 받을 돈 ${won(get)} · 줄 돈 ${won(give)}`:'아직 맡긴 일이 없어요';
+  // 큰 숫자 = 내가 기사에게 줄 돈 (할 일), 아래 줄 = 몇 명 · 그 사람들에게 받을 돈
+  $('u-label').textContent='기사에게 줄 돈'; $('u-total').textContent=won(give);
+  $('u-sub').textContent=all.length?`맡긴 일 있는 사람 ${all.length}명 · 그 사람들에게 받을 돈 ${won(get)}`:'아직 맡긴 일이 없어요';
   $('u-list').innerHTML=L.length?L.map(o=>{const c=o.bal<0?'c-sub':o.bal>0?'c-due':'c-paid';
-    return `<div class="drvrow${o.bal<0?' owe':''}" data-do="client" data-c="${esc(o.name)}" role="button" tabindex="0"><b>🤝 ${esc(o.name)}</b><span class="bal num ${c}">${o.bal?won(Math.abs(o.bal)):'0원'}<small>${o.bal<0?'줄 돈':o.bal>0?'받을 돈':'다 정리됨'}</small></span><small>맡긴 일 ${o.subs}건 · 내가 뛴 일 ${o.own}건 · 마지막 ${md(o.last)}</small>${o.bal<0?`<button type="button" class="btn gvbtn" data-gv="${esc(o.name)}">💵 돈 줌</button>`:''}</div>`}).join('')
-    :`<div class="empty">${q?'찾는 기사가 없어요.':'아직 맡긴 일이 없어요. 등록에서 [🤝 맡긴 일]로 적으면 여기에 떠요.'}</div>`;
+    return `<div class="drvrow${o.bal<0?' owe':''}" data-do="client" data-c="${esc(o.name)}" role="button" tabindex="0"><b>${ic(P.user)}${esc(o.name)}</b><span class="bal num ${c}">${o.bal?won(Math.abs(o.bal)):'0원'}<small>${o.bal<0?'줄 돈':o.bal>0?'받을 돈':'다 정리됨'}</small></span><small>맡긴 일 ${o.subs}건${o.own?` · 내가 뛴 일 ${o.own}건`:''} · 마지막 ${md(o.last)}</small>${o.bal<0?`<button type="button" class="btn gvbtn" data-gv="${esc(o.name)}">돈 줌</button>`:''}</div>`}).join('')
+    :`<div class="empty">${q?'찾는 기사가 없어요.':'아직 맡긴 일이 없어요. 등록 › 지출 › [맡긴 일]로 적으면 여기에 떠요.'}</div>`;
 }
 function renderUnpaid(){
   const drv=uMode==='drv';
@@ -475,7 +476,7 @@ function renderUnpaid(){
   // 줄 돈: 맡긴 일이 받을 돈보다 많은 사람 (남은 돈이 마이너스)
   const owe=[...PLEFT.keys()].map(k=>[k,-personBal(k)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
   const oweHtml=owe.length&&!filtered?`<div class="lsec owe"><b>줄 돈</b><span class="num">${owe.length}명 · ${short(owe.reduce((a,x)=>a+x[1],0))}원</span><small>맡긴 일이 받을 돈보다 많은 사람</small></div>`
-    +owe.map(([k,v])=>`<div class="owei" data-do="client" data-c="${esc(k)}" role="button" tabindex="0"><b>🤝 ${esc(k)}</b><span class="num">${won(v)}</span><small>이 사람에게 줄 돈 · 눌러서 장부 보기</small><button type="button" class="btn gvbtn" data-gv="${esc(k)}">💵 돈 줌</button></div>`).join(''):'';
+    +owe.map(([k,v])=>`<div class="owei" data-do="client" data-c="${esc(k)}" role="button" tabindex="0"><b>${ic(P.user)}${esc(k)}</b><span class="num">${won(v)}</span><small>이 사람에게 줄 돈 · 눌러서 장부 보기</small><button type="button" class="btn gvbtn" data-gv="${esc(k)}">돈 줌</button></div>`).join(''):'';
   $('u-list').innerHTML=(list.length?list.map(t=>rowHtml(t,'unpaid')).join(''):`<div class="empty">${filtered?'조건에 맞는 못 받은 돈이 없어요.':'못 받은 돈이 없어요.'}</div>`)+planHtml+oweHtml;
 }
 // 받을 돈: 순서(오래된 것 위로 · 최근 것 위로)
@@ -743,7 +744,7 @@ $('ledsheet').addEventListener('click',e=>{
 let costOpen=null, costDel=null;
 // 기사 운임 (맡긴 건): 누르면 운행 목록에서 그 건을 펼쳐 보여줌 · 고치기는 운행에서
 const subCostRowHtml=t=>`<div class="row crow subc"><div class="chead" data-do="subcost" data-id="${t.id}" role="button" tabindex="0">`
-  +`<span class="cat">맡긴 일</span><span class="cmemo">🤝 ${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
+  +`<span class="cat">맡긴 일</span><span class="cmemo">${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
   +`<span class="cdate num">${md(t.date)} · 기사 운임${t.settled?' · 예전에 정리함':''}</span></div></div>`;
 const catName=c=>c.cat==='기사'?'기사 운임':(c.cat||'기타');
 function costRowHtml(c){
@@ -1329,10 +1330,10 @@ const personRecs=name=>{const k=pkey(name);return [...trips.filter(t=>pkey(t.cli
   .sort((a,b)=>b.t.date.localeCompare(a.t.date)||((b.t.createdAt||0)-(a.t.createdAt||0)))};
 function clListHtml(){
   return clTs.slice(0,clShow).map(({t,own,pay})=>pay
-    ?`<div><small class="num">${md(t.date)}</small><span>💵 기사에게 돈 줌<button type="button" class="gvdel" data-gvdel="${t.id}">지우기</button></span><b class="num c-paid">+${short(t.amount)}<small> 줌</small></b></div>`
+    ?`<div><small class="num">${md(t.date)}</small><span>${ic(P.cash)}기사에게 돈 줌<button type="button" class="gvdel" data-gvdel="${t.id}">지우기</button></span><b class="num c-paid">+${short(t.amount)}<small> 줌</small></b></div>`
     :own
     ?`<div><small class="num">${md(t.date)}</small><span>${routeHtml(t)}</span><b class="num ${done(t)?'c-paid':isPlan(t)?'':'c-due'}">${short(done(t)?t.amount:left(t))}<small> ${t.paid?'받음':done(t)?'맡긴 일로 정리':isPlan(t)?'예정':(t.got||OFF.get(t.id))?`남음 (${short(t.amount)} 중)`:'미수'}</small></b></div>`
-    :`<div${t.settled?' class="oldset"':''}><small class="num">${md(t.date)}</small><span>🤝 맡긴 일 · ${routeHtml(t)}</span><b class="num c-sub">−${short(t.subPay)}<small> ${t.settled?'예전에 정리함':'맡긴 일'}</small></b></div>`).join('')
+    :`<div${t.settled?' class="oldset"':''}><small class="num">${md(t.date)}</small><span>${ic(P.user)}맡긴 일 · ${routeHtml(t)}</span><b class="num c-sub">−${short(t.subPay)}<small> ${t.settled?'예전에 정리함':'맡긴 일'}</small></b></div>`).join('')
     +(clTs.length>clShow?`<button type="button" class="clmore" id="cl-more">더보기 <span class="num">(남은 ${clTs.length-clShow}건)</span></button>`:'');
 }
 function openClient(name){clName=name;clShow=5;renderClient();$('clsheet').hidden=false;pushOverlay({csheet:true})}
@@ -1345,11 +1346,11 @@ function renderClient(){
   const ownAll=all.filter(x=>x.own).map(x=>x.t).sort(byNew), ct=ownAll.find(t=>t.clientPhone||t.clientName), sp=all.map(x=>x.t).find(t=>t.sub&&pkey(t.sub)===k&&t.subPhone);
   $('cl-h').textContent=name;
   const top=bal>0?`<button type="button" class="btn cldue" id="cl-due"><span>이 사람에게 받을 돈</span><b class="num">${won(bal)}</b><small class="num">${due.length}건${oldest?` · 가장 오래된 것 ${md(oldest.date)} (${agoTxt(oldest.date)})`:''} · 눌러서 보기</small></button>`
-    :bal<0?`<div class="drdue"><span>이 사람에게 줄 돈</span><b class="num">${won(-bal)}</b><small>맡긴 일이 받을 돈보다 많아요. 다음에 이 사람 일을 하면 거기서 먼저 깎여요.</small><button type="button" class="btn gvbtn" data-gv="${esc(name)}">💵 돈 줌</button></div>`
+    :bal<0?`<div class="drdue"><span>이 사람에게 줄 돈</span><b class="num">${won(-bal)}</b><small>맡긴 일이 받을 돈보다 많아요. 다음에 이 사람 일을 하면 거기서 먼저 깎여요.</small><button type="button" class="btn gvbtn" data-gv="${esc(name)}">돈 줌</button></div>`
     :'<p class="clok">남은 돈 0원 · 다 정리됐어요</p>';
   $('cl-body').innerHTML=perSw()+(ct||sp?`<div class="clct">${ct&&ct.clientName?`<b>${esc(ct.clientName)}</b>`:''}${(ct&&ct.clientPhone)||(sp&&sp.subPhone)?`<a class="callbtn" href="${telHref((ct&&ct.clientPhone)||sp.subPhone)}">${ic(P.phone)}${esc((ct&&ct.clientPhone)||sp.subPhone)}</a>`:''}</div>`:'')
     +top
-    +`<div class="clstats"><div><span>내가 뛴 일</span><b class="num">${own.length}건</b></div><div><span>운임 합계</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b><small>맡긴 일로 정리 포함</small></div>`
+    +`<div class="clstats"><div><span>내가 뛴 일</span><b class="num">${own.length}건</b></div><div><span>운임 합계</span><b class="num">${short(sum)}원</b></div><div><span>받은 돈</span><b class="num c-paid">${short(got)}원</b><small>맡긴 일 포함</small></div>`
     +`<div><span>맡긴 일</span><b class="num">${subs.length}건</b></div><div><span>기사 운임 합계</span><b class="num c-sub">${short(subSum)}원</b></div><div><span>마지막 일</span><b class="num">${ts.length?md(ts[0].t.date):'-'}</b></div></div>`
     +`<div class="section-title">${pl?pl+' ':''}장부 · 내가 뛴 일과 맡긴 일 <span class="num">${ts.length}건</span></div><div class="clrecent" id="cl-list">`+(ts.length?clListHtml():`<div class="empty">${pl?pl+'에는':'아직'} 기록이 없어요.</div>`)+'</div>';
 }
@@ -1912,7 +1913,8 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.17.0',d:'10/31',items:['사람별 남은 돈: 등록 › 지출 › [🤝 맡긴 일]로 적으면 그 기사에게 받을 돈에서 오래된 것부터 깎여요 (상세주소는 안 적어도 돼요)','화주 · 기사 이름을 누르면 그 사람 장부: 맨 위에 받을 돈 / 줄 돈 숫자 하나, 내가 뛴 일과 맡긴 일을 날짜순으로','남은 돈에 [받을 돈 | 🤝 기사] 창 · 받을 돈 아래 "줄 돈" 묶음','예전 기사 기록(지출의 기사 운임 · 예전 맡긴 운행)은 새 방식으로 옮김 · 이미 준 것은 "예전에 정리함"','없앰: 지출의 기사 운임 · 기사에게 [줬어요] · 기사 한눈에 보기']},
+  {v:'1.17.1',d:'10/31',items:['줄 돈에 [돈 줌]: 기사에게 준 날짜 · 금액을 적으면 줄 돈이 줄어요 (덜 주면 남은 돈은 계속 줄 돈) · 장부에 +줌 기록','맡긴 일 등록: 상하차 담당자 · 선착불 · 착불 칸 없앰 · 메모는 안 적어도 돼요','맡긴 일로 깎인 운행에 "맡긴 일로 ○원 깎음" 표시 · 그림 문자 대신 아이콘 · 아래 창이 열리면 스샷 버튼 숨김']},
+  {v:'1.17.0',d:'10/31',items:['사람별 남은 돈: 등록 › 지출 › [맡긴 일]로 적으면 그 기사에게 받을 돈에서 오래된 것부터 깎여요 (상세주소는 안 적어도 돼요)','화주 · 기사 이름을 누르면 그 사람 장부: 맨 위에 받을 돈 / 줄 돈 숫자 하나, 내가 뛴 일과 맡긴 일을 날짜순으로','남은 돈에 [받을 돈 | 기사] 창 · 받을 돈 아래 "줄 돈" 묶음','예전 기사 기록(지출의 기사 운임 · 예전 맡긴 운행)은 새 방식으로 옮김 · 이미 준 것은 "예전에 정리함"','없앰: 지출의 기사 운임 · 기사에게 [줬어요] · 기사 한눈에 보기']},
   {v:'1.16.0',d:'10/30',items:['기사 운임은 지출에서: 등록 › 지출은 기사 운임이 기본 · 기사 · 화주 · 상차지 · 하차지 · 같은 운행이 있으면 저절로 연결(담당 기사 · 내 몫)','[받을 돈] 탭 이름을 [남은 돈]으로 · 안에서 [받을 돈 | 기사에게 줄 돈] 고르기 · 줄 돈에도 목록/달력 · 찾기 · 기간 · 순서','기사에게 [줬어요]: 언제 · 얼마 적기 (덜 주면 남은 줄 돈) · 장부 지출에서도','기사 한눈에 보기 · 화주 · 기사 창에 [이번 달 | 전체]','운행 등록의 [다른 기사에게 맡김]은 없앰 (예전 기록은 그대로 보임) · 목록/달력은 제목 옆 아이콘으로']},
   {v:'1.15.0',d:'10/30',items:['맡긴 일 정산: 등록에서 [다른 기사에게 맡김] · 내 몫 · 기사에게 줄 돈(자동, 고칠 수 있음)','화주 돈을 다 받으면 "기사에게 보내셨어요?" · 기사에게 보낸 날짜 · 금액 적기 · 달력 위 기사에게 줄 돈','기사별 보기 · 기사 계산서 받음 표시 · 기사 정산 복사 · 장부에 실제 번 돈, 기사 운임은 지출로','스샷 버튼: 누르면 지금 화면을 사진으로, 꾹 누르면 자리 옮기기','화주 한눈에 보기: 운행 기록 [더보기]']},
   {v:'1.14.1',d:'10/26',items:['여러 곳 들르는 운행: 들르는 곳 순서표에서 곳마다 상차 · 하차 완료 (하차는 상차를 다 끝낸 뒤)','목록에서 추가한 곳이 보이게: 서울 [+안산] → 부산 [+청주]','추가한 상차지 · 하차지에도 자주 간 곳 버튼과 전에 갔던 곳(주소 · 담당자)']},
@@ -2094,7 +2096,7 @@ $('f').addEventListener('submit',e=>{
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
   ls.set(draftKey(),''); if(formKind==='sub')formKind='trip'; resetForm(); goCal(); // 맡긴 일을 저장하면 다음 등록은 운행부터
-  toast(`${f.sub?`🤝 ${f.sub}에게 맡긴 일 `:''}${cities(f,'from')}→${cities(f,'to')} 저장했어요`,()=>removeTrip(t));
+  toast(`${f.sub?`${f.sub}에게 맡긴 일 `:''}${cities(f,'from')}→${cities(f,'to')} 저장했어요`,()=>removeTrip(t));
 });
 
 // ---------- 예전 기사 기록 옮기기 ----------
