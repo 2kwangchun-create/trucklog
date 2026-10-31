@@ -386,6 +386,11 @@ body.selecting .row .legs{display:none}
 .c-sub{color:var(--sub)}
 .seg.job button[data-job="sub"][aria-pressed="true"]{background:var(--sub);color:#fff}
 .jobhint{margin:-4px 2px 0;color:var(--sub)}
+.jobhint .linkbtn{border:0;background:none;color:var(--accent);font:inherit;font-weight:700;text-decoration:underline;padding:2px 0;cursor:pointer}
+.catgrid .subcat{grid-column:1/-1;border-color:var(--sub);color:var(--sub);background:var(--sub-soft)}
+.catgrid .subcat small{font-size:12px;font-weight:500;opacity:.85;margin-left:4px}
+/* 맡긴 일에선 상세주소 · 전에 갔던 곳(주소 채우기)은 안 씀 */
+#f.subjob .addrin,#f.subjob .places{display:none!important}
 #f.subjob .card{border-color:var(--sub-soft)}
 .origbox{display:flex;flex-direction:column;gap:8px}
 .cpast .cpsub{background:var(--sub-soft);color:var(--sub)}
@@ -989,8 +994,8 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <div class="seg kind" id="f-kind" role="group" aria-label="무엇을 적을까요"><button type="button" data-fkind="trip" aria-pressed="true">운행</button><button type="button" data-fkind="cost" aria-pressed="false">지출</button></div>
     <p class="notice draftnote" id="f-draft" hidden><span id="f-draftmsg"></span><button type="button" class="linkbtn" id="f-discard">지우고 새로 쓰기</button></p>
     <form class="form" id="f" novalidate>
-      <div class="seg kind job" id="f-job" role="group" aria-label="누가 뛴 일인가요"><button type="button" data-job="own" aria-pressed="true">내가 뛴 일</button><button type="button" data-job="sub" aria-pressed="false">🤝 맡긴 일</button></div>
-      <p class="hint small jobhint" id="f-jobhint" hidden>다른 기사에게 넘긴 일이에요. 기사 운임만큼 그 기사에게 받을 돈이 깎여요.</p>
+      <div class="seg kind job" id="f-job" hidden role="group" aria-label="누가 뛴 일인가요"><button type="button" data-job="own" aria-pressed="true">내가 뛴 일</button><button type="button" data-job="sub" aria-pressed="false">🤝 맡긴 일</button></div>
+      <p class="hint small jobhint" id="f-jobhint" hidden><b>지출 › 🤝 맡긴 일</b> · 다른 기사에게 넘긴 일이에요. 기사 운임만큼 그 기사에게 받을 돈이 깎여요. <button type="button" class="linkbtn" id="f-tocost">다른 지출 고르기</button></p>
       <div class="card field"><span class="flabel">어떤 콜로 받았나요?<small>(안 골라도 돼요)</small></span>
         <div class="srcgrid" id="f-src" role="group" aria-label="어떤 콜로 받았나요">
           <button type="button" data-src="원콜" aria-pressed="false"><span class="appic s1 logo"><img src="icons/call-one.webp" alt="" width="48" height="48"></span>원콜</button>
@@ -1037,6 +1042,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
       <div class="card field"><label for="cf-date">날짜 <em>*</em></label><input type="date" id="cf-date"></div>
       <div class="card field"><span class="flabel">항목 <em>*</em></span>
         <div class="catgrid" id="cf-cat" role="group" aria-label="지출 항목">
+          <button type="button" data-cat="맡긴일" class="subcat" aria-pressed="false">🤝 맡긴 일 <small>다른 기사에게 넘긴 일</small></button>
           <button type="button" data-cat="주유" aria-pressed="false">주유</button>
           <button type="button" data-cat="요소수" aria-pressed="false">요소수</button>
           <button type="button" data-cat="통행료" aria-pressed="false">통행료</button>

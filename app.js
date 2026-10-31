@@ -621,7 +621,7 @@ function renderLedger(){
   $('l-costsum').textContent=won(csum+subOut);
   $('l-csvtxt').textContent=span+' 장부 엑셀로 보내기';
   const byCat={};mc.forEach(c=>byCat[catName(c)]=(byCat[catName(c)]||0)+c.amount);
-  if(subOut)byCat['기사 운임']=(byCat['기사 운임']||0)+subOut;
+  if(subOut)byCat['맡긴 일']=(byCat['맡긴 일']||0)+subOut;
   $('l-catsum').innerHTML=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b class="num">${short(v)}</b></span>`).join('');
   // 지출 목록: 적은 지출 + 기사 운임(맡긴 건), 날짜 최근 순
   const cshown=[...mc.map(c=>({d:c.date,k:c.createdAt||0,h:costRowHtml(c)})),...subL.map(t=>({d:t.date,k:t.createdAt||0,h:subCostRowHtml(t)}))].sort((a,b)=>b.d.localeCompare(a.d)||b.k-a.k);
@@ -737,8 +737,8 @@ $('ledsheet').addEventListener('click',e=>{
 let costOpen=null, costDel=null;
 // 기사 운임 (맡긴 건): 누르면 운행 목록에서 그 건을 펼쳐 보여줌 · 고치기는 운행에서
 const subCostRowHtml=t=>`<div class="row crow subc"><div class="chead" data-do="subcost" data-id="${t.id}" role="button" tabindex="0">`
-  +`<span class="cat">기사 운임</span><span class="cmemo">${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
-  +`<span class="cdate num">${md(t.date)} · 맡긴 일${t.settled?' · 예전에 정리함':''}</span></div></div>`;
+  +`<span class="cat">맡긴 일</span><span class="cmemo">🤝 ${esc(t.sub)} · ${esc(cities(t,'from'))} → ${esc(cities(t,'to'))}</span><b class="num camt">${comma(t.subPay)}</b>`
+  +`<span class="cdate num">${md(t.date)} · 기사 운임${t.settled?' · 예전에 정리함':''}</span></div></div>`;
 const catName=c=>c.cat==='기사'?'기사 운임':(c.cat||'기타');
 function costRowHtml(c){
   const open=costOpen===c.id;
@@ -954,7 +954,7 @@ function ledgerXlsx(list,costList,label){
   const tripTotal=[S('합계',5),S('',5),S('',5),S(L.length+'건',5),S('',5),S('',5),S('',5),S('',5),S('',5),S('',5),S(sum,6),S(fees,6),S('',5),S('',5),S(got,6),S(due,6)];
   const trip=XL.sheet([tripHead,...tripRows,...(L.length?[tripTotal]:[])],{widths:[12,12,10,14,15,15,11,26,11,26,12,11,13,12,13,13,12,16,15,28,12,15,15,15,15,17,17,11,11,15,12,12],filterRows:L.length+1});
   // 지출 시트: 적은 지출 + 기사 운임(맡긴 건)
-  const SC=L.filter(t=>t.sub), CR=[...C.map(c=>({d:c.date,r:[day(c.date),catName(c),money(c.amount),c.cat==='기사'?[c.client,[c.from,c.to].filter(Boolean).join('→'),c.memo].filter(Boolean).join(' · '):c.memo]})),...SC.map(t=>({d:t.date,r:[day(t.date),'기사 운임',money(t.subPay),`${t.sub} · ${cities(t,'from')}→${cities(t,'to')} · ${t.settled?'예전에 정리함':'맡긴 일'}`]}))].sort((a,b)=>a.d.localeCompare(b.d));
+  const SC=L.filter(t=>t.sub), CR=[...C.map(c=>({d:c.date,r:[day(c.date),catName(c),money(c.amount),c.cat==='기사'?[c.client,[c.from,c.to].filter(Boolean).join('→'),c.memo].filter(Boolean).join(' · '):c.memo]})),...SC.map(t=>({d:t.date,r:[day(t.date),'맡긴 일',money(t.subPay),`${t.sub} · ${cities(t,'from')}→${cities(t,'to')} · ${t.settled?'예전에 정리함':'맡긴 일'}`]}))].sort((a,b)=>a.d.localeCompare(b.d));
   const csAll=cs+SC.reduce((s,t)=>s+t.subPay,0);
   const cost=XL.sheet([['날짜','항목','금액','메모'],...CR.map(x=>x.r),...(CR.length?[[S('합계',5),S(CR.length+'건',5),S(csAll,6),S('',5)]]:[])],{widths:[12,12,13,40],filterRows:CR.length+1});
   // 요약: 큰 숫자 · 화주별 · 지출 항목별
@@ -963,7 +963,7 @@ function ledgerXlsx(list,costList,label){
   const paidFee=L.filter(t=>t.paid).reduce((s,t)=>s+(t.fee||0),0);
   const byC={};L.forEach(t=>{const k=t.client||'화주 미입력',o=byC[k]||(byC[k]={n:0,a:0,g:0,d:0});o.n++;o.a+=t.amount;o.g+=recv(t);o.d+=left(t)});
   const byK={};C.forEach(c=>byK[catName(c)]=(byK[catName(c)]||0)+c.amount);
-  if(subOut)byK['기사 운임']=(byK['기사 운임']||0)+subOut; // 맡긴 건의 기사 운임도 지출
+  if(subOut)byK['맡긴 일']=(byK['맡긴 일']||0)+subOut; // 맡긴 건의 기사 운임도 지출
   const sumRows=[[S('아빠장부 정산 요약',8)],[S('기간',5),label],[S('만든 날',5),todayIso],[],
     [S('항목',1),S('금액',1)],['운행 건수',S(L.length,0)],['총 운임',money(sum)],['받은 돈',money(got)],['못 받은 돈',money(due)],['수수료',money(fees)],[subOut?'지출 (기사 운임 포함)':'지출',money(cs+subOut)],['계산서 발행 운임 (공급가액)',money(taxSum)],['부가세 (10%)',money(Math.round(taxSum*0.1))],['계산서 미발행 운임',money(sum-taxSum)],
     ...(subOut?[['실제 번 돈 (맡긴 건은 내 몫만)',money(sum-subOut)]]:[]),
@@ -1599,7 +1599,8 @@ document.addEventListener('click',e=>{
   const kd=e.target.closest('[data-fkind]');
   if(kd){setKind(kd.dataset.fkind);return}
   const ct=e.target.closest('[data-cat]');
-  if(ct){setCat(ct.dataset.cat);return}
+  if(ct){if(ct.dataset.cat==='맡긴일'){setKind('sub');window.scrollTo(0,0);return}setCat(ct.dataset.cat);return}
+  if(e.target.closest('#f-tocost')){setKind('cost');window.scrollTo(0,0);return}
   const ca=e.target.closest('[data-cadd]');
   if(ca){const a=Number(ca.dataset.cadd),cur=Number(($('cf-amt').value||'0').replace(/\D/g,''));$('cf-amt').value=a?comma(cur+a):'';return}
   const uv=e.target.closest('[data-uview]');
@@ -1825,17 +1826,19 @@ function setPt(v){formPt=v;document.querySelectorAll('#f-pt [data-pt]').forEach(
 // 등록 화면 위쪽: [운행 기록 | 지출 기록] 고르기, 제목·취소 버튼은 지금 하는 일에 맞춤
 let formKind='trip', costEditId=null, costCat='';
 function setMode(){
-  const cost=formKind==='cost', ed=cost?costEditId!==null:editingId!==null;
-  $('f-title').textContent=(cost?'지출 ':'운행 ')+(ed?'수정':'등록');
+  const cost=formKind==='cost', sub=formKind==='sub', ed=cost?costEditId!==null:editingId!==null;
+  $('f-title').textContent=(cost?'지출 ':sub?'맡긴 일 ':'운행 ')+(ed?'수정':'등록');
   $('f-submit').textContent=editingId!==null?'수정 저장':'저장';
   $('cf-submit').textContent=costEditId!==null?'수정 저장':'지출 저장';
   $('f-cancel').hidden=!ed;
   $('f-kind').hidden=editingId!==null||costEditId!==null;
   $('f').hidden=cost; $('cf').hidden=!cost;
   if(cost)$('f-draft').hidden=true;
-  document.querySelectorAll('#f-kind [data-fkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fkind===formKind));
+  document.querySelectorAll('#f-kind [data-fkind]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fkind===(sub?'cost':formKind)));
 }
-function setKind(k){formKind=k;setMode();if(k==='cost')renderCostRecent();else loadDraftNew()}
+// 운행 · 지출 · 지출 › 맡긴 일: 운행과 맡긴 일은 같은 양식(칸 제목만 다름) · 적던 것은 따로 보관(draftNew · draftSub)
+function setKind(k){const was=formKind;formKind=k;setMode();if(k==='cost')renderCostRecent();else{if((was==='sub')!==(k==='sub'))resetForm();loadDraftNew()}}
+const draftKey=()=>formKind==='sub'?'draftSub':'draftNew';
 
 // ---------- 지출 기록 ----------
 function setCat(c){costCat=c;document.querySelectorAll('#cf-cat [data-cat]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===c))}
@@ -1879,7 +1882,7 @@ $('cf').addEventListener('submit',e=>{
 // ---------- 업데이트 내용 (설정 맨 아래) ----------
 // 새 버전을 올릴 때 맨 위에 한 줄씩 추가 (v는 sw.js VERSION과 같게)
 const CHANGES=[
-  {v:'1.17.0',d:'10/31',items:['사람별 남은 돈: 등록 맨 위 [내가 뛴 일 | 🤝 맡긴 일] · 맡긴 일은 그 기사에게 받을 돈에서 오래된 것부터 깎여요','화주 · 기사 이름을 누르면 그 사람 장부: 맨 위에 받을 돈 / 줄 돈 숫자 하나, 내가 뛴 일과 맡긴 일을 날짜순으로','남은 돈에 [받을 돈 | 🤝 기사] 창 · 받을 돈 아래 "줄 돈" 묶음','예전 기사 기록(지출의 기사 운임 · 예전 맡긴 운행)은 새 방식으로 옮김 · 이미 준 것은 "예전에 정리함"','없앰: 지출의 기사 운임 · 기사에게 [줬어요] · 기사 한눈에 보기']},
+  {v:'1.17.0',d:'10/31',items:['사람별 남은 돈: 등록 › 지출 › [🤝 맡긴 일]로 적으면 그 기사에게 받을 돈에서 오래된 것부터 깎여요 (상세주소는 안 적어도 돼요)','화주 · 기사 이름을 누르면 그 사람 장부: 맨 위에 받을 돈 / 줄 돈 숫자 하나, 내가 뛴 일과 맡긴 일을 날짜순으로','남은 돈에 [받을 돈 | 🤝 기사] 창 · 받을 돈 아래 "줄 돈" 묶음','예전 기사 기록(지출의 기사 운임 · 예전 맡긴 운행)은 새 방식으로 옮김 · 이미 준 것은 "예전에 정리함"','없앰: 지출의 기사 운임 · 기사에게 [줬어요] · 기사 한눈에 보기']},
   {v:'1.16.0',d:'10/30',items:['기사 운임은 지출에서: 등록 › 지출은 기사 운임이 기본 · 기사 · 화주 · 상차지 · 하차지 · 같은 운행이 있으면 저절로 연결(담당 기사 · 내 몫)','[받을 돈] 탭 이름을 [남은 돈]으로 · 안에서 [받을 돈 | 기사에게 줄 돈] 고르기 · 줄 돈에도 목록/달력 · 찾기 · 기간 · 순서','기사에게 [줬어요]: 언제 · 얼마 적기 (덜 주면 남은 줄 돈) · 장부 지출에서도','기사 한눈에 보기 · 화주 · 기사 창에 [이번 달 | 전체]','운행 등록의 [다른 기사에게 맡김]은 없앰 (예전 기록은 그대로 보임) · 목록/달력은 제목 옆 아이콘으로']},
   {v:'1.15.0',d:'10/30',items:['맡긴 일 정산: 등록에서 [다른 기사에게 맡김] · 내 몫 · 기사에게 줄 돈(자동, 고칠 수 있음)','화주 돈을 다 받으면 "기사에게 보내셨어요?" · 기사에게 보낸 날짜 · 금액 적기 · 달력 위 기사에게 줄 돈','기사별 보기 · 기사 계산서 받음 표시 · 기사 정산 복사 · 장부에 실제 번 돈, 기사 운임은 지출로','스샷 버튼: 누르면 지금 화면을 사진으로, 꾹 누르면 자리 옮기기','화주 한눈에 보기: 운행 기록 [더보기]']},
   {v:'1.14.1',d:'10/26',items:['여러 곳 들르는 운행: 들르는 곳 순서표에서 곳마다 상차 · 하차 완료 (하차는 상차를 다 끝낸 뒤)','목록에서 추가한 곳이 보이게: 서울 [+안산] → 부산 [+청주]','추가한 상차지 · 하차지에도 자주 간 곳 버튼과 전에 갔던 곳(주소 · 담당자)']},
@@ -1917,7 +1920,7 @@ function setTextSize(z){
 setTextSize(ls.get('textSize')||'');
 setSrcMark(srcMark);
 setLate(lateDays);
-function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;$('f-orig').open=false;setJob('own');setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function resetForm(keepDraft){if(editingId!==null&&!keepDraft)ls.set('draftEdit','');editingId=null;$('f').reset();$('f-date').value=todayIso;$('f-err').textContent='';setPt('인수증');setSrc('');$('f-more').open=false;$('f-todmore').open=false;$('f-orig').open=false;setJob(formKind==='sub'?'sub':'own');setMode(false);showDraftNote('');renderStops([]);paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 // 하차일 [같은 날 · 다음 날 · 모레] 중 지금 값에 맞는 버튼 표시 (비어 있으면 같은 날)
 // 하차일은 [+ 하차일]을 눌러야 펼쳐짐 · 날짜가 있으면(수정 · 또 등록 · 적던 것) 펼쳐서 보여줌
 function paintTod(){const d=$('f-date').value,v=$('f-todate').value,n=v&&d?Math.round((parseD(v)-parseD(d))/86400000):0;
@@ -1936,12 +1939,12 @@ function formSnap(){const v={};F_IDS.forEach(id=>v[id]=$(id).value);return {v,jo
 function saveDraft(){
   if(view!=='add'||formKind==='cost')return;
   if(editingId!==null){ls.set('draftEdit',JSON.stringify({id:editingId,back:backView,orig:editOrig,...formSnap()}));return}
-  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&s.job!=='sub'&&!readStops().length&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
-  ls.set('draftNew',blank?'':JSON.stringify(s));
+  const s=formSnap(), blank=F_IDS.every(id=>id==='f-date'||!s.v[id].trim())&&!readStops().length&&s.pt==='인수증'&&!s.paid&&!s.tax&&!s.src;
+  ls.set(draftKey(),blank?'':JSON.stringify(s));
 }
-function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setJob(s.job||'own');if($('f-oclient').value||$('f-oamt').value)$('f-orig').open=true;renderStops(s.stops||[]);setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
+function fillSnap(s){F_IDS.forEach(id=>{if(typeof s.v[id]==='string')$(id).value=s.v[id]});setJob(formKind==='sub'?'sub':'own');if($('f-oclient').value||$('f-oamt').value)$('f-orig').open=true;renderStops(s.stops||[]);setPt(s.pt||'인수증');setSrc(s.src||'');$('f-paidnow').checked=!!s.paid;$('f-taxnow').checked=!!s.tax;$('f-more').open=!!s.more;syncMore();paintTod();renderPlaces('from');renderPlaces('to');renderCPast()}
 function showDraftNote(msg,canDiscard){$('f-draftmsg').textContent=msg;$('f-discard').hidden=!canDiscard;$('f-draft').hidden=!msg||formKind==='cost'}
-function loadDraftNew(){const s=readDraft('draftNew');if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
+function loadDraftNew(){const s=readDraft(draftKey());if(s&&s.v){fillSnap(s);showDraftNote('적던 내용을 불러왔어요.',true)}}
 // 고친 게 있는지 비교할 때 쓰는 값 (더보기 펼침 여부는 빼고)
 const snapKey=s=>JSON.stringify([s.v,s.job||'own',s.pt,s.paid,!!s.tax,s.src||'',(s.stops||[]).filter(x=>x.c||x.a||x.n||x.p)]);
 let editOrig='';
@@ -1980,11 +1983,11 @@ $('f').addEventListener('input',saveDraft);
 $('f').addEventListener('change',saveDraft);
 $('f').addEventListener('click',()=>setTimeout(saveDraft,0)); // 최근 지역·금액 버튼 등 글자 입력 없이 바뀌는 것
 $('f-more').addEventListener('toggle',saveDraft);
-$('f-discard').onclick=()=>{resetForm();ls.set('draftNew','');$('f-date').focus()};
+$('f-discard').onclick=()=>{resetForm();ls.set(draftKey(),'');$('f-date').focus()};
 function startEdit(t){
   if(!t)return;
   backView=view==='add'?'ledger':view;
-  formKind='trip'; resetForm(); editingId=t.id; setMode();
+  formKind=t.sub?'sub':'trip'; resetForm(); editingId=t.id; setMode();
   fillTrip(t);
   $('f-paidnow').checked=!t.sub&&!!t.paid; $('f-taxnow').checked=t.sub?!!t.subTax:!!t.tax;
   syncMore();
@@ -2035,7 +2038,7 @@ function againTrip(t){
 }
 $('f-cancel').onclick=()=>{
   if(costEditId!==null){const id=costEditId;resetCost();view=backView;costOpen=id;popOverlay('cedit');render();window.scrollTo(0,0);return}
-  const id=editingId;resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
+  const id=editingId;if(formKind==='sub')formKind='trip';resetForm();view=backView;openId=id;popOverlay('edit');render();window.scrollTo(0,0)};
 $('f').addEventListener('submit',e=>{
   e.preventDefault();
   const f=readForm(), miss=formMissing(f), date=f.date;
@@ -2052,6 +2055,7 @@ $('f').addEventListener('submit',e=>{
     const id=t.id; resetForm();
     if(backView==='cal'){const d=parseD(date);calY=d.getFullYear();calM=d.getMonth();calSel=date}
     if(backView==='ledger'&&!(ledRange&&inRange({date},ledRange))){const d=parseD(date);ledY=d.getFullYear();ledM=d.getMonth();ledRange=null}
+    if(formKind==='sub'){formKind='trip';resetForm()}
     view=backView; openId=id; popOverlay('edit'); render(); window.scrollTo(0,0);
     toast('수정했어요',()=>{Object.assign(t,before);saveTrip(t)});
     return;
@@ -2059,7 +2063,7 @@ $('f').addEventListener('submit',e=>{
   const t={id:newId(),createdAt:Date.now(),updatedAt:0,deleted:false,...f,paid:formJob!=='sub'&&$('f-paidnow').checked?date:null,tax:formJob!=='sub'&&$('f-taxnow').checked?todayIso:'',subTax:formJob==='sub'&&$('f-taxnow').checked?todayIso:''};
   saveTrip(t);
   calY=parseD(date).getFullYear();calM=parseD(date).getMonth();calSel=date;calFilter='all';
-  resetForm(); ls.set('draftNew',''); goCal();
+  ls.set(draftKey(),''); if(formKind==='sub')formKind='trip'; resetForm(); goCal(); // 맡긴 일을 저장하면 다음 등록은 운행부터
   toast(`${f.sub?`🤝 ${f.sub}에게 맡긴 일 `:''}${cities(f,'from')}→${cities(f,'to')} 저장했어요`,()=>removeTrip(t));
 });
 
