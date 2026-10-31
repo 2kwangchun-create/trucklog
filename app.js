@@ -1833,6 +1833,9 @@ function setJob(j){formJob=j==='sub'?'sub':'own';const sub=formJob==='sub';
   $('f-amtlbl').textContent=sub?'기사 운임':'운임'; $('f-amt').placeholder=sub?'예: 270,000':'예: 450,000';
   $('f-paidlbl').hidden=sub; $('f-taxlbl').textContent=sub?'계산서 받음 (기사가 끊어 준 계산서)':'전자 계산서 발행했어요';
   $('f-more').hidden=sub; $('f-orig').hidden=!sub;
+  // 맡긴 일: 상차 · 하차 담당자 이름 · 전화, 인수증 · 선착불 · 착불은 안 씀 · 메모는 안 적어도 됨
+  $('f-fromname').parentElement.hidden=sub; $('f-toname').parentElement.hidden=sub; $('f-pt').hidden=sub;
+  const mo=document.querySelector('label[for="f-memo"] em'); if(mo)mo.hidden=sub;
   if(sub)$('r-oclient').innerHTML=topVals('client').map(v=>`<button type="button" data-fill="f-oclient" data-v="${esc(v)}">${esc(v)}</button>`).join('');
   renderCPast()}
 const readForm0=()=>({src:srcValue(),date:$('f-date').value,toDate:$('f-todate').value,from:$('f-from').value.trim(),to:$('f-to').value.trim(),
@@ -1846,7 +1849,7 @@ const readForm=()=>{const f=readForm0();
   const g={...f,sub:f.client,subPhone:f.clientPhone,subPay:f.amount,client:$('f-oclient').value.trim(),amount:Number($('f-oamt').value.replace(/\D/g,''))||0,fee:0};
   delete g.clientPhone; delete g.clientName; return g};
 function formMissing(f){if(readStops().some(x=>!x.c))return ['추가한 곳의 시·군'];
-  if(formJob==='sub')return [!f.date&&'상차일',!f.sub&&'기사',!f.from&&'상차지',!f.to&&'하차지',!f.subPay&&'기사 운임',!f.memo&&'메모'].filter(Boolean);
+  if(formJob==='sub')return [!f.date&&'상차일',!f.sub&&'기사',!f.from&&'상차지',!f.to&&'하차지',!f.subPay&&'기사 운임'].filter(Boolean);
   return [!f.date&&'상차일',!f.from&&'상차지',!f.to&&'하차지',!f.amount&&'운임',!f.memo&&'메모'].filter(Boolean)}
 ['f-amt','f-fee','f-oamt'].forEach(id=>$(id).addEventListener('input',e=>{const n=e.target.value.replace(/\D/g,'').slice(0,12);e.target.value=n?comma(Number(n)):''}));
 function setPt(v){formPt=v;document.querySelectorAll('#f-pt [data-pt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pt===v))}
