@@ -411,7 +411,32 @@ function initScope(id,inputId,key,onChange){
 }
 let uRange=null, uPanel=false; // 받을 돈 기간 (null=전체) · uPanel은 예전 기간 패널용(지금은 늘 false)
 const rangeTxt=r=>r.start===r.end?md(r.start):`${md(r.start)} ~ ${md(r.end)}`;
+// 남은 돈 [받을 돈 | 기사] (이 휴대폰에 기억) · 기사: 맡긴 일이 한 번이라도 있는 사람마다 남은 돈 하나
+let uMode=ls.get('uMode')==='drv'?'drv':'recv';
+function drvPeople(){const m=new Map();
+  trips.forEach(t=>{if(!t.sub)return;const k=pkey(t.sub);const o=m.get(k)||{name:k,subs:0,own:0,last:''};o.subs++;if(t.date>o.last)o.last=t.date;m.set(k,o)});
+  m.forEach(o=>{trips.forEach(t=>{if(pkey(t.client)===o.name&&t.amount>0){o.own++;if(t.date>o.last)o.last=t.date}});o.bal=personBal(o.name)});
+  return [...m.values()]}
+function renderDrivers(){
+  const q=sNorm($('u-search').value), all=drvPeople(), L=all.filter(o=>!q||sNorm(o.name).includes(q))
+    .sort((a,b)=>(a.bal<0)!==(b.bal<0)?(a.bal<0?-1:1):Math.abs(b.bal)-Math.abs(a.bal)||b.last.localeCompare(a.last));
+  const give=all.filter(o=>o.bal<0).reduce((a,o)=>a-o.bal,0), get=all.filter(o=>o.bal>0).reduce((a,o)=>a+o.bal,0);
+  $('u-label').textContent='기사 · 맡긴 일이 있는 사람'; $('u-total').textContent=give?`줄 돈 ${won(give)}`:`${all.length}명`;
+  $('u-sub').textContent=all.length?`${all.length}명 · 받을 돈 ${won(get)} · 줄 돈 ${won(give)}`:'아직 맡긴 일이 없어요';
+  $('u-list').innerHTML=L.length?L.map(o=>{const c=o.bal<0?'c-sub':o.bal>0?'c-due':'c-paid';
+    return `<button type="button" class="drvrow${o.bal<0?' owe':''}" data-do="client" data-c="${esc(o.name)}"><b>🤝 ${esc(o.name)}</b><span class="bal num ${c}">${o.bal?won(Math.abs(o.bal)):'0원'}<small>${o.bal<0?'줄 돈':o.bal>0?'받을 돈':'다 정리됨'}</small></span><small>맡긴 일 ${o.subs}건 · 내가 뛴 일 ${o.own}건 · 마지막 ${md(o.last)}</small></button>`}).join('')
+    :`<div class="empty">${q?'찾는 기사가 없어요.':'아직 맡긴 일이 없어요. 등록에서 [🤝 맡긴 일]로 적으면 여기에 떠요.'}</div>`;
+}
 function renderUnpaid(){
+  const drv=uMode==='drv';
+  document.querySelectorAll('#u-mode [data-umode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.umode===uMode));
+  $('u-drvcnt').textContent=(n=>n?n+'명':'')(new Set(trips.filter(t=>t.sub).map(t=>pkey(t.sub))).size);
+  $('v-unpaid').classList.toggle('drvmode',drv);
+  ['u-view','u-age','u-sortrow','u-rangebtn','u-calbox','u-shint'].forEach(id=>{if(drv)$(id).hidden=true});
+  $('u-scope').hidden=drv; $('u-searchbox').hidden=false;
+  if(drv){$('u-search').placeholder='기사 이름으로 찾기';renderDrivers();return}
+  $('u-view').hidden=false;
+  if($('u-search').placeholder==='기사 이름으로 찾기')$('u-search').placeholder=SPH[scopeOf('u-scope')]||SPH.auto;
   document.querySelectorAll('#u-view [data-uview]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.uview===uView));
   const calMode=uView==='cal';
   // 달력으로 볼 땐 달력이 고르는 도구라 찾기 · 기간 · 미수 기간 · 순서는 숨김
@@ -1310,7 +1335,7 @@ $('clsheet').addEventListener('click',e=>{
   if(e.target.closest('#cl-more')){clShow+=10;$('cl-list').innerHTML=clListHtml();return}
   const sp=e.target.closest('[data-sp]'); if(sp){setSheetPer(sp.dataset.sp);clShow=5;renderClient();return}
   if(e.target.closest('#cl-due')){ // 받을 돈 목록에서 이 화주만
-    closeClient(); setTimeout(()=>{uView='list';uRange=sheetPer==='month'?{start:perMonth()+'-01',end:iso(new Date(+perMonth().slice(0,4),+perMonth().slice(5,7),0))}:null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
+    closeClient(); setTimeout(()=>{uMode='recv';uView='list';uRange=sheetPer==='month'?{start:perMonth()+'-01',end:iso(new Date(+perMonth().slice(0,4),+perMonth().slice(5,7),0))}:null;uAge=null;$('u-scope').value='client';$('u-search').value=clName;$('u-search').placeholder=SPH.client;navTab('unpaid');window.scrollTo(0,0)},60);
   }
 });
 
@@ -1569,6 +1594,7 @@ document.addEventListener('click',e=>{
   if(smb){openSms(store.get(smb.dataset.id));return}
   const ced=e.target.closest('[data-do="cedit"]');
   if(ced){startCostEdit(store.get(ced.dataset.id));return}
+  const um=e.target.closest('[data-umode]'); if(um){uMode=um.dataset.umode;ls.set('uMode',uMode);openId=payingId=null;$('u-search').value='';renderUnpaid();window.scrollTo(0,0);return}
   const jb=e.target.closest('[data-job]'); if(jb){setJob(jb.dataset.job);saveDraft();return}
   const kd=e.target.closest('[data-fkind]');
   if(kd){setKind(kd.dataset.fkind);return}

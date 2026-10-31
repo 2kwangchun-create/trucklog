@@ -149,9 +149,16 @@ html[data-text="l"] .titlebtn.long{font-size:17px}.todaybtn{padding:0 10px}
 .vsw button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .sortsw.umode{padding:4px}
 .sortsw.umode button{flex:1;font-size:15px;padding:9px 8px}
-.sortsw.umode button[data-umode="give"][aria-pressed="true"]{background:var(--sub);color:#fff}
-.sortsw.umode #u-givecnt{font-size:12px;font-weight:700;opacity:.85}
-#v-unpaid.givemode .hero{background:var(--sub);color:#fff}
+.sortsw.umode button[data-umode="drv"][aria-pressed="true"]{background:var(--sub);color:#fff}
+.sortsw.umode #u-drvcnt{font-size:12px;font-weight:700;opacity:.85}
+/* 남은 돈 › 기사: 사람마다 남은 돈 하나 */
+.drvrow{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:12px 14px;margin-top:8px;font:inherit;color:var(--fg);cursor:pointer}
+.drvrow b{font-size:17px}
+.drvrow .bal{font-size:17px;font-weight:800;white-space:nowrap}
+.drvrow .bal small{display:block;font-size:12px;font-weight:600;text-align:right;opacity:.8}
+.drvrow>small{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.drvrow.owe{border-color:var(--sub);background:var(--sub-soft)}
+#v-unpaid.drvmode .hero{background:var(--sub);color:#fff}
 .udrv .udsec{font-size:13px;font-weight:700;color:var(--muted);margin-top:6px}
 .udrv .udi .done{font-size:13px;color:var(--paid);font-weight:700;white-space:nowrap}
 .udrv{border:1px solid var(--sub);background:var(--sub-soft);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
@@ -895,6 +902,7 @@ body.gated nav.tabs,body.gated .toast,body.gated .askbar{visibility:hidden}
     <header class="top"><h1>남은 돈</h1>
       <div class="hbtns"><div class="vsw" id="u-view" role="group" aria-label="보는 방법"><button type="button" data-uview="list" aria-pressed="true" aria-label="목록으로 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button><button type="button" data-uview="cal" aria-pressed="false" aria-label="달력으로 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></button></div>
       <button type="button" class="rangebtn" id="u-rangebtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="u-rangetxt">기간: 전체</span></button></div></header>
+    <div class="sortsw umode" id="u-mode" role="group" aria-label="받을 돈 · 기사"><button type="button" data-umode="recv" aria-pressed="true">받을 돈</button><button type="button" data-umode="drv" aria-pressed="false">🤝 기사 <span class="num" id="u-drvcnt"></span></button></div>
     <div class="hero">
       <div class="label" id="u-label">아직 못 받은 돈</div>
       <div class="big num" id="u-total">0원</div>
